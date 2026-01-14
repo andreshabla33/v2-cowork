@@ -692,10 +692,15 @@ export const VirtualSpace: React.FC = () => {
           if (!this.playerContainer || !this.playerContainer.body) return;
           const body = this.playerContainer.body as Phaser.Physics.Arcade.Body;
           let vx = 0; let vy = 0; let animDir = '';
-          if (this.cursors.left.isDown || this.wasd.A.isDown) { vx = -MOVE_SPEED; animDir = 'left'; }
-          else if (this.cursors.right.isDown || this.wasd.D.isDown) { vx = MOVE_SPEED; animDir = 'right'; }
-          if (this.cursors.up.isDown || this.wasd.W.isDown) { vy = -MOVE_SPEED; animDir = 'up'; }
-          else if (this.cursors.down.isDown || this.wasd.S.isDown) { vy = MOVE_SPEED; animDir = 'down'; }
+          
+          // Ignorar WASD si el usuario está escribiendo en un input
+          const activeEl = document.activeElement;
+          const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable);
+          
+          if (this.cursors.left.isDown || (!isTyping && this.wasd.A.isDown)) { vx = -MOVE_SPEED; animDir = 'left'; }
+          else if (this.cursors.right.isDown || (!isTyping && this.wasd.D.isDown)) { vx = MOVE_SPEED; animDir = 'right'; }
+          if (this.cursors.up.isDown || (!isTyping && this.wasd.W.isDown)) { vy = -MOVE_SPEED; animDir = 'up'; }
+          else if (this.cursors.down.isDown || (!isTyping && this.wasd.S.isDown)) { vy = MOVE_SPEED; animDir = 'down'; }
           body.setVelocity(vx, vy);
           if (vx !== 0 || vy !== 0) {
             const key = `player-tex-${animDir || (vy < 0 ? 'up' : 'down')}`;
