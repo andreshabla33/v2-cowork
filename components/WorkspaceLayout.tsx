@@ -54,7 +54,7 @@ export const WorkspaceLayout: React.FC = () => {
                 isCameraOn: presence.isCameraOn || false,
                 isScreenSharing: false,
                 isPrivate: false,
-                status: PresenceStatus.AVAILABLE,
+                status: presence.status || PresenceStatus.AVAILABLE,
               });
             }
           });
@@ -78,6 +78,7 @@ export const WorkspaceLayout: React.FC = () => {
             direction: currentUser.direction,
             isMicOn: currentUser.isMicOn,
             isCameraOn: currentUser.isCameraOn,
+            status: currentUser.status,
           });
         }
       });
@@ -103,9 +104,10 @@ export const WorkspaceLayout: React.FC = () => {
         direction: currentUser.direction,
         isMicOn: currentUser.isMicOn,
         isCameraOn: currentUser.isCameraOn,
+        status: currentUser.status,
       });
     }
-  }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, session?.user?.id]);
+  }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, currentUser.status, session?.user?.id]);
 
   if (!activeWorkspace) return null;
 
