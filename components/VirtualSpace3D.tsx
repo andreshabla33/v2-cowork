@@ -13,6 +13,45 @@ import { Avatar3DGLTF, ProceduralChibiAvatar } from './Avatar3DGLTF';
 const MOVE_SPEED = 5;
 const WORLD_SIZE = 50;
 
+// --- Minimap Component ---
+const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = ({ currentUser, users, workspace }) => {
+  if (!workspace) return null;
+  const size = 140;
+  const mapWidth = workspace.width || 2000;
+  const mapHeight = workspace.height || 2000;
+  const scaleX = size / mapWidth;
+  const scaleY = size / mapHeight;
+
+  return (
+    <div className="absolute bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden pointer-events-none shadow-2xl z-20">
+      <div className="absolute inset-0 opacity-10">
+        <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle, #6366f1 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
+      </div>
+      <div className="relative w-full h-full">
+        <div 
+          className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,1)] z-10"
+          style={{ 
+            left: `${currentUser.x * scaleX}px`, 
+            top: `${currentUser.y * scaleY}px`,
+            transform: 'translate(-50%, -50%)'
+          }}
+        />
+        {users.map(u => (
+          <div 
+            key={u.id}
+            className="absolute w-1.5 h-1.5 bg-white/50 rounded-full"
+            style={{ 
+              left: `${u.x * scaleX}px`, 
+              top: `${u.y * scaleY}px`,
+              transform: 'translate(-50%, -50%)'
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
 // Colores por tema
 const themeColors = {
   dark: '#1a1d21',
@@ -475,9 +514,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
   return (
     <div className="w-full h-full relative">
-      <Canvas shadows>
+      <Canvas shadows camera={{ position: [25, 30, 25], fov: 50 }}>
         <Suspense fallback={null}>
-          <Physics gravity={[0, 0, 0]}>
+          <Physics gravity={[0, 0, 0]} debug={false}>
             <Scene3D
               currentUser={currentUser}
               onlineUsers={onlineUsers}
@@ -490,6 +529,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           </Physics>
         </Suspense>
       </Canvas>
+      
+      {/* Minimapa */}
+      <Minimap currentUser={currentUser} users={onlineUsers} workspace={activeWorkspace} />
       
       {/* Indicador de zona actual */}
       {currentZone && (
