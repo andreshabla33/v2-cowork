@@ -787,6 +787,42 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     });
   }, [usersInCall, hasActiveCall, initiateCall, session?.user?.id]);
 
+  // Agregar screen share a conexiones existentes cuando se inicia
+  useEffect(() => {
+    if (!screenStream || !hasActiveCall) return;
+    
+    console.log('Adding screen share to existing peer connections');
+    
+    peerConnectionsRef.current.forEach(async (pc, peerId) => {
+      // Verificar si ya tiene el track de screen
+      const senders = pc.getSenders();
+      const hasScreenTrack = senders.some(s => s.track?.label?.toLowerCase().includes('screen') || s.track?.label?.toLowerCase().includes('display'));
+      
+      if (!hasScreenTrack && screenStream) {
+        // Agregar tracks de screen share
+        screenStream.getTracks().forEach(track => {
+          console.log('Adding screen track to peer:', peerId, track.label);
+          pc.addTrack(track, screenStream);
+        });
+        
+        // Renegociar la conexión
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (webrtcChannelRef.current) {
+            webrtcChannelRef.current.send({
+              type: 'broadcast',
+              event: 'offer',
+              payload: { offer, to: peerId, from: session?.user?.id }
+            });
+          }
+        } catch (err) {
+          console.error('Error renegotiating after adding screen share:', err);
+        }
+      }
+    });
+  }, [screenStream, hasActiveCall, session?.user?.id]);
+
   // Manejar stream de video
   useEffect(() => {
     const manageStream = async () => {
