@@ -116,11 +116,11 @@ interface PlayerProps {
 }
 
 const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
-  const positionRef = useRef(new THREE.Vector3(
-    (currentUser.x || 400) / 16,
-    0,
-    (currentUser.y || 400) / 16
-  ));
+  const groupRef = useRef<THREE.Group>(null);
+  const positionRef = useRef({
+    x: (currentUser.x || 400) / 16,
+    z: (currentUser.y || 400) / 16
+  });
   const [isMoving, setIsMoving] = useState(false);
   const [direction, setDirection] = useState('front');
   const keysPressed = useRef<Set<string>>(new Set());
@@ -174,6 +174,12 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
       positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z + dz));
     }
 
+    // Mover el grupo del avatar directamente
+    if (groupRef.current) {
+      groupRef.current.position.x = positionRef.current.x;
+      groupRef.current.position.z = positionRef.current.z;
+    }
+
     setIsMoving(moving);
     if (newDirection !== direction) setDirection(newDirection);
 
@@ -200,15 +206,17 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
   });
 
   return (
-    <Avatar
-      position={positionRef.current}
-      config={currentUser.avatarConfig}
-      name={currentUser.name}
-      status={currentUser.status}
-      isCurrentUser={true}
-      isMoving={isMoving}
-      direction={direction}
-    />
+    <group ref={groupRef} position={[positionRef.current.x, 0, positionRef.current.z]}>
+      <Avatar
+        position={new THREE.Vector3(0, 0, 0)}
+        config={currentUser.avatarConfig}
+        name={currentUser.name}
+        status={currentUser.status}
+        isCurrentUser={true}
+        isMoving={isMoving}
+        direction={direction}
+      />
+    </group>
   );
 };
 
