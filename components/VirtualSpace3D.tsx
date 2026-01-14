@@ -409,6 +409,7 @@ interface VideoHUDProps {
   stream: MediaStream | null;
   screenStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
+  remoteScreenStreams: Map<string, MediaStream>;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleShare: () => void;
@@ -419,7 +420,7 @@ interface VideoHUDProps {
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams,
+  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams,
   onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onTriggerReaction, currentReaction, theme
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -470,9 +471,9 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
       {expandedId && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center" onClick={() => setExpandedId(null)}>
           <div className="relative w-[80vw] h-[80vh] max-w-4xl bg-black rounded-[40px] overflow-hidden border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
-            {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId && remoteStreams.get(expandedId)) ? (
+            {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId?.startsWith('screen-') && remoteScreenStreams.get(expandedId.replace('screen-', ''))) || (expandedId && remoteStreams.get(expandedId)) ? (
               <StableVideo 
-                stream={expandedId === 'local' ? stream : expandedId === 'screen' ? screenStream : remoteStreams.get(expandedId) || null}
+                stream={expandedId === 'local' ? stream : expandedId === 'screen' ? screenStream : expandedId?.startsWith('screen-') ? remoteScreenStreams.get(expandedId.replace('screen-', '')) || null : remoteStreams.get(expandedId) || null}
                 muted={expandedId === 'local'}
                 className={`w-full h-full object-contain ${expandedId === 'local' ? 'mirror' : ''}`}
               />
@@ -597,6 +598,23 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           );
         })}
+
+        {/* Burbujas de screen share de otros usuarios */}
+        {usersInCall.map((u) => {
+          const remoteScreen = remoteScreenStreams.get(u.id);
+          if (!remoteScreen) return null;
+          return (
+            <div key={`screen-${u.id}`} className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/50 shadow-2xl group w-52 h-36">
+              <StableVideo stream={remoteScreen} className="w-full h-full object-cover" />
+              <div className="absolute top-3 left-3 bg-green-600 backdrop-blur-md px-2 py-1 rounded-lg">
+                <span className="text-[10px] font-bold uppercase tracking-wide text-white">{u.name} - Pantalla</span>
+              </div>
+              <button onClick={() => setExpandedId(`screen-${u.id}`)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-green-600 text-white opacity-0 group-hover:opacity-100 transition-all">
+                <IconExpand on={false}/>
+              </button>
+            </div>
+          );
+        })}
       </div>
     </>
   );
@@ -620,6 +638,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [remoteScreenStreams, setRemoteScreenStreams] = useState<Map<string, MediaStream>>(new Map());
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeScreenRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
@@ -670,12 +689,27 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
 
     pc.ontrack = (event) => {
-      console.log('Received remote track from', peerId);
-      setRemoteStreams(prev => {
-        const newMap = new Map(prev);
-        newMap.set(peerId, event.streams[0]);
-        return newMap;
-      });
+      console.log('Received remote track from', peerId, 'kind:', event.track.kind);
+      const stream = event.streams[0];
+      // Detectar si es screen share (video sin audio en el stream o con label de display)
+      const isScreenShare = event.track.kind === 'video' && 
+        (event.track.label.toLowerCase().includes('screen') || 
+         event.track.label.toLowerCase().includes('display') ||
+         event.track.label.toLowerCase().includes('window'));
+      
+      if (isScreenShare) {
+        setRemoteScreenStreams(prev => {
+          const newMap = new Map(prev);
+          newMap.set(peerId, stream);
+          return newMap;
+        });
+      } else {
+        setRemoteStreams(prev => {
+          const newMap = new Map(prev);
+          newMap.set(peerId, stream);
+          return newMap;
+        });
+      }
     };
 
     pc.onconnectionstatechange = () => {
@@ -688,6 +722,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
     if (activeStreamRef.current) {
       activeStreamRef.current.getTracks().forEach(track => pc.addTrack(track, activeStreamRef.current!));
+    }
+    // Agregar screen share si está activo
+    if (activeScreenRef.current) {
+      activeScreenRef.current.getTracks().forEach(track => pc.addTrack(track, activeScreenRef.current!));
     }
 
     return pc;
@@ -844,6 +882,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           stream={stream}
           screenStream={screenStream}
           remoteStreams={remoteStreams}
+          remoteScreenStreams={remoteScreenStreams}
           onToggleMic={toggleMic}
           onToggleCam={toggleCamera}
           onToggleShare={handleToggleScreenShare}
