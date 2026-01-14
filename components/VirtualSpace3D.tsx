@@ -170,6 +170,71 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   );
 };
 
+// ============== CAMERA CONTROLLER (ZOOM + PAN) ==============
+const CameraController: React.FC<{ onPanning: (panning: boolean) => void }> = ({ onPanning }) => {
+  const { camera, gl } = useThree();
+  const isPanning = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
+  const cameraOffset = useRef({ x: 0, z: 0 });
+
+  useEffect(() => {
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const zoomSpeed = 0.1;
+      const orthoCamera = camera as THREE.OrthographicCamera;
+      const newZoom = orthoCamera.zoom + (e.deltaY > 0 ? -zoomSpeed * orthoCamera.zoom : zoomSpeed * orthoCamera.zoom);
+      orthoCamera.zoom = Math.max(10, Math.min(100, newZoom));
+      orthoCamera.updateProjectionMatrix();
+    };
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        isPanning.current = true;
+        lastMouse.current = { x: e.clientX, y: e.clientY };
+        onPanning(true);
+        e.preventDefault();
+      }
+    };
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (isPanning.current) {
+        const deltaX = (e.clientX - lastMouse.current.x) * 0.05;
+        const deltaY = (e.clientY - lastMouse.current.y) * 0.05;
+        cameraOffset.current.x -= deltaX;
+        cameraOffset.current.z -= deltaY;
+        lastMouse.current = { x: e.clientX, y: e.clientY };
+      }
+    };
+
+    const handleMouseUp = () => {
+      if (isPanning.current) {
+        isPanning.current = false;
+        onPanning(false);
+      }
+    };
+
+    const canvas = gl.domElement;
+    canvas.addEventListener('wheel', handleWheel, { passive: false });
+    canvas.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    return () => {
+      canvas.removeEventListener('wheel', handleWheel);
+      canvas.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [camera, gl, onPanning]);
+
+  useFrame(() => {
+    // Aplicar offset de pan a la cámara (se suma al seguimiento del jugador)
+    (camera as any).userData.panOffset = cameraOffset.current;
+  });
+
+  return null;
+};
+
 // ============== JUGADOR CONTROLABLE (SIN FÍSICA) ==============
 interface PlayerProps {
   currentUser: User;
@@ -246,13 +311,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     if (newDirection !== direction) setDirection(newDirection);
 
     // Cámara 2.5D ISOMÉTRICA (en ángulo para ver avatares 3D)
-    const cameraOffset = 12;
+    const cameraDistance = 12;
+    const panOffset = (camera as any).userData?.panOffset || { x: 0, z: 0 };
     camera.position.set(
-      positionRef.current.x,
-      cameraOffset * 1.5,
-      positionRef.current.z + cameraOffset
+      positionRef.current.x + panOffset.x,
+      cameraDistance * 1.5,
+      positionRef.current.z + cameraDistance + panOffset.z
     );
-    camera.lookAt(positionRef.current.x, 0, positionRef.current.z);
+    camera.lookAt(positionRef.current.x + panOffset.x, 0, positionRef.current.z + panOffset.z);
 
     // Sincronizar posición con el store (factor 16 para consistencia)
     const now = state.clock.getElapsedTime();
@@ -309,9 +375,10 @@ interface SceneProps {
   onlineUsers: User[];
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
   theme: string;
+  onPanning: (panning: boolean) => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, onPanning }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -332,6 +399,9 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         near={0.1}
         far={1000}
       />
+      
+      {/* Controlador de cámara (zoom + pan) */}
+      <CameraController onPanning={onPanning} />
       
       {/* Piso con grid */}
       <Grid
@@ -652,6 +722,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const webrtcChannelRef = useRef<any>(null);
   const [currentReaction, setCurrentReaction] = useState<string | null>(null);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
+  const [isPanning, setIsPanning] = useState(false);
 
   // Detectar usuarios en proximidad
   const usersInCall = useMemo(() => {
@@ -914,7 +985,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   };
 
   return (
-    <div className="w-full h-full relative">
+    <div className={`w-full h-full relative ${isPanning ? 'cursor-grabbing' : ''}`}>
       <Canvas
         shadows
         gl={{ 
@@ -933,6 +1004,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             onlineUsers={onlineUsers}
             setPosition={setPosition}
             theme={theme}
+            onPanning={setIsPanning}
           />
         </Suspense>
       </Canvas>
