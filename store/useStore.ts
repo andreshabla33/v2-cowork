@@ -133,12 +133,20 @@ export const useStore = create<AppState>((set, get) => ({
           .eq('usuario_id', user.id)
           .single();
 
+        const { data: usuarioData } = await supabase
+          .from('usuarios')
+          .select('estado_disponibilidad, estado_personalizado')
+          .eq('id', user.id)
+          .single();
+
         set({ 
           currentUser: {
             ...get().currentUser,
             id: user.id,
             name: user.user_metadata?.full_name || user.email.split('@')[0],
-            avatarConfig: avatarConfigData?.configuracion || initialAvatar
+            avatarConfig: avatarConfigData?.configuracion || initialAvatar,
+            status: usuarioData?.estado_disponibilidad || PresenceStatus.AVAILABLE,
+            statusText: usuarioData?.estado_personalizado || ''
           }
         });
 
