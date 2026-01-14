@@ -157,11 +157,11 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     let dx = 0, dy = 0;
     let newDirection = direction;
 
-    // Movimiento en 2D top-down (X = horizontal, Y = vertical en pantalla)
+    // Movimiento en 2D (corregido para vista isométrica)
     if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = MOVE_SPEED * delta; newDirection = 'up'; }
     if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -MOVE_SPEED * delta; newDirection = 'front'; }
-    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -MOVE_SPEED * delta; newDirection = 'left'; }
-    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = MOVE_SPEED * delta; newDirection = 'right'; }
+    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = MOVE_SPEED * delta; newDirection = 'left'; }
+    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = -MOVE_SPEED * delta; newDirection = 'right'; }
 
     // Normalizar diagonal
     if (dx !== 0 && dy !== 0) {
