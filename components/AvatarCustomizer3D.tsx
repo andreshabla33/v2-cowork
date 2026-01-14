@@ -330,6 +330,18 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
             </div>
           )}
         </div>
+
+        {/* Botón de guardar */}
+        <button
+          onClick={() => handleUpdate(localConfig)}
+          className={`w-full py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${
+            saved
+              ? 'bg-green-500 text-white'
+              : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+          }`}
+        >
+          {saved ? '✓ CAMBIOS GUARDADOS' : '💾 GUARDAR AVATAR'}
+        </button>
       </div>
     </div>
   );
