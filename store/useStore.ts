@@ -278,7 +278,7 @@ export const useStore = create<AppState>((set, get) => ({
       }).eq('id', session.user.id);
     }
     set((state) => ({
-      currentUser: { ...state.currentUser, status, statusText: statusText || state.currentUser.statusText }
+      currentUser: { ...state.currentUser, status, statusText: statusText !== undefined ? statusText : state.currentUser.statusText }
     }));
   },
 
