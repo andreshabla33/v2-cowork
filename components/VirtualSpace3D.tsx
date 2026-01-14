@@ -6,7 +6,8 @@ import { OrthographicCamera, Grid, Text, Environment } from '@react-three/drei';
 import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
 import { useStore } from '@/store/useStore';
-import { User, PresenceStatus } from '@/types';
+import { User, PresenceStatus, AvatarConfig } from '@/types';
+import { Avatar3DGLTF, ProceduralChibiAvatar } from './Avatar3DGLTF';
 
 // Constantes
 const MOVE_SPEED = 5;
@@ -289,9 +290,9 @@ const PlayerController: React.FC<PlayerControllerProps> = ({ currentUser, setPos
       linearDamping={10}
     >
       <CuboidCollider args={[0.3, 0.8, 0.3]} />
-      <Avatar3D
+      <Avatar3DGLTF
         position={[0, 0, 0]}
-        avatarConfig={currentUser.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
+        config={currentUser.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
         name={currentUser.name}
         status={currentUser.status}
         isCurrentUser={true}
@@ -311,10 +312,10 @@ const RemoteUsers: React.FC<RemoteUsersProps> = ({ users }) => {
   return (
     <>
       {users.map((user) => (
-        <Avatar3D
+        <Avatar3DGLTF
           key={user.id}
           position={[(user.x || 400) / 16, 0, (user.y || 400) / 16]}
-          avatarConfig={user.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
+          config={user.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
           name={user.name}
           status={user.status || PresenceStatus.AVAILABLE}
           isMoving={false}

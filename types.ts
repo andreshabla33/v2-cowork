@@ -26,7 +26,10 @@ export interface AvatarConfig {
   skinColor: string;
   clothingColor: string;
   hairColor: string;
-  accessory: 'none' | 'glasses' | 'hat' | 'headphones';
+  hairStyle?: 'default' | 'spiky' | 'long' | 'ponytail';
+  eyeColor?: string;
+  accessory?: 'none' | 'glasses' | 'hat' | 'headphones';
+  modelUrl?: string;
 }
 
 export interface User {

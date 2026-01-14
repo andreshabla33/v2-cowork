@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 import VirtualSpace3D from './VirtualSpace3D';
 import { TaskBoard } from './TaskBoard';
 import { MiembrosView } from './MiembrosView';
-import { AvatarCustomizer } from './AvatarCustomizer';
+import AvatarCustomizer3D from './AvatarCustomizer3D';
 import { ChatPanel } from './ChatPanel';
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
@@ -256,7 +256,7 @@ export const WorkspaceLayout: React.FC = () => {
           <div className={`h-full w-full overflow-y-auto ${activeSubTab !== 'space' ? 'animate-in fade-in duration-500' : ''}`}>
             {activeSubTab === 'tasks' && <TaskBoard />}
             {activeSubTab === 'miembros' && <MiembrosView />}
-            {activeSubTab === 'avatar' && <AvatarCustomizer />}
+            {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
             {(activeSubTab as any) === 'chat' && <ChatPanel chatOnly={true} />}
             {activeSubTab === 'settings' && (
               <div className="p-16 max-w-4xl mx-auto">
