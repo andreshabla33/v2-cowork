@@ -68,7 +68,7 @@ const statusColors: Record<PresenceStatus, string> = {
   [PresenceStatus.DND]: '#a855f7',
 };
 
-// ============== AVATAR 3D SIMPLE ==============
+// ============== AVATAR 3D CHIBI (vista 2.5D isométrica) ==============
 interface AvatarProps {
   position: THREE.Vector3;
   config: any;
@@ -82,6 +82,7 @@ interface AvatarProps {
 const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, direction }) => {
   return (
     <group position={position}>
+      {/* Avatar 3D Chibi */}
       <ProceduralChibiAvatar
         config={config || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
         isMoving={isMoving}
@@ -89,19 +90,19 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       />
       
       {/* Indicador de estado */}
-      <mesh position={[0.4, 1.55, 0]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
+      <mesh position={[0.4, 1.6, 0]}>
+        <sphereGeometry args={[0.12, 16, 16]} />
         <meshBasicMaterial color={statusColors[status]} />
       </mesh>
       
-      {/* Nombre */}
+      {/* Nombre flotante */}
       <Text
-        position={[0, 1.85, 0]}
-        fontSize={0.22}
+        position={[0, 2.0, 0]}
+        fontSize={0.28}
         color={isCurrentUser ? '#60a5fa' : '#ffffff'}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.025}
+        outlineWidth={0.03}
         outlineColor="#000000"
       >
         {name}
@@ -185,11 +186,12 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     setIsMoving(moving);
     if (newDirection !== direction) setDirection(newDirection);
 
-    // Cámara TOP-DOWN (mirando directamente hacia abajo)
+    // Cámara 2.5D ISOMÉTRICA (en ángulo para ver avatares 3D)
+    const cameraOffset = 12;
     camera.position.set(
       positionRef.current.x,
-      30,
-      positionRef.current.z
+      cameraOffset * 1.5,
+      positionRef.current.z + cameraOffset
     );
     camera.lookAt(positionRef.current.x, 0, positionRef.current.z);
 
@@ -262,14 +264,13 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         castShadow
       />
       
-      {/* Cámara Top-Down (mirando desde arriba) */}
+      {/* Cámara 2.5D Isométrica */}
       <OrthographicCamera
         makeDefault
-        position={[WORLD_SIZE/2, 50, WORLD_SIZE/2]}
-        zoom={25}
+        position={[WORLD_SIZE/2, 30, WORLD_SIZE/2 + 20]}
+        zoom={40}
         near={0.1}
         far={1000}
-        rotation={[-Math.PI / 2, 0, 0]}
       />
       
       {/* Piso con grid */}
