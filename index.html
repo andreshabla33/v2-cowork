@@ -45,6 +45,15 @@
         100% { width: 0%; }
       }
       .animate-shrink { animation: shrink linear forwards; }
+
+      @keyframes fade-in-out {
+        0% { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+        15% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+        30% { transform: translate(-50%, -50%) scale(1); }
+        70% { opacity: 1; }
+        100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+      }
+      .animate-fade-in-out { animation: fade-in-out 3s ease-out forwards; }
     </style>
   <script type="importmap">
 {

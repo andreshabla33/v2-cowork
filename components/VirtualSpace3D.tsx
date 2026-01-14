@@ -123,9 +123,10 @@ interface AvatarProps {
   isCurrentUser?: boolean;
   isMoving?: boolean;
   direction?: string;
+  reaction?: string | null;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, direction }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, direction, reaction }) => {
   return (
     <group position={position}>
       {/* Avatar 3D Chibi */}
@@ -140,6 +141,18 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         <sphereGeometry args={[0.12, 16, 16]} />
         <meshBasicMaterial color={statusColors[status]} />
       </mesh>
+      
+      {/* Reacción emoji encima del avatar */}
+      {reaction && (
+        <Text
+          position={[0, 2.5, 0]}
+          fontSize={0.5}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {reaction}
+        </Text>
+      )}
       
       {/* Nombre flotante */}
       <Text
@@ -265,6 +278,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
         isCurrentUser={true}
         isMoving={isMoving}
         direction={direction}
+        reaction={null}
       />
     </group>
   );
@@ -396,6 +410,8 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
   const [showEmojis, setShowEmojis] = useState(false);
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const expandedVideoRef = useRef<HTMLVideoElement>(null);
+  const [reactionFading, setReactionFading] = useState(false);
 
   useEffect(() => {
     if (localVideoRef.current && stream) {
@@ -416,36 +432,47 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
     onTriggerReaction(emoji);
   };
 
+  // Manejar video expandido sin titileo
+  useEffect(() => {
+    if (!expandedVideoRef.current || !expandedId) return;
+    let targetStream: MediaStream | null = null;
+    if (expandedId === 'local') targetStream = stream;
+    else if (expandedId === 'screen') targetStream = screenStream;
+    else targetStream = remoteStreams.get(expandedId) || null;
+    
+    if (targetStream && expandedVideoRef.current.srcObject !== targetStream) {
+      expandedVideoRef.current.srcObject = targetStream;
+      expandedVideoRef.current.play().catch(() => {});
+    }
+  }, [expandedId, stream, screenStream, remoteStreams]);
+
   return (
     <>
       {/* Overlay expandido */}
       {expandedId && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center" onClick={() => setExpandedId(null)}>
           <div className="relative w-[80vw] h-[80vh] max-w-4xl bg-black rounded-[40px] overflow-hidden border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
-            {expandedId === 'local' && stream && (
-              <video autoPlay muted playsInline className="w-full h-full object-contain mirror" ref={el => { if (el && stream) { el.srcObject = stream; el.play().catch(() => {}); } }} />
-            )}
-            {expandedId === 'screen' && screenStream && (
-              <video autoPlay playsInline className="w-full h-full object-contain" ref={el => { if (el && screenStream) { el.srcObject = screenStream; el.play().catch(() => {}); } }} />
-            )}
-            {expandedId !== 'local' && expandedId !== 'screen' && (() => {
-              const rs = remoteStreams.get(expandedId);
-              return rs ? (
-                <video autoPlay playsInline className="w-full h-full object-contain" ref={el => { if (el && rs) { el.srcObject = rs; el.play().catch(() => {}); } }} />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
-                    {usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
-                  </div>
+            {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId && remoteStreams.get(expandedId)) ? (
+              <video 
+                ref={expandedVideoRef}
+                autoPlay 
+                muted={expandedId === 'local'} 
+                playsInline 
+                className={`w-full h-full object-contain ${expandedId === 'local' ? 'mirror' : ''}`}
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
+                  {expandedId === 'local' ? userName.charAt(0) : usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
                 </div>
-              );
-            })()}
+              </div>
+            )}
             <button onClick={() => setExpandedId(null)} className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
               <IconExpand on={true} />
             </button>
             {/* Reacción en pantalla expandida */}
             {currentReaction && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl animate-bounce pointer-events-none">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl pointer-events-none animate-fade-in-out">
                 {currentReaction}
               </div>
             )}
@@ -465,7 +492,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         <div className="relative bg-black rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
           {/* Reacción actual */}
           {currentReaction && (
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-4xl animate-bounce z-20 pointer-events-none">
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl z-20 pointer-events-none animate-fade-in-out">
               {currentReaction}
             </div>
           )}
