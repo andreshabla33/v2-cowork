@@ -170,13 +170,33 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   );
 };
 
-// ============== CAMERA TARGET (para OrbitControls) ==============
-const CameraTarget: React.FC<{ targetRef: React.MutableRefObject<THREE.Vector3> }> = ({ targetRef }) => {
+// ============== CAMERA FOLLOW (sigue al jugador) ==============
+const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> = ({ orbitControlsRef }) => {
   const { camera } = useThree();
+  const lastPlayerPos = useRef({ x: 0, z: 0 });
   
   useFrame(() => {
-    // La cámara siempre mira al target (posición del jugador)
-    camera.lookAt(targetRef.current);
+    const playerPos = (camera as any).userData?.playerPosition;
+    if (!playerPos || !orbitControlsRef.current) return;
+    
+    // Detectar si el jugador se movió
+    const moved = Math.abs(playerPos.x - lastPlayerPos.current.x) > 0.01 || 
+                  Math.abs(playerPos.z - lastPlayerPos.current.z) > 0.01;
+    
+    if (moved) {
+      // Actualizar el target de OrbitControls para seguir al jugador
+      const controls = orbitControlsRef.current;
+      const deltaX = playerPos.x - lastPlayerPos.current.x;
+      const deltaZ = playerPos.z - lastPlayerPos.current.z;
+      
+      // Mover target y cámara juntos (mantiene la rotación actual)
+      controls.target.x += deltaX;
+      controls.target.z += deltaZ;
+      camera.position.x += deltaX;
+      camera.position.z += deltaZ;
+      
+      lastPlayerPos.current = { x: playerPos.x, z: playerPos.z };
+    }
   });
   
   return null;
@@ -347,7 +367,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         dampingFactor={0.05}
         minDistance={5}
         maxDistance={50}
-        maxPolarAngle={Math.PI / 2.2}
+        maxPolarAngle={Math.PI / 2 - 0.1}
         minPolarAngle={Math.PI / 6}
         enablePan={true}
         panSpeed={0.5}
@@ -359,6 +379,9 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
           RIGHT: THREE.MOUSE.PAN
         }}
       />
+      
+      {/* Seguimiento de cámara al jugador */}
+      <CameraFollow orbitControlsRef={orbitControlsRef} />
       
       {/* Piso con grid */}
       <Grid
@@ -941,6 +964,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   };
 
+  // Función para resetear la vista de la cámara
+  const handleResetView = useCallback(() => {
+    if (orbitControlsRef.current) {
+      const controls = orbitControlsRef.current;
+      const playerX = (currentUser.x || 400) / 16;
+      const playerZ = (currentUser.y || 400) / 16;
+      
+      // Resetear target al jugador
+      controls.target.set(playerX, 0, playerZ);
+      
+      // Resetear posición de cámara a vista isométrica por defecto
+      controls.object.position.set(playerX, 15, playerZ + 15);
+      
+      controls.update();
+    }
+  }, [currentUser.x, currentUser.y]);
+
   return (
     <div className="w-full h-full relative">
       <Canvas
@@ -965,6 +1005,19 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           />
         </Suspense>
       </Canvas>
+      
+      {/* Botón de resetear vista */}
+      <button
+        onClick={handleResetView}
+        className="absolute bottom-4 left-4 bg-gray-800/80 hover:bg-gray-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm backdrop-blur-sm transition-colors z-10"
+        title="Resetear vista (centrar cámara en tu avatar)"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+        Centrar
+      </button>
       
       {/* VideoHUD - solo se muestra cuando hay usuarios cerca */}
       {hasActiveCall && (
