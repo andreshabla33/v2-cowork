@@ -1,36 +1,15 @@
 'use client';
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef } from 'react';
 import { useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations, Text } from '@react-three/drei';
 import * as THREE from 'three';
-import { PresenceStatus } from '@/types';
 
-// URLs de modelos GLTF gratuitos (Quaternius CC0 / Mixamo)
-// Puedes reemplazar estos con tus propios modelos
-const AVATAR_MODELS = {
-  // Avatares predefinidos estilo chibi
-  knight: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb',
-  casual: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb',
-  business: 'https://models.readyplayer.me/64bfa15f0e72c63d7c3934a6.glb',
-  // Fallback a procedural si no hay modelo
-  procedural: null,
-};
-
-// Colores de estado
-const statusColors: Record<PresenceStatus, string> = {
-  [PresenceStatus.AVAILABLE]: '#22c55e',
-  [PresenceStatus.BUSY]: '#ef4444',
-  [PresenceStatus.AWAY]: '#eab308',
-  [PresenceStatus.DND]: '#a855f7',
-};
-
-// ============== AVATAR PROCEDURAL MEJORADO (CHIBI STYLE) ==============
+// ============== AVATAR PROCEDURAL CHIBI ==============
 interface ProceduralAvatarProps {
   config: {
-    skinColor: string;
-    clothingColor: string;
-    hairColor: string;
+    skinColor?: string;
+    clothingColor?: string;
+    hairColor?: string;
     hairStyle?: string;
     accessory?: string;
     eyeColor?: string;
@@ -46,6 +25,15 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const time = useRef(0);
+
+  const { 
+    skinColor = '#fcd34d', 
+    clothingColor = '#6366f1', 
+    hairColor = '#4b2c20', 
+    hairStyle = 'default', 
+    accessory = 'none', 
+    eyeColor = '#3b82f6' 
+  } = config || {};
 
   useFrame((_, delta) => {
     if (!groupRef.current) return;
@@ -66,8 +54,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
     };
     groupRef.current.rotation.y = rotations[direction] || 0;
   });
-
-  const { skinColor, clothingColor, hairColor, hairStyle = 'default', accessory = 'none', eyeColor = '#3b82f6' } = config;
 
   return (
     <group ref={groupRef}>
@@ -108,7 +94,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
               <sphereGeometry args={[0.36, 24, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
             </mesh>
-            {/* Flequillo */}
             <mesh position={[0, 0.1, 0.25]} castShadow>
               <boxGeometry args={[0.5, 0.15, 0.15]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
@@ -118,7 +103,7 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
         
         {hairStyle === 'spiky' && (
           <>
-            <mesh position={[0, 0.25, 0]} rotation={[0, 0, 0]} castShadow>
+            <mesh position={[0, 0.25, 0]} castShadow>
               <coneGeometry args={[0.25, 0.4, 8]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
             </mesh>
@@ -139,7 +124,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
               <sphereGeometry args={[0.4, 24, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
             </mesh>
-            {/* Cabello largo atrás */}
             <mesh position={[0, -0.2, -0.15]} castShadow>
               <capsuleGeometry args={[0.25, 0.5, 8, 16]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
@@ -153,7 +137,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
               <sphereGeometry args={[0.36, 24, 24, 0, Math.PI * 2, 0, Math.PI / 2]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
             </mesh>
-            {/* Coleta */}
             <mesh position={[0, 0.1, -0.35]} rotation={[0.5, 0, 0]} castShadow>
               <capsuleGeometry args={[0.1, 0.4, 8, 12]} />
               <meshStandardMaterial color={hairColor} roughness={0.8} />
@@ -162,7 +145,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
         )}
 
         {/* === CARA === */}
-        {/* Ojos */}
         <group position={[0, 0, 0.32]}>
           {/* Ojo izquierdo */}
           <mesh position={[-0.12, 0, 0]}>
@@ -203,13 +185,13 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
           <meshBasicMaterial color={hairColor} />
         </mesh>
         
-        {/* Boca (sonrisa) */}
+        {/* Boca */}
         <mesh position={[0, -0.12, 0.34]}>
           <torusGeometry args={[0.06, 0.015, 8, 16, Math.PI]} />
           <meshBasicMaterial color="#d97706" />
         </mesh>
         
-        {/* Mejillas sonrojadas */}
+        {/* Mejillas */}
         <mesh position={[-0.22, -0.05, 0.28]}>
           <circleGeometry args={[0.05, 16]} />
           <meshBasicMaterial color="#fca5a5" transparent opacity={0.5} />
@@ -263,7 +245,6 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
       {/* === ACCESORIOS === */}
       {accessory === 'glasses' && (
         <group position={[0, 1.05, 0.35]}>
-          {/* Marco de gafas */}
           <mesh position={[-0.12, 0, 0]}>
             <torusGeometry args={[0.08, 0.015, 8, 16]} />
             <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
@@ -272,72 +253,44 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
             <torusGeometry args={[0.08, 0.015, 8, 16]} />
             <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
           </mesh>
-          {/* Puente */}
           <mesh position={[0, 0, 0]}>
             <boxGeometry args={[0.08, 0.015, 0.015]} />
             <meshStandardMaterial color="#1f2937" metalness={0.8} roughness={0.2} />
-          </mesh>
-          {/* Cristales */}
-          <mesh position={[-0.12, 0, 0]}>
-            <circleGeometry args={[0.07, 16]} />
-            <meshStandardMaterial color="#93c5fd" transparent opacity={0.3} />
-          </mesh>
-          <mesh position={[0.12, 0, 0]}>
-            <circleGeometry args={[0.07, 16]} />
-            <meshStandardMaterial color="#93c5fd" transparent opacity={0.3} />
           </mesh>
         </group>
       )}
       
       {accessory === 'hat' && (
         <group position={[0, 1.45, 0]}>
-          {/* Base del sombrero */}
           <mesh castShadow>
             <cylinderGeometry args={[0.35, 0.35, 0.05, 24]} />
             <meshStandardMaterial color="#7c3aed" roughness={0.7} />
           </mesh>
-          {/* Copa del sombrero */}
           <mesh position={[0, 0.15, 0]} castShadow>
             <cylinderGeometry args={[0.22, 0.25, 0.25, 24]} />
             <meshStandardMaterial color="#7c3aed" roughness={0.7} />
-          </mesh>
-          {/* Cinta */}
-          <mesh position={[0, 0.05, 0]} castShadow>
-            <cylinderGeometry args={[0.26, 0.26, 0.05, 24]} />
-            <meshStandardMaterial color="#fbbf24" roughness={0.5} />
           </mesh>
         </group>
       )}
       
       {accessory === 'headphones' && (
         <group position={[0, 1.15, 0]}>
-          {/* Banda superior */}
-          <mesh position={[0, 0.25, 0]} rotation={[0, 0, 0]}>
+          <mesh position={[0, 0.25, 0]}>
             <torusGeometry args={[0.32, 0.03, 8, 24, Math.PI]} />
             <meshStandardMaterial color="#1f2937" metalness={0.6} roughness={0.3} />
           </mesh>
-          {/* Auricular izquierdo */}
           <mesh position={[-0.35, 0, 0]} rotation={[0, Math.PI / 2, 0]} castShadow>
             <cylinderGeometry args={[0.1, 0.1, 0.08, 16]} />
             <meshStandardMaterial color="#ef4444" metalness={0.5} roughness={0.4} />
           </mesh>
-          <mesh position={[-0.38, 0, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <circleGeometry args={[0.08, 16]} />
-            <meshStandardMaterial color="#1f2937" />
-          </mesh>
-          {/* Auricular derecho */}
           <mesh position={[0.35, 0, 0]} rotation={[0, -Math.PI / 2, 0]} castShadow>
             <cylinderGeometry args={[0.1, 0.1, 0.08, 16]} />
             <meshStandardMaterial color="#ef4444" metalness={0.5} roughness={0.4} />
           </mesh>
-          <mesh position={[0.38, 0, 0]} rotation={[0, -Math.PI / 2, 0]}>
-            <circleGeometry args={[0.08, 16]} />
-            <meshStandardMaterial color="#1f2937" />
-          </mesh>
         </group>
       )}
 
-      {/* Sombra bajo el avatar */}
+      {/* Sombra */}
       <mesh position={[0, -0.19, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.4, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.25} />
@@ -346,62 +299,4 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
   );
 };
 
-// ============== AVATAR COMPLETO CON NOMBRE Y ESTADO ==============
-interface Avatar3DGLTFProps {
-  position: [number, number, number];
-  config: {
-    skinColor: string;
-    clothingColor: string;
-    hairColor: string;
-    hairStyle?: string;
-    accessory?: string;
-    eyeColor?: string;
-    modelUrl?: string;
-  };
-  name: string;
-  status: PresenceStatus;
-  isCurrentUser?: boolean;
-  isMoving?: boolean;
-  direction?: string;
-}
-
-export const Avatar3DGLTF: React.FC<Avatar3DGLTFProps> = ({
-  position,
-  config,
-  name,
-  status,
-  isCurrentUser = false,
-  isMoving = false,
-  direction = 'front',
-}) => {
-  return (
-    <group position={position}>
-      <ProceduralChibiAvatar
-        config={config}
-        isMoving={isMoving}
-        direction={direction}
-      />
-      
-      {/* Indicador de estado */}
-      <mesh position={[0.4, 1.55, 0]}>
-        <sphereGeometry args={[0.1, 16, 16]} />
-        <meshBasicMaterial color={statusColors[status]} />
-      </mesh>
-      
-      {/* Nombre flotante */}
-      <Text
-        position={[0, 1.85, 0]}
-        fontSize={0.22}
-        color={isCurrentUser ? '#60a5fa' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.025}
-        outlineColor="#000000"
-      >
-        {name}
-      </Text>
-    </group>
-  );
-};
-
-export default Avatar3DGLTF;
+export default ProceduralChibiAvatar;
