@@ -397,7 +397,6 @@ export const Avatar3DGLTF: React.FC<Avatar3DGLTFProps> = ({
         anchorY="middle"
         outlineWidth={0.025}
         outlineColor="#000000"
-        font="/fonts/Inter-Bold.woff"
       >
         {name}
       </Text>
