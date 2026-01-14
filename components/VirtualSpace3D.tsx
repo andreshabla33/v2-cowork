@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useMemo, Suspense, useState } from 'react';
+import React, { useRef, useEffect, useMemo, Suspense, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrthographicCamera, Grid, Text } from '@react-three/drei';
 import * as THREE from 'three';
@@ -9,8 +9,9 @@ import { User, PresenceStatus } from '@/types';
 import { ProceduralChibiAvatar } from './Avatar3DGLTF';
 
 // Constantes
-const MOVE_SPEED = 0.15;
-const WORLD_SIZE = 50;
+const MOVE_SPEED = 4;
+const WORLD_SIZE = 100;
+const PROXIMITY_RADIUS = 8;
 
 // --- Minimap Component ---
 const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = ({ currentUser, users, workspace }) => {
@@ -151,27 +152,28 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     };
   }, []);
 
-  useFrame((state) => {
-    let dx = 0, dz = 0;
+  useFrame((state, delta) => {
+    let dx = 0, dy = 0;
     let newDirection = direction;
 
-    if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dz = -MOVE_SPEED; newDirection = 'up'; }
-    if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dz = MOVE_SPEED; newDirection = 'front'; }
-    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -MOVE_SPEED; newDirection = 'left'; }
-    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = MOVE_SPEED; newDirection = 'right'; }
+    // Movimiento en 2D top-down (X = horizontal, Y = vertical en pantalla)
+    if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = MOVE_SPEED * delta; newDirection = 'up'; }
+    if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -MOVE_SPEED * delta; newDirection = 'front'; }
+    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -MOVE_SPEED * delta; newDirection = 'left'; }
+    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = MOVE_SPEED * delta; newDirection = 'right'; }
 
     // Normalizar diagonal
-    if (dx !== 0 && dz !== 0) {
+    if (dx !== 0 && dy !== 0) {
       dx *= 0.707;
-      dz *= 0.707;
+      dy *= 0.707;
     }
 
-    const moving = dx !== 0 || dz !== 0;
+    const moving = dx !== 0 || dy !== 0;
     
     if (moving) {
-      // Actualizar posición
+      // Actualizar posición (X horizontal, Z vertical en el mundo 3D visto desde arriba)
       positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
-      positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z + dz));
+      positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
     }
 
     // Mover el grupo del avatar directamente
@@ -183,11 +185,11 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     setIsMoving(moving);
     if (newDirection !== direction) setDirection(newDirection);
 
-    // Actualizar cámara para seguir al jugador
+    // Cámara TOP-DOWN (mirando directamente hacia abajo)
     camera.position.set(
-      positionRef.current.x + 15,
-      20,
-      positionRef.current.z + 15
+      positionRef.current.x,
+      30,
+      positionRef.current.z
     );
     camera.lookAt(positionRef.current.x, 0, positionRef.current.z);
 
@@ -195,8 +197,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     const now = state.clock.getElapsedTime();
     if (now - lastSyncTime.current > 0.1) {
       setPosition(
-        positionRef.current.x * 16,
-        positionRef.current.z * 16,
+        positionRef.current.x * 20,
+        positionRef.current.z * 20,
         newDirection,
         false,
         moving
@@ -260,13 +262,14 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         castShadow
       />
       
-      {/* Cámara Isométrica */}
+      {/* Cámara Top-Down (mirando desde arriba) */}
       <OrthographicCamera
         makeDefault
-        position={[25, 30, 25]}
-        zoom={35}
+        position={[WORLD_SIZE/2, 50, WORLD_SIZE/2]}
+        zoom={25}
         near={0.1}
         far={1000}
+        rotation={[-Math.PI / 2, 0, 0]}
       />
       
       {/* Piso con grid */}
