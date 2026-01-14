@@ -45,7 +45,7 @@ interface AppState {
   
   setPosition: (x: number, y: number, direction?: User['direction'], isSitting?: boolean, isMoving?: boolean) => void;
   updateAvatar: (config: AvatarConfig) => Promise<void>;
-  updateStatus: (status: PresenceStatus) => void;
+  updateStatus: (status: PresenceStatus, statusText?: string) => Promise<void>;
   toggleMic: () => void;
   toggleCamera: () => void;
   toggleScreenShare: (val?: boolean) => void;
@@ -268,9 +268,19 @@ export const useStore = create<AppState>((set, get) => ({
     set((state) => ({ currentUser: { ...state.currentUser, avatarConfig: config } }));
   },
 
-  updateStatus: (status) => set((state) => ({
-    currentUser: { ...state.currentUser, status }
-  })),
+  updateStatus: async (status, statusText) => {
+    const { session } = get();
+    if (session?.user?.id) {
+      await supabase.from('usuarios').update({
+        estado_disponibilidad: status,
+        estado_personalizado: statusText || null,
+        estado_actualizado_en: new Date().toISOString()
+      }).eq('id', session.user.id);
+    }
+    set((state) => ({
+      currentUser: { ...state.currentUser, status, statusText: statusText || state.currentUser.statusText }
+    }));
+  },
 
   toggleMic: () => set((state) => ({
     currentUser: { ...state.currentUser, isMicOn: !state.currentUser.isMicOn }

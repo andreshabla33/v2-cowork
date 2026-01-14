@@ -8,6 +8,7 @@ import { AvatarCustomizer } from './AvatarCustomizer';
 import { ChatPanel } from './ChatPanel';
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
+import { StatusSelector } from './StatusSelector';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
 
@@ -223,6 +224,9 @@ export const WorkspaceLayout: React.FC = () => {
           </div>
           
           <div className="flex items-center gap-6">
+            {/* SELECTOR DE ESTADO */}
+            <StatusSelector />
+            
             {/* SELECTOR DE TEMAS */}
             <div className={`flex items-center gap-2 p-1 rounded-[20px] border ${s.border} bg-black/20 shadow-inner`}>
               <span className="text-[9px] font-black uppercase tracking-widest opacity-30 px-3 hidden lg:block">Estilo</span>
