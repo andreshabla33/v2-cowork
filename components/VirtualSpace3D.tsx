@@ -160,8 +160,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     // Movimiento en 2D (corregido para vista isométrica)
     if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = MOVE_SPEED * delta; newDirection = 'up'; }
     if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -MOVE_SPEED * delta; newDirection = 'front'; }
-    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = MOVE_SPEED * delta; newDirection = 'left'; }
-    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = -MOVE_SPEED * delta; newDirection = 'right'; }
+    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = MOVE_SPEED * delta; newDirection = 'right'; }
+    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = -MOVE_SPEED * delta; newDirection = 'left'; }
 
     // Normalizar diagonal
     if (dx !== 0 && dy !== 0) {
@@ -195,12 +195,12 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     );
     camera.lookAt(positionRef.current.x, 0, positionRef.current.z);
 
-    // Sincronizar posición con el store
+    // Sincronizar posición con el store (factor 16 para consistencia)
     const now = state.clock.getElapsedTime();
     if (now - lastSyncTime.current > 0.1) {
       setPosition(
-        positionRef.current.x * 20,
-        positionRef.current.z * 20,
+        positionRef.current.x * 16,
+        positionRef.current.z * 16,
         newDirection,
         false,
         moving
