@@ -6,6 +6,7 @@ import { OrthographicCamera, Grid, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
+import { supabase } from '@/lib/supabase';
 import { ProceduralChibiAvatar } from './Avatar3DGLTF';
 
 // Constantes
@@ -375,6 +376,7 @@ interface VideoHUDProps {
   usersInCall: User[];
   stream: MediaStream | null;
   screenStream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleShare: () => void;
@@ -385,7 +387,7 @@ interface VideoHUDProps {
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream,
+  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams,
   onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onTriggerReaction, currentReaction, theme
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -426,13 +428,18 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             {expandedId === 'screen' && screenStream && (
               <video autoPlay playsInline className="w-full h-full object-contain" ref={el => { if (el && screenStream) { el.srcObject = screenStream; el.play().catch(() => {}); } }} />
             )}
-            {expandedId !== 'local' && expandedId !== 'screen' && (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
-                  {usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
+            {expandedId !== 'local' && expandedId !== 'screen' && (() => {
+              const rs = remoteStreams.get(expandedId);
+              return rs ? (
+                <video autoPlay playsInline className="w-full h-full object-contain" ref={el => { if (el && rs) { el.srcObject = rs; el.play().catch(() => {}); } }} />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
+                    {usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
+                  </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
             <button onClick={() => setExpandedId(null)} className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
               <IconExpand on={true} />
             </button>
@@ -524,22 +531,33 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         )}
 
         {/* Burbujas de usuarios cercanos */}
-        {usersInCall.map((u) => (
-          <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
-                {u.name.charAt(0)}
+        {usersInCall.map((u) => {
+          const remoteStream = remoteStreams.get(u.id);
+          return (
+            <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
+              {remoteStream ? (
+                <video 
+                  autoPlay playsInline 
+                  className="absolute inset-0 w-full h-full object-cover"
+                  ref={(el) => { if (el && el.srcObject !== remoteStream) { el.srcObject = remoteStream; el.play().catch(() => {}); } }}
+                />
+              ) : (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
+                    {u.name.charAt(0)}
+                  </div>
+                </div>
+              )}
+              <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
               </div>
+              <button onClick={() => setExpandedId(u.id)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white opacity-0 group-hover:opacity-100 transition-all">
+                <IconExpand on={false}/>
+              </button>
             </div>
-            <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-              <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-              <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
-            </div>
-            <button onClick={() => setExpandedId(u.id)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white opacity-0 group-hover:opacity-100 transition-all">
-              <IconExpand on={false}/>
-            </button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </>
   );
@@ -550,12 +568,23 @@ interface VirtualSpace3DProps {
   theme?: string;
 }
 
+// ICE Servers para WebRTC
+const ICE_SERVERS = [
+  { urls: 'stun:stun.l.google.com:19302' },
+  { urls: 'stun:stun1.l.google.com:19302' },
+  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+];
+
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
-  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy } = useStore();
+  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeScreenRef = useRef<MediaStream | null>(null);
+  const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const webrtcChannelRef = useRef<any>(null);
   const [currentReaction, setCurrentReaction] = useState<string | null>(null);
 
   // Detectar usuarios en proximidad
@@ -584,6 +613,102 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     setCurrentReaction(emoji);
     setTimeout(() => setCurrentReaction(null), 3000);
   }, []);
+
+  // ========== WebRTC para video remoto ==========
+  const createPeerConnection = useCallback((peerId: string) => {
+    if (peerConnectionsRef.current.has(peerId)) return peerConnectionsRef.current.get(peerId)!;
+    
+    const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+    peerConnectionsRef.current.set(peerId, pc);
+
+    pc.onicecandidate = (event) => {
+      if (event.candidate && webrtcChannelRef.current) {
+        webrtcChannelRef.current.send({
+          type: 'broadcast', event: 'ice-candidate',
+          payload: { candidate: event.candidate, to: peerId, from: session?.user?.id }
+        });
+      }
+    };
+
+    pc.ontrack = (event) => {
+      console.log('Received remote track from', peerId);
+      setRemoteStreams(prev => {
+        const newMap = new Map(prev);
+        newMap.set(peerId, event.streams[0]);
+        return newMap;
+      });
+    };
+
+    pc.onconnectionstatechange = () => {
+      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+        pc.close();
+        peerConnectionsRef.current.delete(peerId);
+        setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+      }
+    };
+
+    if (activeStreamRef.current) {
+      activeStreamRef.current.getTracks().forEach(track => pc.addTrack(track, activeStreamRef.current!));
+    }
+
+    return pc;
+  }, [session?.user?.id]);
+
+  const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit, fromId: string) => {
+    const pc = createPeerConnection(fromId);
+    await pc.setRemoteDescription(new RTCSessionDescription(offer));
+    const answer = await pc.createAnswer();
+    await pc.setLocalDescription(answer);
+    if (webrtcChannelRef.current) {
+      webrtcChannelRef.current.send({ type: 'broadcast', event: 'answer', payload: { answer, to: fromId, from: session?.user?.id } });
+    }
+  }, [createPeerConnection, session?.user?.id]);
+
+  const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit, fromId: string) => {
+    const pc = peerConnectionsRef.current.get(fromId);
+    if (pc) await pc.setRemoteDescription(new RTCSessionDescription(answer));
+  }, []);
+
+  const handleIceCandidate = useCallback(async (candidate: RTCIceCandidateInit, fromId: string) => {
+    const pc = peerConnectionsRef.current.get(fromId);
+    if (pc) await pc.addIceCandidate(new RTCIceCandidate(candidate));
+  }, []);
+
+  const initiateCall = useCallback(async (peerId: string) => {
+    const pc = createPeerConnection(peerId);
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    if (webrtcChannelRef.current) {
+      webrtcChannelRef.current.send({ type: 'broadcast', event: 'offer', payload: { offer, to: peerId, from: session?.user?.id } });
+    }
+  }, [createPeerConnection, session?.user?.id]);
+
+  // WebRTC Channel
+  useEffect(() => {
+    if (!activeWorkspace?.id || !session?.user?.id) return;
+    const webrtcChannel = supabase.channel(`webrtc:${activeWorkspace.id}`);
+    webrtcChannel
+      .on('broadcast', { event: 'offer' }, ({ payload }) => { if (payload.to === session.user.id) handleOffer(payload.offer, payload.from); })
+      .on('broadcast', { event: 'answer' }, ({ payload }) => { if (payload.to === session.user.id) handleAnswer(payload.answer, payload.from); })
+      .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => { if (payload.to === session.user.id) handleIceCandidate(payload.candidate, payload.from); })
+      .subscribe();
+    webrtcChannelRef.current = webrtcChannel;
+    return () => {
+      supabase.removeChannel(webrtcChannel);
+      peerConnectionsRef.current.forEach(pc => pc.close());
+      peerConnectionsRef.current.clear();
+    };
+  }, [activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate]);
+
+  // Iniciar llamadas cuando hay usuarios cerca
+  useEffect(() => {
+    if (!hasActiveCall || !activeStreamRef.current) return;
+    usersInCall.forEach(user => {
+      if (!peerConnectionsRef.current.has(user.id) && session?.user?.id && session.user.id < user.id) {
+        initiateCall(user.id);
+      }
+    });
+  }, [usersInCall, hasActiveCall, initiateCall, session?.user?.id]);
 
   // Manejar stream de video
   useEffect(() => {
@@ -679,6 +804,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           usersInCall={usersInCall}
           stream={stream}
           screenStream={screenStream}
+          remoteStreams={remoteStreams}
           onToggleMic={toggleMic}
           onToggleCam={toggleCamera}
           onToggleShare={handleToggleScreenShare}
