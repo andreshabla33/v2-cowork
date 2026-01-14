@@ -41,6 +41,23 @@ const IconReaction = () => (
   </svg>
 );
 
+const IconPrivacy = ({ on }: { on: boolean }) => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    {on && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M12 11v4" />}
+  </svg>
+);
+
+const IconExpand = ({ on }: { on: boolean }) => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    {on ? (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M6 18L18 6M6 6l12 12" />
+    ) : (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+    )}
+  </svg>
+);
+
 // --- Minimap Component ---
 const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = ({ currentUser, users, workspace }) => {
   if (!workspace) return null;
@@ -354,93 +371,177 @@ interface VideoHUDProps {
   micOn: boolean;
   camOn: boolean;
   sharingOn: boolean;
+  isPrivate: boolean;
   usersInCall: User[];
   stream: MediaStream | null;
   screenStream: MediaStream | null;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleShare: () => void;
+  onTogglePrivacy: () => void;
+  onTriggerReaction: (emoji: string) => void;
+  currentReaction: string | null;
   theme: string;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, usersInCall, stream, screenStream,
-  onToggleMic, onToggleCam, onToggleShare, theme
+  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream,
+  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onTriggerReaction, currentReaction, theme
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
-  const currentStream = sharingOn ? screenStream : stream;
+  const screenVideoRef = useRef<HTMLVideoElement>(null);
   const accentColor = theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-600 text-white';
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
   const [showEmojis, setShowEmojis] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (localVideoRef.current && localVideoRef.current.srcObject !== currentStream) {
-      localVideoRef.current.srcObject = currentStream;
+    if (localVideoRef.current && stream) {
+      localVideoRef.current.srcObject = stream;
       localVideoRef.current.play().catch(e => console.warn("Auto-play error", e));
     }
-  }, [currentStream]);
+  }, [stream]);
+
+  useEffect(() => {
+    if (screenVideoRef.current && screenStream) {
+      screenVideoRef.current.srcObject = screenStream;
+      screenVideoRef.current.play().catch(e => console.warn("Auto-play error", e));
+    }
+  }, [screenStream]);
+
+  const handleEmojiClick = (emoji: string) => {
+    setShowEmojis(false);
+    onTriggerReaction(emoji);
+  };
 
   return (
-    <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto z-50">
-      {/* Burbuja local (tu video) */}
-      <div className="relative bg-black rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
-        <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn && !sharingOn ? 'opacity-0' : 'opacity-100'} ${!sharingOn ? 'mirror' : ''}`}>
-          <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover block" />
-        </div>
-        {(!camOn && !sharingOn) && (
-          <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black text-2xl bg-black/50">
-              {userName.charAt(0)}
-            </div>
-          </div>
-        )}
-        
-        {/* Controles */}
-        <div className="absolute bottom-3 left-2 right-2 flex justify-center items-center gap-1.5 transition-all duration-300 opacity-0 group-hover:opacity-100">
-          <button onClick={onToggleMic} className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${micOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
-            <IconMic on={micOn}/>
-          </button>
-          <button onClick={onToggleCam} className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${camOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
-            <IconCam on={camOn}/>
-          </button>
-          <button onClick={onToggleShare} className={`w-8 h-8 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${sharingOn ? accentColor : 'bg-white/20 text-white hover:bg-white/40'}`}>
-            <IconScreen on={sharingOn}/>
-          </button>
-          <div className="relative">
-            <button onClick={() => setShowEmojis(!showEmojis)} className="w-8 h-8 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md border border-white/10 text-white hover:bg-white/40 transition-all">
-              <IconReaction />
+    <>
+      {/* Overlay expandido */}
+      {expandedId && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center" onClick={() => setExpandedId(null)}>
+          <div className="relative w-[80vw] h-[80vh] max-w-4xl bg-black rounded-[40px] overflow-hidden border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
+            {expandedId === 'local' && stream && (
+              <video autoPlay muted playsInline className="w-full h-full object-contain mirror" ref={el => { if (el && stream) { el.srcObject = stream; el.play().catch(() => {}); } }} />
+            )}
+            {expandedId === 'screen' && screenStream && (
+              <video autoPlay playsInline className="w-full h-full object-contain" ref={el => { if (el && screenStream) { el.srcObject = screenStream; el.play().catch(() => {}); } }} />
+            )}
+            {expandedId !== 'local' && expandedId !== 'screen' && (
+              <div className="w-full h-full flex items-center justify-center">
+                <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
+                  {usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
+                </div>
+              </div>
+            )}
+            <button onClick={() => setExpandedId(null)} className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
+              <IconExpand on={true} />
             </button>
-            {showEmojis && (
-              <div className="absolute bottom-10 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 flex gap-1 shadow-2xl">
-                {emojis.map(e => (
-                  <button key={e} onClick={() => setShowEmojis(false)} className="text-xl hover:scale-125 transition-transform p-1">{e}</button>
-                ))}
+            {/* Reacción en pantalla expandida */}
+            {currentReaction && (
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-8xl animate-bounce pointer-events-none">
+                {currentReaction}
               </div>
             )}
           </div>
         </div>
-        
-        {/* Nombre */}
-        <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-          <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tú</span>
-        </div>
-      </div>
+      )}
 
-      {/* Burbujas de usuarios cercanos */}
-      {usersInCall.map((u) => (
-        <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
-          <div className="absolute inset-0 flex items-center justify-center">
-            <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
-              {u.name.charAt(0)}
-            </div>
+      <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto z-50">
+        {/* Indicador de privacidad */}
+        {isPrivate && (
+          <div className="bg-amber-500 text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+            <IconPrivacy on={true} /> Conversación privada
           </div>
-          <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-            <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-            <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
+        )}
+
+        {/* Burbuja local (tu cámara) */}
+        <div className="relative bg-black rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
+          {/* Reacción actual */}
+          {currentReaction && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-4xl animate-bounce z-20 pointer-events-none">
+              {currentReaction}
+            </div>
+          )}
+          <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn ? 'opacity-0' : 'opacity-100'} mirror`}>
+            <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover block" />
+          </div>
+          {!camOn && (
+            <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black text-2xl bg-black/50">
+                {userName.charAt(0)}
+              </div>
+            </div>
+          )}
+          
+          {/* Controles */}
+          <div className="absolute bottom-3 left-2 right-2 flex justify-center items-center gap-1 transition-all duration-300 opacity-0 group-hover:opacity-100">
+            <button onClick={onToggleMic} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${micOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
+              <IconMic on={micOn}/>
+            </button>
+            <button onClick={onToggleCam} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${camOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
+              <IconCam on={camOn}/>
+            </button>
+            <button onClick={onToggleShare} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${sharingOn ? accentColor : 'bg-white/20 text-white hover:bg-white/40'}`}>
+              <IconScreen on={sharingOn}/>
+            </button>
+            <button onClick={onTogglePrivacy} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${isPrivate ? 'bg-amber-500 text-white shadow-lg' : 'bg-white/20 text-white hover:bg-white/40'}`}>
+              <IconPrivacy on={isPrivate}/>
+            </button>
+            <div className="relative">
+              <button onClick={() => setShowEmojis(!showEmojis)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md border border-white/10 text-white hover:bg-white/40 transition-all">
+                <IconReaction />
+              </button>
+              {showEmojis && (
+                <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 flex gap-1 shadow-2xl z-50">
+                  {emojis.map(e => (
+                    <button key={e} onClick={() => handleEmojiClick(e)} className="text-xl hover:scale-125 transition-transform p-1">{e}</button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <button onClick={() => setExpandedId('local')} className="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 backdrop-blur-md border border-white/10 text-white hover:bg-indigo-500 transition-all">
+              <IconExpand on={false}/>
+            </button>
+          </div>
+          
+          {/* Nombre */}
+          <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+            <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tú</span>
           </div>
         </div>
-      ))}
-    </div>
+
+        {/* Burbuja de screen share (separada) */}
+        {sharingOn && screenStream && (
+          <div className="relative bg-black rounded-[28px] overflow-hidden border border-indigo-500/50 shadow-2xl group w-52 h-36">
+            <video ref={screenVideoRef} autoPlay playsInline className="w-full h-full object-cover block" />
+            <div className="absolute top-3 left-3 bg-indigo-600 backdrop-blur-md px-2 py-1 rounded-lg">
+              <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tu pantalla</span>
+            </div>
+            <button onClick={() => setExpandedId('screen')} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white opacity-0 group-hover:opacity-100 transition-all">
+              <IconExpand on={false}/>
+            </button>
+          </div>
+        )}
+
+        {/* Burbujas de usuarios cercanos */}
+        {usersInCall.map((u) => (
+          <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
+                {u.name.charAt(0)}
+              </div>
+            </div>
+            <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+              <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+              <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
+            </div>
+            <button onClick={() => setExpandedId(u.id)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white opacity-0 group-hover:opacity-100 transition-all">
+              <IconExpand on={false}/>
+            </button>
+          </div>
+        ))}
+      </div>
+    </>
   );
 };
 
@@ -450,11 +551,12 @@ interface VirtualSpace3DProps {
 }
 
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
-  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare } = useStore();
+  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeScreenRef = useRef<MediaStream | null>(null);
+  const [currentReaction, setCurrentReaction] = useState<string | null>(null);
 
   // Detectar usuarios en proximidad
   const usersInCall = useMemo(() => {
@@ -471,8 +573,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     if (hasActiveCall) {
       if (!currentUser.isMicOn) toggleMic();
       if (!currentUser.isCameraOn) toggleCamera();
+    } else {
+      // Apagar todo cuando no hay usuarios cerca
+      if (currentUser.isPrivate) setPrivacy(false);
     }
   }, [hasActiveCall]);
+
+  // Trigger reaction con auto-clear
+  const handleTriggerReaction = useCallback((emoji: string) => {
+    setCurrentReaction(emoji);
+    setTimeout(() => setCurrentReaction(null), 3000);
+  }, []);
 
   // Manejar stream de video
   useEffect(() => {
@@ -564,12 +675,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           micOn={!!currentUser.isMicOn}
           camOn={!!currentUser.isCameraOn}
           sharingOn={!!currentUser.isScreenSharing}
+          isPrivate={!!currentUser.isPrivate}
           usersInCall={usersInCall}
           stream={stream}
           screenStream={screenStream}
           onToggleMic={toggleMic}
           onToggleCam={toggleCamera}
           onToggleShare={handleToggleScreenShare}
+          onTogglePrivacy={togglePrivacy}
+          onTriggerReaction={handleTriggerReaction}
+          currentReaction={currentReaction}
           theme={theme}
         />
       )}
