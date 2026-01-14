@@ -6,6 +6,18 @@ import { ModalCrearGrupo } from './chat/ModalCrearGrupo';
 import { AgregarMiembros } from './chat/AgregarMiembros';
 import { ChatToast, ToastNotification } from './ChatToast';
 import { MeetingRooms } from './MeetingRooms';
+import { PresenceStatus } from '../types';
+
+// Helper para obtener color del estado
+const getStatusColor = (status?: PresenceStatus) => {
+  switch (status) {
+    case PresenceStatus.AVAILABLE: return 'bg-green-500';
+    case PresenceStatus.BUSY: return 'bg-red-500';
+    case PresenceStatus.AWAY: return 'bg-yellow-500';
+    case PresenceStatus.DND: return 'bg-purple-500';
+    default: return 'bg-zinc-500';
+  }
+};
 
 interface ChatPanelProps {
   sidebarOnly?: boolean;
@@ -663,7 +675,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                 >
                   <div className="relative">
                     <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[8px] font-black">{otherUser?.nombre?.charAt(0) || '?'}</div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#19171d] ${isOnline ? 'bg-green-500' : 'bg-zinc-500'}`} />
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#19171d] ${isOnline ? getStatusColor(onlineUsers.find(ou => ou.id === otherUserId)?.status) : 'bg-zinc-500'}`} />
                   </div>
                   <span className="truncate flex-1">{otherUser?.nombre || 'Usuario'}</span>
                   {unreadCount > 0 && (
@@ -697,7 +709,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                 >
                   <div className="relative">
                     <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[8px] font-black">{u.nombre?.charAt(0)}</div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#19171d] ${isOnline ? 'bg-green-500' : 'bg-zinc-500'}`} />
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#19171d] ${isOnline ? getStatusColor(onlineUsers.find(ou => ou.id === u.id)?.status) : 'bg-zinc-500'}`} />
                   </div>
                   <span className="truncate flex-1">{u.nombre}</span>
                 </button>
