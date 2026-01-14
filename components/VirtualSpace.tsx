@@ -626,6 +626,9 @@ export const VirtualSpace: React.FC = () => {
           this.cursors = this.input.keyboard!.createCursorKeys();
           this.wasd = this.input.keyboard!.addKeys('W,A,S,D') as any;
           
+          // No capturar teclas globalmente para permitir escribir en inputs
+          this.input.keyboard!.disableGlobalCapture();
+          
           this.input.on('wheel', (pointer: any, gameObjects: any, dx: number, dy: number) => {
             const newZoom = Phaser.Math.Clamp(this.cameras.main.zoom - (dy * 0.001), MIN_ZOOM, MAX_ZOOM);
             this.cameras.main.setZoom(newZoom);
