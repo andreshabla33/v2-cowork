@@ -380,6 +380,24 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
   );
 };
 
+// ============== COMPONENTE VIDEO ESTABLE ==============
+const StableVideo: React.FC<{ stream: MediaStream | null; muted?: boolean; className?: string }> = ({ stream, muted = false, className = '' }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  
+  useEffect(() => {
+    if (videoRef.current && stream) {
+      if (videoRef.current.srcObject !== stream) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.play().catch(() => {});
+      }
+    }
+  }, [stream]);
+
+  return stream ? (
+    <video ref={videoRef} autoPlay playsInline muted={muted} className={className} />
+  ) : null;
+};
+
 // ============== VIDEO HUD (burbuja con cámara) ==============
 interface VideoHUDProps {
   userName: string;
@@ -453,11 +471,9 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center" onClick={() => setExpandedId(null)}>
           <div className="relative w-[80vw] h-[80vh] max-w-4xl bg-black rounded-[40px] overflow-hidden border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
             {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId && remoteStreams.get(expandedId)) ? (
-              <video 
-                ref={expandedVideoRef}
-                autoPlay 
-                muted={expandedId === 'local'} 
-                playsInline 
+              <StableVideo 
+                stream={expandedId === 'local' ? stream : expandedId === 'screen' ? screenStream : remoteStreams.get(expandedId) || null}
+                muted={expandedId === 'local'}
                 className={`w-full h-full object-contain ${expandedId === 'local' ? 'mirror' : ''}`}
               />
             ) : (
@@ -497,7 +513,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           )}
           <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn ? 'opacity-0' : 'opacity-100'} mirror`}>
-            <video ref={localVideoRef} autoPlay muted playsInline className="w-full h-full object-cover block" />
+            <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />
           </div>
           {!camOn && (
             <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
@@ -547,7 +563,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbuja de screen share (separada) */}
         {sharingOn && screenStream && (
           <div className="relative bg-black rounded-[28px] overflow-hidden border border-indigo-500/50 shadow-2xl group w-52 h-36">
-            <video ref={screenVideoRef} autoPlay playsInline className="w-full h-full object-cover block" />
+            <StableVideo stream={screenStream} className="w-full h-full object-cover block" />
             <div className="absolute top-3 left-3 bg-indigo-600 backdrop-blur-md px-2 py-1 rounded-lg">
               <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tu pantalla</span>
             </div>
@@ -563,11 +579,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
           return (
             <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
               {remoteStream ? (
-                <video 
-                  autoPlay playsInline 
-                  className="absolute inset-0 w-full h-full object-cover"
-                  ref={(el) => { if (el && el.srcObject !== remoteStream) { el.srcObject = remoteStream; el.play().catch(() => {}); } }}
-                />
+                <StableVideo stream={remoteStream} className="absolute inset-0 w-full h-full object-cover" />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
