@@ -410,6 +410,7 @@ interface VideoHUDProps {
   screenStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   remoteScreenStreams: Map<string, MediaStream>;
+  remoteReaction: { emoji: string; from: string; fromName: string } | null;
   onToggleMic: () => void;
   onToggleCam: () => void;
   onToggleShare: () => void;
@@ -420,7 +421,7 @@ interface VideoHUDProps {
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams,
+  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
   onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onTriggerReaction, currentReaction, theme
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
@@ -588,6 +589,12 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   </div>
                 </div>
               )}
+              {/* Reacción remota recibida */}
+              {remoteReaction && remoteReaction.from === u.id && (
+                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-3xl z-20 pointer-events-none animate-fade-in-out">
+                  {remoteReaction.emoji}
+                </div>
+              )}
               <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
                 <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
                 <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
@@ -644,6 +651,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const webrtcChannelRef = useRef<any>(null);
   const [currentReaction, setCurrentReaction] = useState<string | null>(null);
+  const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
 
   // Detectar usuarios en proximidad
   const usersInCall = useMemo(() => {
@@ -666,11 +674,20 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [hasActiveCall]);
 
-  // Trigger reaction con auto-clear
+  // Trigger reaction con auto-clear y envío a otros usuarios
   const handleTriggerReaction = useCallback((emoji: string) => {
     setCurrentReaction(emoji);
     setTimeout(() => setCurrentReaction(null), 3000);
-  }, []);
+    
+    // Enviar reacción a otros usuarios por el canal WebRTC
+    if (webrtcChannelRef.current && session?.user?.id) {
+      webrtcChannelRef.current.send({
+        type: 'broadcast',
+        event: 'reaction',
+        payload: { emoji, from: session.user.id, fromName: currentUser.name }
+      });
+    }
+  }, [session?.user?.id, currentUser.name]);
 
   // ========== WebRTC para video remoto ==========
   const createPeerConnection = useCallback((peerId: string) => {
@@ -689,21 +706,27 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
 
     pc.ontrack = (event) => {
-      console.log('Received remote track from', peerId, 'kind:', event.track.kind);
+      console.log('Received remote track from', peerId, 'kind:', event.track.kind, 'label:', event.track.label, 'streamId:', event.streams[0]?.id);
       const stream = event.streams[0];
-      // Detectar si es screen share (video sin audio en el stream o con label de display)
+      const trackLabel = event.track.label.toLowerCase();
+      
+      // Detectar si es screen share por label
       const isScreenShare = event.track.kind === 'video' && 
-        (event.track.label.toLowerCase().includes('screen') || 
-         event.track.label.toLowerCase().includes('display') ||
-         event.track.label.toLowerCase().includes('window'));
+        (trackLabel.includes('screen') || 
+         trackLabel.includes('display') ||
+         trackLabel.includes('window') ||
+         trackLabel.includes('monitor'));
       
       if (isScreenShare) {
+        console.log('Detected SCREEN SHARE from', peerId);
         setRemoteScreenStreams(prev => {
           const newMap = new Map(prev);
           newMap.set(peerId, stream);
           return newMap;
         });
       } else {
+        // Es cámara normal
+        console.log('Detected CAMERA from', peerId);
         setRemoteStreams(prev => {
           const newMap = new Map(prev);
           newMap.set(peerId, stream);
@@ -768,6 +791,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       .on('broadcast', { event: 'offer' }, ({ payload }) => { if (payload.to === session.user.id) handleOffer(payload.offer, payload.from); })
       .on('broadcast', { event: 'answer' }, ({ payload }) => { if (payload.to === session.user.id) handleAnswer(payload.answer, payload.from); })
       .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => { if (payload.to === session.user.id) handleIceCandidate(payload.candidate, payload.from); })
+      .on('broadcast', { event: 'reaction' }, ({ payload }) => {
+        // Recibir reacción de otro usuario
+        if (payload.from !== session.user.id) {
+          console.log('Received reaction from', payload.fromName, ':', payload.emoji);
+          setRemoteReaction({ emoji: payload.emoji, from: payload.from, fromName: payload.fromName });
+          setTimeout(() => setRemoteReaction(null), 3000);
+        }
+      })
       .subscribe();
     webrtcChannelRef.current = webrtcChannel;
     return () => {
@@ -919,6 +950,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           screenStream={screenStream}
           remoteStreams={remoteStreams}
           remoteScreenStreams={remoteScreenStreams}
+          remoteReaction={remoteReaction}
           onToggleMic={toggleMic}
           onToggleCam={toggleCamera}
           onToggleShare={handleToggleScreenShare}
