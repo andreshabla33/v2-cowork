@@ -37,7 +37,8 @@ export const StatusSelector: React.FC = () => {
   }, [isEditingCustom]);
 
   const handleStatusChange = async (status: PresenceStatus) => {
-    await updateStatus(status, customStatus);
+    setCustomStatus('');
+    await updateStatus(status, '');
     setIsOpen(false);
   };
 
