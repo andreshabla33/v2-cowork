@@ -44,10 +44,10 @@ export const ProceduralChibiAvatar: React.FC<ProceduralAvatarProps> = ({
     const bounceHeight = isMoving ? 0.15 : 0.05;
     groupRef.current.position.y = Math.sin(time.current * bounceSpeed) * bounceHeight;
     
-    // Rotación según dirección
+    // Rotación según dirección (invertido para vista isométrica)
     const rotations: Record<string, number> = {
-      left: Math.PI / 2,
-      right: -Math.PI / 2,
+      left: -Math.PI / 2,
+      right: Math.PI / 2,
       up: Math.PI,
       front: 0,
       down: 0,
