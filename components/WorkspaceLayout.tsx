@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { VirtualSpace } from './VirtualSpace';
+import VirtualSpace3D from './VirtualSpace3D';
 import { TaskBoard } from './TaskBoard';
 import { MiembrosView } from './MiembrosView';
 import { AvatarCustomizer } from './AvatarCustomizer';
@@ -252,7 +252,7 @@ export const WorkspaceLayout: React.FC = () => {
         </header>
 
         <div className="flex-1 relative overflow-hidden">
-          {activeSubTab === 'space' && <VirtualSpace />}
+          {activeSubTab === 'space' && <VirtualSpace3D theme={theme} />}
           <div className={`h-full w-full overflow-y-auto ${activeSubTab !== 'space' ? 'animate-in fade-in duration-500' : ''}`}>
             {activeSubTab === 'tasks' && <TaskBoard />}
             {activeSubTab === 'miembros' && <MiembrosView />}
