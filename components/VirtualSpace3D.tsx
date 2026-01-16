@@ -235,23 +235,33 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
   const { camera } = useThree();
 
   useEffect(() => {
+    console.log('[Player] Registrando eventos de teclado...');
+    
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
       const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable);
-      if (isTyping) return;
+      if (isTyping) {
+        console.log('[Player] Ignorando tecla - usuario está escribiendo');
+        return;
+      }
       
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         keysPressed.current.add(e.code);
+        console.log('[Player] Tecla presionada:', e.code, 'Keys activas:', Array.from(keysPressed.current));
         e.preventDefault();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current.delete(e.code);
+      console.log('[Player] Tecla liberada:', e.code);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
+    
+    console.log('[Player] Eventos de teclado registrados correctamente');
+    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
@@ -280,6 +290,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
       // Actualizar posición (X horizontal, Z vertical en el mundo 3D visto desde arriba)
       positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
       positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
+      
+      console.log('[Player] Moviendo - Pos:', positionRef.current.x.toFixed(2), positionRef.current.z.toFixed(2), 'Dir:', newDirection);
     }
 
     // Mover el grupo del avatar directamente
