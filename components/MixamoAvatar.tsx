@@ -225,17 +225,32 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     );
   });
 
-  return (
-    <group ref={groupRef}>
-      {/* Grupo interno con scale y offset para centrar el modelo */}
-      <group 
-        scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
-        position={[centerOffset.x, centerOffset.y, centerOffset.z]}
-      >
-        <primitive object={scene} />
-      </group>
-    </group>
-  );
+  // Agregar scene al grupo manualmente (evitar primitive)
+  useEffect(() => {
+    if (!groupRef.current || !scene) return;
+    
+    // Limpiar hijos previos
+    while (groupRef.current.children.length > 0) {
+      groupRef.current.remove(groupRef.current.children[0]);
+    }
+    
+    // Aplicar transformaciones al scene directamente
+    scene.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
+    scene.position.set(centerOffset.x, centerOffset.y, centerOffset.z);
+    
+    // Agregar al grupo
+    groupRef.current.add(scene);
+    
+    console.log('[MeshyAvatar] Scene agregado al grupo');
+    
+    return () => {
+      if (groupRef.current && scene) {
+        groupRef.current.remove(scene);
+      }
+    };
+  }, [scene, centerOffset]);
+
+  return <group ref={groupRef} />;
 };
 
 export default MixamoAvatar;
