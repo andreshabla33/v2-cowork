@@ -104,7 +104,7 @@ export interface ChatGroup {
   espacio_id: string;
   nombre: string;
   descripcion?: string;
-  tipo: 'publico' | 'privado';
+  tipo: 'publico' | 'privado' | 'directo';
   icono: string;
   color?: string;
   creado_por: string;
@@ -122,4 +122,31 @@ export interface ChatMessage {
     nombre: string;
     avatar_url?: string;
   };
+}
+
+export interface ScheduledMeeting {
+  id: string;
+  espacio_id: string;
+  sala_id?: string;
+  titulo: string;
+  descripcion?: string;
+  fecha_inicio: string;
+  fecha_fin: string;
+  creado_por: string;
+  es_recurrente: boolean;
+  recurrencia_regla?: string;
+  recordatorio_minutos: number;
+  creado_en: string;
+  creador?: { id: string; nombre: string };
+  sala?: { id: string; nombre: string };
+  participantes?: MeetingParticipant[];
+}
+
+export interface MeetingParticipant {
+  id: string;
+  reunion_id: string;
+  usuario_id: string;
+  estado: 'pendiente' | 'aceptado' | 'rechazado' | 'tentativo';
+  notificado: boolean;
+  usuario?: { id: string; nombre: string };
 }
