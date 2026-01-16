@@ -117,7 +117,8 @@ const statusColors: Record<PresenceStatus, string> = {
 
 // ============== AVATAR 3D (vista 2.5D isométrica) ==============
 // Cambiar a true para usar avatares Mixamo (requiere cargar modelos grandes)
-const USE_MIXAMO_AVATARS = true;
+// NOTA: Desactivado temporalmente por Context Lost - modelos muy pesados para GPU
+const USE_MIXAMO_AVATARS = false;
 
 interface AvatarProps {
   position: THREE.Vector3;
