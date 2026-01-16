@@ -264,17 +264,17 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       {/* Header */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center justify-between mb-6">
-          <h1 className={`text-2xl font-black ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
-            Calendar
+          <h1 className={`text-xl font-bold ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
+            Calendario
           </h1>
           <button
             onClick={() => setShowScheduleModal(true)}
             className={`flex items-center gap-2 px-5 py-2.5 ${s.btn} rounded-xl text-sm font-bold transition-all shadow-lg hover:shadow-xl hover:scale-105`}
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
             </svg>
-            Nueva Reunión
+            Nueva reunión
           </button>
         </div>
 
@@ -284,7 +284,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
-            placeholder="Search events"
+            placeholder="Buscar eventos..."
             className={`w-full ${s.input} border rounded-xl px-4 py-3 pl-11 text-sm focus:outline-none transition-all`}
           />
           <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -306,7 +306,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                 : 'opacity-50 hover:opacity-100'
             }`}
           >
-            Scheduled
+            Programadas
           </button>
           <button
             onClick={() => setActiveTab('notes')}
@@ -316,7 +316,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                 : 'opacity-50 hover:opacity-100'
             }`}
           >
-            Meeting Notes
+            Notas de reunión
           </button>
         </div>
       </div>
@@ -392,8 +392,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <p className="text-sm opacity-60 mb-1">Manage your schedule and enhance</p>
-                <p className="text-sm opacity-60 mb-6">meeting experience with Calendar</p>
+                <p className="text-sm opacity-60 mb-1">Administra tu agenda y mejora</p>
+                <p className="text-sm opacity-60 mb-4">la experiencia de tus reuniones</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -546,7 +546,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
             </div>
-            <h4 className="font-bold mb-2">Meeting Notes</h4>
+            <h4 className="font-bold mb-2">Notas de Reunión</h4>
             <p className="text-sm opacity-50 mb-1">Las notas de reuniones con AI</p>
             <p className="text-sm opacity-50">estarán disponibles próximamente</p>
             <span className={`inline-block mt-4 px-3 py-1 ${theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded-full text-xs font-bold`}>
@@ -557,15 +557,15 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       </div>
 
       {/* Google Calendar Button */}
-      <div className="p-6 border-t border-white/10">
+      <div className="px-6 pb-4 pt-2">
         <button
           onClick={connectGoogleCalendar}
-          className={`w-full flex items-center justify-center gap-3 px-6 py-4 ${s.btnGoogle} rounded-2xl font-bold transition-all shadow-lg hover:shadow-xl`}
+          className={`flex items-center justify-center gap-2 px-4 py-2 mx-auto ${s.btnGoogle} rounded-xl text-sm font-medium transition-all hover:opacity-90`}
         >
-          <svg className="w-5 h-5" viewBox="0 0 24 24">
+          <svg className="w-4 h-4" viewBox="0 0 24 24">
             <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
           </svg>
-          Connect Calendar
+          Conectar Google Calendar
         </button>
       </div>
 
