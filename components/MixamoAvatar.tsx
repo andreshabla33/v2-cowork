@@ -105,20 +105,9 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN del modelo y CENTRADO usando bounding box
+  // 2. CLONACIÓN del modelo (sin modificar posición)
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
-    
-    // Calcular bounding box para centrar el modelo
-    const box = new THREE.Box3().setFromObject(clone);
-    const center = box.getCenter(new THREE.Vector3());
-    const size = box.getSize(new THREE.Vector3());
-    
-    console.log('[MeshyAvatar] BoundingBox center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
-    console.log('[MeshyAvatar] BoundingBox size:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
-    
-    // Mover el modelo para que su centro esté en el origen (solo X y Z, Y en el suelo)
-    clone.position.set(-center.x, -box.min.y, -center.z);
     
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -129,8 +118,24 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       }
     });
 
-    console.log('[MeshyAvatar] Modelo centrado - nueva pos:', clone.position.x.toFixed(2), clone.position.y.toFixed(2), clone.position.z.toFixed(2));
+    console.log('[MeshyAvatar] Modelo clonado');
     return clone;
+  }, [gltf.scene]);
+  
+  // Calcular offset de centrado (solo una vez)
+  const centerOffset = useMemo(() => {
+    const box = new THREE.Box3().setFromObject(gltf.scene);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    console.log('[MeshyAvatar] BoundingBox center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
+    console.log('[MeshyAvatar] BoundingBox size:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+    
+    // Offset para centrar: mover X y Z al origen, Y al suelo
+    const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
+    console.log('[MeshyAvatar] Offset aplicado:', offset.x.toFixed(2), offset.y.toFixed(2), offset.z.toFixed(2));
+    
+    return offset;
   }, [gltf.scene]);
   
   // 3. APLICACIÓN DE COLORES (solo cuando cambian)
@@ -213,11 +218,14 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   });
 
   return (
-    <group 
-      ref={groupRef} 
-      scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
-    >
-      <primitive object={scene} />
+    <group ref={groupRef}>
+      {/* Grupo interno con scale y offset para centrar el modelo */}
+      <group 
+        scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
+        position={[centerOffset.x, centerOffset.y, centerOffset.z]}
+      >
+        <primitive object={scene} />
+      </group>
     </group>
   );
 };
