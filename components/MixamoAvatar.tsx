@@ -183,19 +183,19 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     console.log('[MeshyAvatar] Colores aplicados al modelo');
   }, [scene, coloresKey]);
 
-  // 4. CONTROL DE ANIMACIÓN
-  useEffect(() => {
-    const actionName = names.find(n => 
-      n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
-    ) || names[0];
+  // 4. CONTROL DE ANIMACIÓN - DESACTIVADO TEMPORALMENTE PARA DEBUG
+  // useEffect(() => {
+  //   const actionName = names.find(n => 
+  //     n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
+  //   ) || names[0];
 
-    if (actionName && actions[actionName]) {
-      actions[actionName].reset().fadeIn(0.2).play();
-      return () => {
-        actions[actionName]?.fadeOut(0.2);
-      };
-    }
-  }, [actions, names, isMoving]);
+  //   if (actionName && actions[actionName]) {
+  //     actions[actionName].reset().fadeIn(0.2).play();
+  //     return () => {
+  //       actions[actionName]?.fadeOut(0.2);
+  //     };
+  //   }
+  // }, [actions, names, isMoving]);
 
   // 5. Rotación según dirección + Log de posición del grupo padre
   useFrame(() => {
@@ -225,21 +225,32 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     );
   });
 
-  return (
-    <group ref={groupRef}>
-      {/* CUBO DE DEBUG: 0.5m de ancho/profundidad, 1.7m de alto (altura humana aprox) */}
-      <mesh position={[0, 0.85, 0]} castShadow receiveShadow>
-        <boxGeometry args={[0.5, 1.7, 0.5]} />
-        <meshStandardMaterial color="cyan" wireframe={false} />
-      </mesh>
-      
-      {/* Flecha para indicar frente */}
-      <mesh position={[0, 1.5, 0.4]} rotation={[Math.PI/2, 0, 0]}>
-        <coneGeometry args={[0.1, 0.4, 8]} />
-        <meshStandardMaterial color="yellow" />
-      </mesh>
-    </group>
-  );
+  // Agregar scene al grupo manualmente
+  useEffect(() => {
+    if (!groupRef.current || !scene) return;
+    
+    // Limpiar hijos previos (cubo de debug)
+    while (groupRef.current.children.length > 0) {
+      groupRef.current.remove(groupRef.current.children[0]);
+    }
+    
+    // Aplicar solo escala, sin offset por ahora
+    scene.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
+    scene.position.set(0, 0, 0);
+    
+    // Agregar al grupo
+    groupRef.current.add(scene);
+    
+    console.log('[MeshyAvatar] Scene agregado - pos:', scene.position.x, scene.position.y, scene.position.z);
+    
+    return () => {
+      if (groupRef.current && scene) {
+        groupRef.current.remove(scene);
+      }
+    };
+  }, [scene]);
+
+  return <group ref={groupRef} />;
 };
 
 export default MixamoAvatar;
