@@ -61,25 +61,25 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN OPTIMIZADA con copia profunda
+  // 2. CLONACIÓN Y ESCALA EN OBJETO RAÍZ
   const scene = useMemo(() => {
-    // clone(true) para copia profunda del SkinnedMesh
-    const clone = gltf.scene.clone(true);
+    const clone = gltf.scene.clone();
     
-    // Aplicar escala al objeto raíz
+    // 1. Aplicar escala al OBJETO RAÍZ del GLTF
     clone.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
     
-    // Recorrer para activar sombras y evitar frustum culling
-    clone.traverse((obj) => {
-      if ((obj as THREE.Mesh).isMesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
-        // Evita que desaparezca si la cámara está cerca
-        obj.frustumCulled = false;
+    // 2. Forzar actualización de matrices para que las hijas se enteren
+    clone.updateMatrixWorld(true);
+    
+    // 3. Configurar sombras en meshes
+    clone.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
       }
     });
 
-    console.log(`[MixamoAvatar] Modelo cargado, escala: ${AVATAR_SCALE}`);
+    console.log(`[MixamoAvatar] Escala en raíz: ${AVATAR_SCALE}`);
     return clone;
   }, [gltf.scene]);
 
