@@ -129,20 +129,12 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       // Sincronizar con Google Calendar si está conectado
       if (googleConnected) {
         try {
-          const googleEvent = await googleCalendar.createEvent({
+          await googleCalendar.createEvent({
             summary: newMeeting.titulo.trim(),
-            description: newMeeting.descripcion.trim() || undefined,
+            description: `${newMeeting.descripcion.trim() || ''}\n\n🔗 Link: ${meetingLink}`,
             start: fechaInicio.toISOString(),
             end: fechaFin.toISOString()
           });
-          
-          // Guardar el google_event_id en la reunión
-          if (googleEvent?.id) {
-            await supabase
-              .from('reuniones_programadas')
-              .update({ google_event_id: googleEvent.id })
-              .eq('id', meeting.id);
-          }
         } catch (err) {
           console.error('Error creando evento en Google Calendar:', err);
         }
@@ -177,9 +169,21 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     loadMeetings();
   };
 
-  const deleteMeeting = async (meetingId: string) => {
+  const deleteMeeting = async (meetingId: string, googleEventId?: string) => {
+    // Eliminar de Supabase
     await supabase.from('reuniones_programadas').delete().eq('id', meetingId);
+    
+    // Eliminar de Google Calendar si está conectado y tiene ID
+    if (googleConnected && googleEventId) {
+      try {
+        await googleCalendar.deleteEvent(googleEventId);
+      } catch (err) {
+        console.error('Error eliminando de Google Calendar:', err);
+      }
+    }
+    
     loadMeetings();
+    syncGoogleEvents();
   };
 
   const connectGoogleCalendar = () => {
@@ -599,7 +603,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
                           {isCreator(meeting) && (
                             <button
-                              onClick={() => deleteMeeting(meeting.id)}
+                              onClick={() => deleteMeeting(meeting.id, meeting.google_event_id)}
                               className="p-2 bg-red-500/10 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
                               title="Cancelar reunión"
                             >

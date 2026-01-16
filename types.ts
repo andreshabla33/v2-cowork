@@ -137,6 +137,8 @@ export interface ScheduledMeeting {
   recurrencia_regla?: string;
   recordatorio_minutos: number;
   creado_en: string;
+  google_event_id?: string;
+  meeting_link?: string;
   creador?: { id: string; nombre: string };
   sala?: { id: string; nombre: string };
   participantes?: MeetingParticipant[];
