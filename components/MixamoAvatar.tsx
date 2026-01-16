@@ -21,15 +21,15 @@ const getDracoLoader = () => {
   return dracoLoader;
 };
 
-// Mapeo de animaciones disponibles (nombres URL-encoded)
+// Mapeo de animaciones disponibles (nombres actuales en Supabase Storage)
 const ANIMATIONS = {
-  idle: `${SUPABASE_STORAGE_URL}/De%20pie%20con%20maletin%20inactivo`,
-  walk: `${SUPABASE_STORAGE_URL}/Caminata%20desarmada%20hacia%20adelante`,
-  salute: `${SUPABASE_STORAGE_URL}/Saludo`,
-  run: `${SUPABASE_STORAGE_URL}/Ejecutar%20para%20detener`,
+  idle: `${SUPABASE_STORAGE_URL}/Standing%20W_Briefcase%20Idle`,
+  walk: `${SUPABASE_STORAGE_URL}/Unarmed%20Walk%20Forward`,
+  salute: `${SUPABASE_STORAGE_URL}/Salute`,
+  run: `${SUPABASE_STORAGE_URL}/Run%20To%20Stop`,
   walkLeft: `${SUPABASE_STORAGE_URL}/Walk%20Strafe%20Left`,
-  startWalk: `${SUPABASE_STORAGE_URL}/Empieza%20a%20caminar`,
-  turn: `${SUPABASE_STORAGE_URL}/Giro%20hacia%20atras%20a%20la%20derecha`,
+  startWalk: `${SUPABASE_STORAGE_URL}/Start%20Walking`,
+  turn: `${SUPABASE_STORAGE_URL}/Backward%20Right%20Turn`,
 };
 
 interface MixamoAvatarProps {
