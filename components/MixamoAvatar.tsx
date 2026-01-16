@@ -119,6 +119,12 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
       <primitive object={scene} />
+      
+      {/* CUBO DE REFERENCIA 1 METRO - TEMPORAL PARA DIAGNÓSTICO */}
+      <mesh position={[1, 0.5, 0]}>
+        <boxGeometry args={[1, 1, 1]} />
+        <meshStandardMaterial color="red" wireframe />
+      </mesh>
     </group>
   );
 };
