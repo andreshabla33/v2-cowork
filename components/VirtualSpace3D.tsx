@@ -149,11 +149,6 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         />
       )}
       
-      {/* CUBO ROJO 1 METRO - REFERENCIA VISUAL (FUERA DEL AVATAR) */}
-      <mesh position={[2, 0.5, 0]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="red" wireframe />
-      </mesh>
       
       {/* Indicador de estado */}
       <mesh position={[0.4, 1.6, 0]}>

@@ -21,67 +21,130 @@ const getDracoLoader = () => {
   return dracoLoader;
 };
 
-// URLs de animaciones en Supabase Storage
-const ANIMATIONS_URLS = {
-  idle: `${SUPABASE_STORAGE_URL}/Standing%20W_Briefcase%20Idle`,
-  walk: `${SUPABASE_STORAGE_URL}/Unarmed%20Walk%20Forward`,
-  salute: `${SUPABASE_STORAGE_URL}/Salute`,
-  run: `${SUPABASE_STORAGE_URL}/Run%20To%20Stop`,
-  walkLeft: `${SUPABASE_STORAGE_URL}/Walk%20Strafe%20Left`,
-  startWalk: `${SUPABASE_STORAGE_URL}/Start%20Walking`,
-  turn: `${SUPABASE_STORAGE_URL}/Backward%20Right%20Turn`,
+// URL del modelo base Meshy AI (liviano ~315KB)
+const MODEL_URL = `${SUPABASE_STORAGE_URL}/Meshy_AI_Character_output.glb`;
+
+// Escala del avatar Meshy AI (ajustar según el modelo)
+const AVATAR_SCALE = 1.0;
+
+// Colores por defecto para el avatar
+const DEFAULT_COLORS = {
+  piel: '#f5d0c5',
+  ojos: '#4a90d9',
+  cabello: '#3d2314',
+  ropa_principal: '#2563eb',
+  ropa_secundario: '#1e40af',
+  zapatos: '#1f2937',
 };
 
-// Escala correcta para el avatar (Mixamo exporta en CM, Three.js usa M)
-// 0.01 es estándar, si sigue gigante usar 0.0077
-const AVATAR_SCALE = 0.01;
+// Mapeo de nombres de materiales/meshes a partes del cuerpo
+// Ajustar según los nombres reales en el modelo Meshy AI
+const MATERIAL_MAPPING: Record<string, keyof typeof DEFAULT_COLORS> = {
+  'skin': 'piel',
+  'body': 'piel',
+  'head': 'piel',
+  'face': 'piel',
+  'eye': 'ojos',
+  'eyes': 'ojos',
+  'hair': 'cabello',
+  'shirt': 'ropa_principal',
+  'top': 'ropa_principal',
+  'torso': 'ropa_principal',
+  'pants': 'ropa_secundario',
+  'bottom': 'ropa_secundario',
+  'legs': 'ropa_secundario',
+  'shoes': 'zapatos',
+  'feet': 'zapatos',
+  'foot': 'zapatos',
+};
 
-interface MixamoAvatarProps {
-  animation?: keyof typeof ANIMATIONS_URLS;
+export interface AvatarColores {
+  piel?: string;
+  ojos?: string;
+  cabello?: string;
+  ropa_principal?: string;
+  ropa_secundario?: string;
+  zapatos?: string;
+}
+
+interface MeshyAvatarProps {
   position?: [number, number, number];
   rotation?: [number, number, number];
   isMoving?: boolean;
   direction?: string;
+  colores?: AvatarColores;
 }
 
-export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
-  animation = 'idle',
+export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   isMoving = false,
   direction = 'front',
+  colores = {},
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   
-  // 1. CARGA ESTÁTICA: Siempre cargamos el modelo 'idle' como base
-  // Esto evita recargas constantes que causan Context Lost
-  const gltf = useLoader(GLTFLoader, ANIMATIONS_URLS.idle, (loader) => {
+  // Combinar colores por defecto con los personalizados
+  const finalColors = useMemo(() => ({
+    ...DEFAULT_COLORS,
+    ...colores,
+  }), [colores]);
+
+  // 1. CARGA ESTÁTICA del modelo base Meshy AI
+  const gltf = useLoader(GLTFLoader, MODEL_URL, (loader) => {
     loader.setDRACOLoader(getDracoLoader());
   });
 
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN Y CONFIGURACIÓN
+  // 2. CLONACIÓN Y APLICACIÓN DE COLORES
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        child.castShadow = true;
-        child.receiveShadow = true;
-        // IMPORTANTE: Evita que desaparezca por error de escala
-        child.frustumCulled = false;
+        const mesh = child as THREE.Mesh;
+        mesh.castShadow = true;
+        mesh.receiveShadow = true;
+        mesh.frustumCulled = false;
+        
+        // Intentar determinar qué parte del cuerpo es este mesh
+        const meshName = mesh.name.toLowerCase();
+        const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || '';
+        
+        // Buscar coincidencia en el mapeo
+        let colorKey: keyof typeof DEFAULT_COLORS | null = null;
+        
+        for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
+          if (meshName.includes(pattern) || materialName.includes(pattern)) {
+            colorKey = key;
+            break;
+          }
+        }
+        
+        // Aplicar color si encontramos coincidencia
+        if (colorKey && mesh.material) {
+          const color = finalColors[colorKey];
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((mat) => {
+              if ((mat as THREE.MeshStandardMaterial).color) {
+                (mat as THREE.MeshStandardMaterial).color.set(color);
+              }
+            });
+          } else if ((mesh.material as THREE.MeshStandardMaterial).color) {
+            (mesh.material as THREE.MeshStandardMaterial).color.set(color);
+          }
+        }
       }
     });
 
-    console.log(`[MixamoAvatar] Clone creado`);
+    console.log(`[MeshyAvatar] Modelo cargado con colores aplicados`);
     return clone;
-  }, [gltf.scene]);
+  }, [gltf.scene, finalColors]);
 
-  // 3. CONTROL DE ANIMACIÓN (usa animaciones del archivo base)
+  // 3. CONTROL DE ANIMACIÓN
   useEffect(() => {
-    // Buscar animación por nombre (idle o walk si existe)
     const actionName = names.find(n => 
       n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
     ) || names[0];

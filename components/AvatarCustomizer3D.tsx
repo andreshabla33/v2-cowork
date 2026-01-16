@@ -4,70 +4,61 @@ import React, { useState, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useStore } from '@/store/useStore';
-import { ProceduralChibiAvatar } from './Avatar3DGLTF';
+import { MixamoAvatar, AvatarColores } from './MixamoAvatar';
 
 interface AvatarCustomizer3DProps {
   compact?: boolean;
 }
 
+// Presets adaptados para el avatar Meshy AI
 const AVATAR_PRESETS = [
-  { id: 'default', name: 'Clásico', skinColor: '#fcd34d', hairColor: '#4b2c20', clothingColor: '#6366f1', hairStyle: 'default', eyeColor: '#3b82f6' },
-  { id: 'cool', name: 'Cool', skinColor: '#fbbf24', hairColor: '#1a120b', clothingColor: '#ef4444', hairStyle: 'spiky', eyeColor: '#22c55e' },
-  { id: 'elegant', name: 'Elegante', skinColor: '#fef3c7', hairColor: '#7b3f00', clothingColor: '#1f2937', hairStyle: 'long', eyeColor: '#8b5cf6' },
-  { id: 'creative', name: 'Creativo', skinColor: '#d97706', hairColor: '#ec4899', clothingColor: '#10b981', hairStyle: 'ponytail', eyeColor: '#f59e0b' },
-  { id: 'pro', name: 'Profesional', skinColor: '#92400e', hairColor: '#2d1b14', clothingColor: '#3b82f6', hairStyle: 'default', eyeColor: '#64748b' },
-  { id: 'gamer', name: 'Gamer', skinColor: '#78350f', hairColor: '#ffcc00', clothingColor: '#7c3aed', hairStyle: 'spiky', eyeColor: '#ef4444' },
+  { id: 'default', name: 'Clásico', piel: '#f5d0c5', cabello: '#4b2c20', ropa_principal: '#6366f1', ropa_secundario: '#4f46e5', ojos: '#3b82f6', zapatos: '#1f2937' },
+  { id: 'cool', name: 'Cool', piel: '#e8beac', cabello: '#1a120b', ropa_principal: '#ef4444', ropa_secundario: '#dc2626', ojos: '#22c55e', zapatos: '#18181b' },
+  { id: 'elegant', name: 'Elegante', piel: '#fef3c7', cabello: '#7b3f00', ropa_principal: '#1f2937', ropa_secundario: '#374151', ojos: '#8b5cf6', zapatos: '#0f172a' },
+  { id: 'creative', name: 'Creativo', piel: '#d4a574', cabello: '#ec4899', ropa_principal: '#10b981', ropa_secundario: '#059669', ojos: '#f59e0b', zapatos: '#065f46' },
+  { id: 'pro', name: 'Profesional', piel: '#8b6952', cabello: '#2d1b14', ropa_principal: '#3b82f6', ropa_secundario: '#1d4ed8', ojos: '#64748b', zapatos: '#1e3a5f' },
+  { id: 'gamer', name: 'Gamer', piel: '#6b4423', cabello: '#ffcc00', ropa_principal: '#7c3aed', ropa_secundario: '#5b21b6', ojos: '#ef4444', zapatos: '#4c1d95' },
 ];
 
+// Colores para cada parte del avatar Meshy AI
 const COLORS = {
-  skin: ['#fcd34d', '#fbbf24', '#d97706', '#92400e', '#78350f', '#fef3c7', '#f5d0a9', '#c68642'],
-  hair: ['#4b2c20', '#2d1b14', '#1a120b', '#7b3f00', '#c2b280', '#e5e5e5', '#ffcc00', '#ec4899', '#ef4444', '#3b82f6'],
-  clothing: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#71717a', '#7c3aed', '#1f2937', '#ffffff'],
-  eyes: ['#3b82f6', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#ec4899', '#1f2937'],
+  piel: ['#f5d0c5', '#e8beac', '#d4a574', '#c68642', '#8b6952', '#6b4423', '#fef3c7', '#ffe4c4'],
+  cabello: ['#4b2c20', '#2d1b14', '#1a120b', '#7b3f00', '#c2b280', '#e5e5e5', '#ffcc00', '#ec4899', '#ef4444', '#3b82f6'],
+  ropa_principal: ['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#3b82f6', '#ef4444', '#71717a', '#7c3aed', '#1f2937', '#ffffff'],
+  ropa_secundario: ['#4f46e5', '#db2777', '#059669', '#d97706', '#2563eb', '#dc2626', '#525252', '#6d28d9', '#111827', '#f3f4f6'],
+  ojos: ['#3b82f6', '#22c55e', '#8b5cf6', '#f59e0b', '#ef4444', '#64748b', '#ec4899', '#1f2937'],
+  zapatos: ['#1f2937', '#18181b', '#0f172a', '#292524', '#1e3a5f', '#4c1d95', '#065f46', '#7c2d12'],
 };
-
-const HAIR_STYLES = [
-  { id: 'default', name: 'Normal', icon: '💇' },
-  { id: 'spiky', name: 'Puntas', icon: '🦔' },
-  { id: 'long', name: 'Largo', icon: '💁' },
-  { id: 'ponytail', name: 'Coleta', icon: '🎀' },
-];
-
-const ACCESSORIES = [
-  { id: 'none', name: 'Ninguno', icon: '✨' },
-  { id: 'glasses', name: 'Gafas', icon: '👓' },
-  { id: 'hat', name: 'Sombrero', icon: '🎩' },
-  { id: 'headphones', name: 'Auriculares', icon: '🎧' },
-];
 
 export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact = false }) => {
   const { currentUser, updateAvatar } = useStore();
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'presets' | 'customize'>('presets');
   
-  const [localConfig, setLocalConfig] = useState({
-    skinColor: currentUser.avatarConfig?.skinColor || '#fcd34d',
-    hairColor: currentUser.avatarConfig?.hairColor || '#4b2c20',
-    clothingColor: currentUser.avatarConfig?.clothingColor || '#6366f1',
-    hairStyle: (currentUser.avatarConfig as any)?.hairStyle || 'default',
-    accessory: currentUser.avatarConfig?.accessory || 'none',
-    eyeColor: (currentUser.avatarConfig as any)?.eyeColor || '#3b82f6',
+  // Configuración de colores para el avatar Meshy AI
+  const [localConfig, setLocalConfig] = useState<AvatarColores>({
+    piel: (currentUser.avatarConfig as any)?.piel || '#f5d0c5',
+    cabello: (currentUser.avatarConfig as any)?.cabello || '#4b2c20',
+    ropa_principal: (currentUser.avatarConfig as any)?.ropa_principal || '#6366f1',
+    ropa_secundario: (currentUser.avatarConfig as any)?.ropa_secundario || '#4f46e5',
+    ojos: (currentUser.avatarConfig as any)?.ojos || '#3b82f6',
+    zapatos: (currentUser.avatarConfig as any)?.zapatos || '#1f2937',
   });
 
   const handleSave = async () => {
-    await updateAvatar(localConfig);
+    await updateAvatar(localConfig as any);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
 
   const handlePresetSelect = (preset: typeof AVATAR_PRESETS[0]) => {
     setLocalConfig({
-      skinColor: preset.skinColor,
-      hairColor: preset.hairColor,
-      clothingColor: preset.clothingColor,
-      hairStyle: preset.hairStyle,
-      accessory: localConfig.accessory,
-      eyeColor: preset.eyeColor,
+      piel: preset.piel,
+      cabello: preset.cabello,
+      ropa_principal: preset.ropa_principal,
+      ropa_secundario: preset.ropa_secundario,
+      ojos: preset.ojos,
+      zapatos: preset.zapatos,
     });
   };
 
@@ -82,7 +73,7 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
             <directionalLight position={[-5, 3, -5]} intensity={0.3} />
             
             <group position={[0, -0.8, 0]}>
-              <ProceduralChibiAvatar config={localConfig} isMoving={false} direction="front" />
+              <MixamoAvatar colores={localConfig} isMoving={false} direction="front" />
             </group>
             
             <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={5} />
@@ -136,12 +127,12 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
                   key={preset.id}
                   onClick={() => handlePresetSelect(preset)}
                   className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
-                    localConfig.skinColor === preset.skinColor && localConfig.hairColor === preset.hairColor
+                    localConfig.piel === preset.piel && localConfig.cabello === preset.cabello
                       ? 'border-indigo-500 bg-indigo-500/10'
                       : 'border-white/10 hover:border-white/30 bg-white/5'
                   }`}
                 >
-                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ backgroundColor: preset.clothingColor }}>
+                  <div className="w-12 h-12 rounded-full flex items-center justify-center text-2xl" style={{ backgroundColor: preset.ropa_principal }}>
                     👤
                   </div>
                   <span className="text-[11px] font-bold text-white/80">{preset.name}</span>
@@ -155,11 +146,11 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
               <section>
                 <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Tono de Piel</label>
                 <div className="flex flex-wrap gap-2">
-                  {COLORS.skin.map((color) => (
+                  {COLORS.piel.map((color) => (
                     <button
                       key={color}
-                      onClick={() => setLocalConfig({ ...localConfig, skinColor: color })}
-                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.skinColor === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      onClick={() => setLocalConfig({ ...localConfig, piel: color })}
+                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.piel === color ? 'border-white scale-110' : 'border-transparent'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -169,11 +160,11 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
               <section>
                 <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Color de Cabello</label>
                 <div className="flex flex-wrap gap-2">
-                  {COLORS.hair.map((color) => (
+                  {COLORS.cabello.map((color) => (
                     <button
                       key={color}
-                      onClick={() => setLocalConfig({ ...localConfig, hairColor: color })}
-                      className={`w-8 h-8 rounded-lg border-2 transition-all ${localConfig.hairColor === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      onClick={() => setLocalConfig({ ...localConfig, cabello: color })}
+                      className={`w-8 h-8 rounded-lg border-2 transition-all ${localConfig.cabello === color ? 'border-white scale-110' : 'border-transparent'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -181,31 +172,13 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
               </section>
 
               <section>
-                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Estilo de Cabello</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {HAIR_STYLES.map((style) => (
-                    <button
-                      key={style.id}
-                      onClick={() => setLocalConfig({ ...localConfig, hairStyle: style.id })}
-                      className={`py-3 rounded-xl text-center transition-all border-2 ${
-                        localConfig.hairStyle === style.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/60'
-                      }`}
-                    >
-                      <div className="text-xl mb-1">{style.icon}</div>
-                      <div className="text-[8px] font-bold uppercase">{style.name}</div>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section>
-                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Color de Ropa</label>
+                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Color de Ojos</label>
                 <div className="flex flex-wrap gap-2">
-                  {COLORS.clothing.map((color) => (
+                  {COLORS.ojos.map((color) => (
                     <button
                       key={color}
-                      onClick={() => setLocalConfig({ ...localConfig, clothingColor: color })}
-                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.clothingColor === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      onClick={() => setLocalConfig({ ...localConfig, ojos: color })}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${localConfig.ojos === color ? 'border-white scale-110' : 'border-transparent'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -213,19 +186,43 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
               </section>
 
               <section>
-                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Accesorios</label>
-                <div className="grid grid-cols-4 gap-2">
-                  {ACCESSORIES.map((acc) => (
+                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Ropa Principal</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.ropa_principal.map((color) => (
                     <button
-                      key={acc.id}
-                      onClick={() => setLocalConfig({ ...localConfig, accessory: acc.id })}
-                      className={`py-3 rounded-xl text-center transition-all border-2 ${
-                        localConfig.accessory === acc.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/60'
-                      }`}
-                    >
-                      <div className="text-xl mb-1">{acc.icon}</div>
-                      <div className="text-[8px] font-bold uppercase">{acc.name}</div>
-                    </button>
+                      key={color}
+                      onClick={() => setLocalConfig({ ...localConfig, ropa_principal: color })}
+                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.ropa_principal === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Ropa Secundaria</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.ropa_secundario.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setLocalConfig({ ...localConfig, ropa_secundario: color })}
+                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.ropa_secundario === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </section>
+
+              <section>
+                <label className="text-[9px] uppercase font-black tracking-widest text-indigo-400 mb-2 block">Zapatos</label>
+                <div className="flex flex-wrap gap-2">
+                  {COLORS.zapatos.map((color) => (
+                    <button
+                      key={color}
+                      onClick={() => setLocalConfig({ ...localConfig, zapatos: color })}
+                      className={`w-9 h-9 rounded-full border-2 transition-all ${localConfig.zapatos === color ? 'border-white scale-110' : 'border-transparent'}`}
+                      style={{ backgroundColor: color }}
+                    />
                   ))}
                 </div>
               </section>
