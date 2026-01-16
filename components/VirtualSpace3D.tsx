@@ -117,7 +117,7 @@ const statusColors: Record<PresenceStatus, string> = {
 
 // ============== AVATAR 3D (vista 2.5D isométrica) ==============
 // Avatares Mixamo con geometría simplificada (~50% polígonos)
-const USE_MIXAMO_AVATARS = false; // Temporalmente false - volver al chibi funcional
+const USE_MIXAMO_AVATARS = true; // Probando fix de posición
 
 interface AvatarProps {
   position: THREE.Vector3;

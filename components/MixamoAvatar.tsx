@@ -109,6 +109,9 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
+    // Resetear posición del modelo a origen
+    clone.position.set(0, 0, 0);
+    
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -118,7 +121,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       }
     });
 
-    console.log('[MeshyAvatar] Modelo clonado');
+    console.log('[MeshyAvatar] Modelo clonado - pos:', clone.position.x, clone.position.y, clone.position.z);
     return clone;
   }, [gltf.scene]);
   
@@ -173,9 +176,19 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     }
   }, [actions, names, isMoving]);
 
-  // 5. Rotación según dirección
+  // 5. Rotación según dirección + Log de posición del grupo padre
   useFrame(() => {
     if (!groupRef.current) return;
+    
+    // Log para debug - ver posición del grupo
+    const worldPos = new THREE.Vector3();
+    groupRef.current.getWorldPosition(worldPos);
+    
+    // Solo log cada 60 frames para no saturar
+    if (Math.random() < 0.02) {
+      console.log('[MeshyAvatar] WorldPos:', worldPos.x.toFixed(2), worldPos.y.toFixed(2), worldPos.z.toFixed(2));
+    }
+    
     const rotations: Record<string, number> = {
       left: -Math.PI / 2,
       right: Math.PI / 2,
