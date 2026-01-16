@@ -139,8 +139,8 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
           <MixamoAvatar
             isMoving={isMoving}
             direction={direction}
-            scale={0.008}
-            position={[0, -0.5, 0]}
+            scale={0.0015}
+            position={[0, 0, 0]}
           />
         </Suspense>
       ) : (
