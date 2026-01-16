@@ -139,7 +139,6 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
           <MixamoAvatar
             isMoving={isMoving}
             direction={direction}
-            targetHeight={1.8}
           />
         </Suspense>
       ) : (

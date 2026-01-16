@@ -89,8 +89,8 @@ export const AvatarSelector3D: React.FC<AvatarSelector3DProps> = ({ compact = fa
             <directionalLight position={[5, 5, 5]} intensity={1} castShadow />
             <directionalLight position={[-5, 3, -5]} intensity={0.3} />
             
-            <group position={[0, -0.9, 0]}>
-              <MixamoAvatar targetHeight={1.8} />
+            <group position={[0, -0.85, 0]}>
+              <MixamoAvatar />
             </group>
             
             <OrbitControls 
