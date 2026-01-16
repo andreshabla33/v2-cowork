@@ -61,17 +61,11 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN Y ESCALA EN OBJETO RAÍZ
+  // 2. CLONACIÓN SIN ESCALA (la escala se aplica al group contenedor)
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
-    // 1. Aplicar escala al OBJETO RAÍZ del GLTF
-    clone.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
-    
-    // 2. Forzar actualización de matrices para que las hijas se enteren
-    clone.updateMatrixWorld(true);
-    
-    // 3. Configurar sombras en meshes
+    // Solo configurar sombras
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;
@@ -79,7 +73,7 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
       }
     });
 
-    console.log(`[MixamoAvatar] Escala en raíz: ${AVATAR_SCALE}`);
+    console.log(`[MixamoAvatar] Clone creado, escala se aplica al group`);
     return clone;
   }, [gltf.scene]);
 
@@ -118,7 +112,10 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
-      <primitive object={scene} />
+      {/* ESCALA APLICADA AL GROUP CONTENEDOR DEL PRIMITIVE */}
+      <group scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}>
+        <primitive object={scene} />
+      </group>
       
       {/* CUBO DE REFERENCIA 1 METRO - TEMPORAL PARA DIAGNÓSTICO */}
       <mesh position={[1, 0.5, 0]}>
