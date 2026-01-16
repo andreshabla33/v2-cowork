@@ -8,6 +8,7 @@ import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { ProceduralChibiAvatar } from './Avatar3DGLTF';
+import { MixamoAvatar } from './MixamoAvatar';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -114,7 +115,10 @@ const statusColors: Record<PresenceStatus, string> = {
   [PresenceStatus.DND]: '#a855f7',
 };
 
-// ============== AVATAR 3D CHIBI (vista 2.5D isométrica) ==============
+// ============== AVATAR 3D (vista 2.5D isométrica) ==============
+// Cambiar a true para usar avatares Mixamo (requiere cargar modelos grandes)
+const USE_MIXAMO_AVATARS = false;
+
 interface AvatarProps {
   position: THREE.Vector3;
   config: any;
@@ -129,12 +133,22 @@ interface AvatarProps {
 const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, direction, reaction }) => {
   return (
     <group position={position}>
-      {/* Avatar 3D Chibi */}
-      <ProceduralChibiAvatar
-        config={config || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
-        isMoving={isMoving}
-        direction={direction}
-      />
+      {/* Avatar 3D - Mixamo o Procedural */}
+      {USE_MIXAMO_AVATARS ? (
+        <Suspense fallback={null}>
+          <MixamoAvatar
+            isMoving={isMoving}
+            direction={direction}
+            scale={0.01}
+          />
+        </Suspense>
+      ) : (
+        <ProceduralChibiAvatar
+          config={config || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20' }}
+          isMoving={isMoving}
+          direction={direction}
+        />
+      )}
       
       {/* Indicador de estado */}
       <mesh position={[0.4, 1.6, 0]}>
