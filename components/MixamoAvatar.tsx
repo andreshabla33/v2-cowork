@@ -116,12 +116,6 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
       <group scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}>
         <primitive object={scene} />
       </group>
-      
-      {/* CUBO DE REFERENCIA 1 METRO - TEMPORAL PARA DIAGNÓSTICO */}
-      <mesh position={[1, 0.5, 0]}>
-        <boxGeometry args={[1, 1, 1]} />
-        <meshStandardMaterial color="red" wireframe />
-      </mesh>
     </group>
   );
 };
