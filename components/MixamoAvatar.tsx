@@ -65,23 +65,20 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   
   const { actions } = useAnimations(gltf.animations, groupRef);
   
-  // Clonar y normalizar automáticamente basado en bounding box
+  // Clonar y aplicar escala fija (los modelos de Mixamo/optimizeglb tienen escala inconsistente)
   const clonedScene = useMemo(() => {
     const scene = gltf.scene.clone();
     
-    // Calcular bounding box del modelo original
+    // Escala fija muy pequeña - los modelos están en una escala enorme
+    // Probar con 0.01 primero, si sigue grande probar 0.001
+    const FIXED_SCALE = 0.01;
+    scene.scale.set(FIXED_SCALE, FIXED_SCALE, FIXED_SCALE);
+    
+    // Log para debug
     const box = new THREE.Box3().setFromObject(scene);
     const size = new THREE.Vector3();
     box.getSize(size);
-    
-    // Calcular escala para que altura = TARGET_HEIGHT
-    const currentHeight = size.y;
-    const scale = TARGET_HEIGHT / currentHeight;
-    
-    console.log(`[MixamoAvatar] Altura original: ${currentHeight.toFixed(2)}, Escala aplicada: ${scale.toFixed(6)}`);
-    
-    // Aplicar escala normalizada
-    scene.scale.set(scale, scale, scale);
+    console.log(`[MixamoAvatar] Escala fija: ${FIXED_SCALE}, Altura resultante: ${size.y.toFixed(2)}`);
     
     return scene;
   }, [gltf.scene]);
