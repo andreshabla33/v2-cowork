@@ -225,7 +225,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     );
   });
 
-  // Agregar scene al grupo manualmente (evitar primitive)
+  // Agregar scene al grupo manualmente - SIN offset para debug
   useEffect(() => {
     if (!groupRef.current || !scene) return;
     
@@ -234,21 +234,22 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       groupRef.current.remove(groupRef.current.children[0]);
     }
     
-    // Aplicar transformaciones al scene directamente
+    // Aplicar solo escala, sin offset
     scene.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
-    scene.position.set(centerOffset.x, centerOffset.y, centerOffset.z);
+    scene.position.set(0, 0, 0);
     
     // Agregar al grupo
     groupRef.current.add(scene);
     
-    console.log('[MeshyAvatar] Scene agregado al grupo');
+    console.log('[MeshyAvatar] Scene agregado - pos:', scene.position.x, scene.position.y, scene.position.z);
+    console.log('[MeshyAvatar] Group pos:', groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z);
     
     return () => {
       if (groupRef.current && scene) {
         groupRef.current.remove(scene);
       }
     };
-  }, [scene, centerOffset]);
+  }, [scene]);
 
   return <group ref={groupRef} />;
 };
