@@ -37,22 +37,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
     const { data, error } = await supabase
       .from('reuniones_programadas')
-      .select(`
-        *,
-        creador:usuarios!reuniones_programadas_creado_por_fkey(id, nombre),
-        sala:salas_reunion(id, nombre),
-        participantes:reunion_participantes(
-          id, usuario_id, estado, notificado,
-          usuario:usuarios(id, nombre)
-        )
-      `)
+      .select('*')
       .eq('espacio_id', activeWorkspace.id)
       .order('fecha_inicio', { ascending: true });
 
     console.log('Reuniones cargadas:', data, 'Error:', error);
     
     if (!error && data) {
-      setMeetings(data);
+      setMeetings(data as any);
     } else if (error) {
       console.error('Error cargando reuniones:', error);
     }
