@@ -207,7 +207,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     
     // Solo log cada 60 frames para no saturar
     if (Math.random() < 0.02) {
-      console.log('[MeshyAvatar] WorldPos:', worldPos.x.toFixed(2), worldPos.y.toFixed(2), worldPos.z.toFixed(2));
+      console.log('[MixamoAvatar DEBUG] WorldPos:', worldPos.x.toFixed(2), worldPos.y.toFixed(2), worldPos.z.toFixed(2));
     }
     
     const rotations: Record<string, number> = {
@@ -225,33 +225,21 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     );
   });
 
-  // Agregar scene al grupo manualmente - SIN offset para debug
-  useEffect(() => {
-    if (!groupRef.current || !scene) return;
-    
-    // Limpiar hijos previos
-    while (groupRef.current.children.length > 0) {
-      groupRef.current.remove(groupRef.current.children[0]);
-    }
-    
-    // Aplicar solo escala, sin offset
-    scene.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
-    scene.position.set(0, 0, 0);
-    
-    // Agregar al grupo
-    groupRef.current.add(scene);
-    
-    console.log('[MeshyAvatar] Scene agregado - pos:', scene.position.x, scene.position.y, scene.position.z);
-    console.log('[MeshyAvatar] Group pos:', groupRef.current.position.x, groupRef.current.position.y, groupRef.current.position.z);
-    
-    return () => {
-      if (groupRef.current && scene) {
-        groupRef.current.remove(scene);
-      }
-    };
-  }, [scene]);
-
-  return <group ref={groupRef} />;
+  return (
+    <group ref={groupRef}>
+      {/* CUBO DE DEBUG: 0.5m de ancho/profundidad, 1.7m de alto (altura humana aprox) */}
+      <mesh position={[0, 0.85, 0]} castShadow receiveShadow>
+        <boxGeometry args={[0.5, 1.7, 0.5]} />
+        <meshStandardMaterial color="cyan" wireframe={false} />
+      </mesh>
+      
+      {/* Flecha para indicar frente */}
+      <mesh position={[0, 1.5, 0.4]} rotation={[Math.PI/2, 0, 0]}>
+        <coneGeometry args={[0.1, 0.4, 8]} />
+        <meshStandardMaterial color="yellow" />
+      </mesh>
+    </group>
+  );
 };
 
 export default MixamoAvatar;
