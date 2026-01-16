@@ -24,8 +24,8 @@ const getDracoLoader = () => {
 // URL del modelo base Meshy AI (liviano ~315KB)
 const MODEL_URL = `${SUPABASE_STORAGE_URL}/Meshy_AI_Character_output.glb`;
 
-// Escala del avatar Meshy AI (ajustar según el modelo)
-const AVATAR_SCALE = 1.0;
+// Escala del avatar Meshy AI - 0.01 para convertir de cm a metros
+const AVATAR_SCALE = 0.01;
 
 // Colores por defecto para el avatar
 const DEFAULT_COLORS = {
