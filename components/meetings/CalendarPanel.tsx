@@ -97,6 +97,10 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       ? new Date(`${newMeeting.fecha}T${newMeeting.hora_fin}`)
       : new Date(fechaInicio.getTime() + 60 * 60 * 1000);
 
+    // Generar link de meeting único
+    const meetingCode = Math.random().toString(36).substring(2, 10);
+    const meetingLink = `${window.location.origin}/meet/${meetingCode}`;
+
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -106,7 +110,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         fecha_inicio: fechaInicio.toISOString(),
         fecha_fin: fechaFin.toISOString(),
         creado_por: currentUser.id,
-        recordatorio_minutos: newMeeting.recordatorio_minutos
+        recordatorio_minutos: newMeeting.recordatorio_minutos,
+        meeting_link: meetingLink
       })
       .select()
       .single();
@@ -742,12 +747,13 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                   value={newMeeting.recordatorio_minutos}
                   onChange={e => setNewMeeting({ ...newMeeting, recordatorio_minutos: parseInt(e.target.value) })}
                   className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all`}
+                  style={{ colorScheme: 'dark' }}
                 >
-                  <option value={5}>5 minutos antes</option>
-                  <option value={10}>10 minutos antes</option>
-                  <option value={15}>15 minutos antes</option>
-                  <option value={30}>30 minutos antes</option>
-                  <option value={60}>1 hora antes</option>
+                  <option value={5} className="bg-zinc-800 text-white">5 minutos antes</option>
+                  <option value={10} className="bg-zinc-800 text-white">10 minutos antes</option>
+                  <option value={15} className="bg-zinc-800 text-white">15 minutos antes</option>
+                  <option value={30} className="bg-zinc-800 text-white">30 minutos antes</option>
+                  <option value={60} className="bg-zinc-800 text-white">1 hora antes</option>
                 </select>
               </div>
 
