@@ -111,8 +111,8 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   });
 
   return (
-    <group ref={groupRef} position={position} rotation={rotation} scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}>
-      <primitive object={clonedScene} />
+    <group ref={groupRef} position={position} rotation={rotation}>
+      <primitive object={clonedScene} scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]} />
     </group>
   );
 };
