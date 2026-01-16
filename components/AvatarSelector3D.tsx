@@ -83,7 +83,15 @@ export const AvatarSelector3D: React.FC<AvatarSelector3DProps> = ({ compact = fa
     <div className={compact ? "p-4 flex flex-col gap-4" : "p-6 max-w-6xl mx-auto flex flex-col lg:flex-row gap-6 h-full overflow-y-auto"}>
       {/* Vista previa 3D */}
       <div className={`${compact ? 'h-64' : 'lg:flex-1 min-h-[400px]'} bg-gradient-to-br from-zinc-900 to-zinc-800 rounded-3xl border border-white/10 overflow-hidden relative`}>
-        <Canvas shadows camera={{ position: [0, 1.5, 4], fov: 45 }}>
+        <Canvas 
+          shadows 
+          camera={{ position: [0, 1.5, 4], fov: 45 }}
+          gl={{ 
+            antialias: false,
+            powerPreference: 'high-performance',
+            failIfMajorPerformanceCaveat: false
+          }}
+        >
           <Suspense fallback={null}>
             <ambientLight intensity={0.6} />
             <directionalLight position={[5, 5, 5]} intensity={1} castShadow />

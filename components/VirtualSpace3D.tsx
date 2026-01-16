@@ -999,13 +999,24 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       <Canvas
         shadows
         gl={{ 
-          antialias: true,
-          powerPreference: 'default',
-          failIfMajorPerformanceCaveat: false
+          antialias: false,
+          powerPreference: 'high-performance',
+          failIfMajorPerformanceCaveat: false,
+          preserveDrawingBuffer: true
         }}
         onCreated={({ gl }) => {
           console.log('Canvas created successfully');
           gl.setClearColor(themeColors[theme] || '#1a1d21');
+          
+          // Manejar Context Lost
+          const canvas = gl.domElement;
+          canvas.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            console.warn('WebGL Context Lost - attempting recovery');
+          });
+          canvas.addEventListener('webglcontextrestored', () => {
+            console.log('WebGL Context Restored');
+          });
         }}
       >
         <Suspense fallback={null}>

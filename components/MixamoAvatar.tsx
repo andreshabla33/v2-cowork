@@ -9,10 +9,17 @@ import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 const SUPABASE_STORAGE_URL = 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars';
 
-// Configurar DRACOLoader
-const dracoLoader = new DRACOLoader();
-dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
-dracoLoader.setDecoderConfig({ type: 'js' });
+// Configurar DRACOLoader (singleton para evitar múltiples instancias)
+let dracoLoader: DRACOLoader | null = null;
+
+const getDracoLoader = () => {
+  if (!dracoLoader) {
+    dracoLoader = new DRACOLoader();
+    dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+    dracoLoader.setDecoderConfig({ type: 'js' });
+  }
+  return dracoLoader;
+};
 
 // Mapeo de animaciones disponibles (nombres URL-encoded)
 const ANIMATIONS = {
@@ -51,9 +58,9 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   const currentAnimation = isMoving ? 'walk' : animation;
   const modelUrl = ANIMATIONS[currentAnimation];
   
-  // Cargar el modelo GLB con DRACOLoader
+  // Cargar el modelo GLB con DRACOLoader (singleton)
   const gltf = useLoader(GLTFLoader, modelUrl, (loader) => {
-    loader.setDRACOLoader(dracoLoader);
+    loader.setDRACOLoader(getDracoLoader());
   });
   
   const { actions } = useAnimations(gltf.animations, groupRef);
