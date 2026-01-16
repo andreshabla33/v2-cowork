@@ -150,17 +150,17 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       
-      {/* Indicador de estado */}
-      <mesh position={[0.4, 1.6, 0]}>
-        <sphereGeometry args={[0.12, 16, 16]} />
+      {/* Indicador de estado - ajustado para avatar Meshy AI */}
+      <mesh position={[0.3, 1.2, 0]}>
+        <sphereGeometry args={[0.08, 16, 16]} />
         <meshBasicMaterial color={statusColors[status]} />
       </mesh>
       
       {/* Reacción emoji encima del avatar */}
       {reaction && (
         <Text
-          position={[0, 2.5, 0]}
-          fontSize={0.5}
+          position={[0, 1.8, 0]}
+          fontSize={0.3}
           anchorX="center"
           anchorY="middle"
         >
@@ -168,14 +168,14 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         </Text>
       )}
       
-      {/* Nombre flotante */}
+      {/* Nombre flotante - ajustado para avatar Meshy AI */}
       <Text
-        position={[0, 2.0, 0]}
-        fontSize={0.28}
+        position={[0, 1.5, 0]}
+        fontSize={0.18}
         color={isCurrentUser ? '#60a5fa' : '#ffffff'}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.03}
+        outlineWidth={0.02}
         outlineColor="#000000"
       >
         {name}
