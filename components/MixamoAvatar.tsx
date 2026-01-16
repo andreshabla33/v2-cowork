@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { useFrame, useLoader } from '@react-three/fiber';
 import { useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
@@ -84,11 +84,22 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Combinar colores por defecto con los personalizados
-  const finalColors = useMemo(() => ({
-    ...DEFAULT_COLORS,
-    ...colores,
-  }), [colores]);
+  // Referencia estable para colores (evita re-renders)
+  const coloresRef = useRef(colores);
+  const [coloresKey, setColoresKey] = useState(0);
+  
+  // Solo actualizar cuando los colores realmente cambian
+  useEffect(() => {
+    const prev = coloresRef.current;
+    const changed = Object.keys({ ...prev, ...colores }).some(
+      key => prev[key as keyof AvatarColores] !== colores[key as keyof AvatarColores]
+    );
+    if (changed) {
+      coloresRef.current = colores;
+      setColoresKey(k => k + 1);
+      console.log('[MeshyAvatar] Colores actualizados');
+    }
+  }, [colores]);
 
   // 1. CARGA ESTÁTICA del modelo base Meshy AI
   const gltf = useLoader(GLTFLoader, MODEL_URL, (loader) => {
@@ -98,7 +109,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN Y APLICACIÓN DE COLORES
+  // 2. CLONACIÓN del modelo (solo una vez)
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
@@ -108,12 +119,23 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         mesh.castShadow = true;
         mesh.receiveShadow = true;
         mesh.frustumCulled = false;
-        
-        // Intentar determinar qué parte del cuerpo es este mesh
+      }
+    });
+
+    console.log('[MeshyAvatar] Modelo clonado');
+    return clone;
+  }, [gltf.scene]);
+  
+  // 3. APLICACIÓN DE COLORES (solo cuando cambian)
+  useEffect(() => {
+    const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
+    
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
         const meshName = mesh.name.toLowerCase();
         const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || '';
         
-        // Buscar coincidencia en el mapeo
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
         
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
@@ -123,7 +145,6 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
           }
         }
         
-        // Aplicar color si encontramos coincidencia
         if (colorKey && mesh.material) {
           const color = finalColors[colorKey];
           if (Array.isArray(mesh.material)) {
@@ -138,12 +159,11 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         }
       }
     });
+    
+    console.log('[MeshyAvatar] Colores aplicados al modelo');
+  }, [scene, coloresKey]);
 
-    console.log(`[MeshyAvatar] Modelo cargado con colores aplicados`);
-    return clone;
-  }, [gltf.scene, finalColors]);
-
-  // 3. CONTROL DE ANIMACIÓN
+  // 4. CONTROL DE ANIMACIÓN
   useEffect(() => {
     const actionName = names.find(n => 
       n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
@@ -157,7 +177,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     }
   }, [actions, names, isMoving]);
 
-  // 4. Rotación según dirección
+  // 5. Rotación según dirección
   useFrame(() => {
     if (!groupRef.current) return;
     const rotations: Record<string, number> = {
