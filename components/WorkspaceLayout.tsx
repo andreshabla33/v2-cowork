@@ -6,6 +6,7 @@ import { TaskBoard } from './TaskBoard';
 import { MiembrosView } from './MiembrosView';
 import AvatarCustomizer3D from './AvatarCustomizer3D';
 import { ChatPanel } from './ChatPanel';
+import { CalendarPanel } from './meetings/CalendarPanel';
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
 import { StatusSelector } from './StatusSelector';
@@ -257,7 +258,8 @@ export const WorkspaceLayout: React.FC = () => {
             {activeSubTab === 'tasks' && <TaskBoard />}
             {activeSubTab === 'miembros' && <MiembrosView />}
             {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
-            {(activeSubTab as any) === 'chat' && <ChatPanel chatOnly={true} />}
+            {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
+            {activeSubTab === 'calendar' && <CalendarPanel />}
             {activeSubTab === 'settings' && (
               <div className="p-16 max-w-4xl mx-auto">
                 <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">Configuración</h2>

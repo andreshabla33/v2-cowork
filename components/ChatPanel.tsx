@@ -6,7 +6,6 @@ import { ModalCrearGrupo } from './chat/ModalCrearGrupo';
 import { AgregarMiembros } from './chat/AgregarMiembros';
 import { ChatToast, ToastNotification } from './ChatToast';
 import { MeetingRooms } from './MeetingRooms';
-import { ScheduledMeetings } from './meetings/ScheduledMeetings';
 import { PresenceStatus } from '../types';
 
 // Helper para obtener color del estado
@@ -49,7 +48,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   const [threadMessages, setThreadMessages] = useState<ChatMessage[]>([]);
   const [threadCounts, setThreadCounts] = useState<Record<string, number>>({});
   const [showMeetingRooms, setShowMeetingRooms] = useState(false);
-  const [showScheduledMeetings, setShowScheduledMeetings] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   
@@ -615,20 +613,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
             </button>
             {showMeetingRooms && <MeetingRooms />}
             <button 
-              onClick={() => setShowScheduledMeetings(!showScheduledMeetings)}
-              className={`w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${showScheduledMeetings ? s.activeItem : 'hover:bg-white/5'}`}
+              onClick={() => setActiveSubTab('calendar')}
+              className={`w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeSubTab === 'calendar' ? s.activeItem : 'hover:bg-white/5'}`}
             >
               <span className="w-4 text-center opacity-60">📅</span>
               <span className="truncate">Calendario</span>
-              <svg className={`w-3 h-3 ml-auto opacity-50 transition-transform ${showScheduledMeetings ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+              <svg className="w-3 h-3 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
               </svg>
             </button>
-            {showScheduledMeetings && (
-              <div className="mt-2 mx-2 rounded-xl overflow-hidden border border-white/10 bg-black/20 max-h-[400px]">
-                <ScheduledMeetings />
-              </div>
-            )}
             <button className="w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-all flex items-center gap-3">
               <span className="w-4 text-center opacity-60">📝</span>
               <span className="truncate">Borradores</span>

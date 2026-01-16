@@ -13,7 +13,7 @@ interface Notification {
 interface AppState {
   theme: ThemeType;
   view: 'dashboard' | 'workspace' | 'invitation' | 'loading';
-  activeSubTab: 'space' | 'tasks' | 'miembros' | 'settings' | 'builder' | 'chat' | 'avatar';
+  activeSubTab: 'space' | 'tasks' | 'miembros' | 'settings' | 'builder' | 'chat' | 'avatar' | 'calendar';
   currentUser: User;
   users: User[];
   onlineUsers: User[];
