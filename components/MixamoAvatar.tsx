@@ -14,15 +14,15 @@ const dracoLoader = new DRACOLoader();
 dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
 dracoLoader.setDecoderConfig({ type: 'js' });
 
-// Mapeo de animaciones disponibles
+// Mapeo de animaciones disponibles (nombres URL-encoded)
 const ANIMATIONS = {
-  idle: `${SUPABASE_STORAGE_URL}/3dpea.com_Standing W_Briefcase Idle.glb`,
-  walk: `${SUPABASE_STORAGE_URL}/3dpea.com_Unarmed Walk Forward.glb`,
-  salute: `${SUPABASE_STORAGE_URL}/3dpea.com_Salute.glb`,
-  run: `${SUPABASE_STORAGE_URL}/3dpea.com_Run To Stop.glb`,
-  walkLeft: `${SUPABASE_STORAGE_URL}/3dpea.com_Walk Strafe Left.glb`,
-  startWalk: `${SUPABASE_STORAGE_URL}/3dpea.com_Start Walking.glb`,
-  turn: `${SUPABASE_STORAGE_URL}/3dpea.com_Backward Right Turn.glb`,
+  idle: `${SUPABASE_STORAGE_URL}/De%20pie%20con%20maletin%20inactivo`,
+  walk: `${SUPABASE_STORAGE_URL}/Caminata%20desarmada%20hacia%20adelante`,
+  salute: `${SUPABASE_STORAGE_URL}/Saludo`,
+  run: `${SUPABASE_STORAGE_URL}/Ejecutar%20para%20detener`,
+  walkLeft: `${SUPABASE_STORAGE_URL}/Walk%20Strafe%20Left`,
+  startWalk: `${SUPABASE_STORAGE_URL}/Empieza%20a%20caminar`,
+  turn: `${SUPABASE_STORAGE_URL}/Giro%20hacia%20atras%20a%20la%20derecha`,
 };
 
 interface MixamoAvatarProps {
