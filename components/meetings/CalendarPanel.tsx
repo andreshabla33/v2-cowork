@@ -428,21 +428,33 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                   
                   const dayMeetings = getMeetingsForDate(date);
                   const isToday = date.toDateString() === new Date().toDateString();
+                  const isPast = date < new Date(new Date().setHours(0,0,0,0));
+
+                  const handleDayClick = () => {
+                    if (!isPast) {
+                      const dateStr = date.toISOString().split('T')[0];
+                      setNewMeeting(prev => ({ ...prev, fecha: dateStr }));
+                      setShowScheduleModal(true);
+                    }
+                  };
 
                   return (
                     <div
                       key={i}
+                      onClick={handleDayClick}
                       className={`p-1 rounded-lg text-[11px] font-medium cursor-pointer transition-all ${
+                        isPast ? 'opacity-30 cursor-not-allowed' :
                         isToday 
                           ? (theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-500 text-white') 
                           : dayMeetings.length > 0 
                             ? 'bg-indigo-500/20 hover:bg-indigo-500/30' 
                             : 'hover:bg-white/10'
                       }`}
+                      title={isPast ? 'Fecha pasada' : 'Click para crear reunión'}
                     >
                       {date.getDate()}
-                      {dayMeetings.length > 0 && !isToday && (
-                        <div className={`w-1 h-1 rounded-full mx-auto mt-0.5 ${theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-indigo-400'}`} />
+                      {dayMeetings.length > 0 && (
+                        <div className={`w-1.5 h-1.5 rounded-full mx-auto mt-0.5 ${theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-indigo-400'}`} />
                       )}
                     </div>
                   );
