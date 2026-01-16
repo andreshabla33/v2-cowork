@@ -25,9 +25,6 @@ const ANIMATIONS = {
   turn: `${SUPABASE_STORAGE_URL}/Giro%20hacia%20atras%20a%20la%20derecha`,
 };
 
-// Altura objetivo del avatar en unidades de Three.js (metros)
-const TARGET_HEIGHT = 1.8;
-
 interface MixamoAvatarProps {
   animation?: keyof typeof ANIMATIONS;
   scale?: number;
@@ -38,8 +35,8 @@ interface MixamoAvatarProps {
   targetHeight?: number;
 }
 
-// Escala estándar para modelos Mixamo (cm a m)
-const MIXAMO_SCALE = 0.01;
+// Altura objetivo del avatar en unidades Three.js (metros)
+const TARGET_HEIGHT = 1.8;
 
 export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   animation = 'idle',
@@ -61,12 +58,24 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   
   const { actions } = useAnimations(gltf.animations, groupRef);
   
-  // Clonar la escena y aplicar escala Mixamo estándar (0.01)
+  // Clonar y normalizar automáticamente basado en bounding box
   const clonedScene = useMemo(() => {
     const scene = gltf.scene.clone();
-    // Mixamo exporta en centímetros, Three.js usa metros
-    // Escala 0.01 convierte cm a m (avatar ~170-180cm = 1.7-1.8 unidades)
-    scene.scale.set(MIXAMO_SCALE, MIXAMO_SCALE, MIXAMO_SCALE);
+    
+    // Calcular bounding box del modelo original
+    const box = new THREE.Box3().setFromObject(scene);
+    const size = new THREE.Vector3();
+    box.getSize(size);
+    
+    // Calcular escala para que altura = TARGET_HEIGHT
+    const currentHeight = size.y;
+    const scale = TARGET_HEIGHT / currentHeight;
+    
+    console.log(`[MixamoAvatar] Altura original: ${currentHeight.toFixed(2)}, Escala aplicada: ${scale.toFixed(6)}`);
+    
+    // Aplicar escala normalizada
+    scene.scale.set(scale, scale, scale);
+    
     return scene;
   }, [gltf.scene]);
   
