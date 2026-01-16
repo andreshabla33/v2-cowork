@@ -21,8 +21,8 @@ const getDracoLoader = () => {
   return dracoLoader;
 };
 
-// Mapeo de animaciones disponibles (nombres actuales en Supabase Storage)
-const ANIMATIONS = {
+// URLs de animaciones en Supabase Storage
+const ANIMATIONS_URLS = {
   idle: `${SUPABASE_STORAGE_URL}/Standing%20W_Briefcase%20Idle`,
   walk: `${SUPABASE_STORAGE_URL}/Unarmed%20Walk%20Forward`,
   salute: `${SUPABASE_STORAGE_URL}/Salute`,
@@ -32,18 +32,16 @@ const ANIMATIONS = {
   turn: `${SUPABASE_STORAGE_URL}/Backward%20Right%20Turn`,
 };
 
+// Escala correcta para el avatar
+const AVATAR_SCALE = 0.0077;
+
 interface MixamoAvatarProps {
-  animation?: keyof typeof ANIMATIONS;
-  scale?: number;
+  animation?: keyof typeof ANIMATIONS_URLS;
   position?: [number, number, number];
   rotation?: [number, number, number];
   isMoving?: boolean;
   direction?: string;
-  targetHeight?: number;
 }
-
-// Altura objetivo del avatar en unidades Three.js (metros)
-const TARGET_HEIGHT = 1.8;
 
 export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   animation = 'idle',
@@ -54,55 +52,55 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   
-  // Determinar qué animación usar basado en el movimiento
-  const currentAnimation = isMoving ? 'walk' : animation;
-  const modelUrl = ANIMATIONS[currentAnimation];
-  
-  // Cargar el modelo GLB con DRACOLoader (singleton)
-  const gltf = useLoader(GLTFLoader, modelUrl, (loader) => {
+  // 1. CARGA ESTÁTICA: Siempre cargamos el modelo 'idle' como base
+  // Esto evita recargas constantes que causan Context Lost
+  const gltf = useLoader(GLTFLoader, ANIMATIONS_URLS.idle, (loader) => {
     loader.setDRACOLoader(getDracoLoader());
   });
-  
-  const { actions } = useAnimations(gltf.animations, groupRef);
-  
-  // Escala para que el avatar mida ~1.4 unidades (igual que el chibi)
-  // El modelo original mide ~182 unidades, queremos ~1.4
-  const AVATAR_SCALE = 0.0077;
-  
-  // Clonar y aplicar escala IMPERATIVA (no como prop)
-  const clonedScene = useMemo(() => {
-    const clone = gltf.scene.clone();
+
+  const { animations: loadedAnimations } = gltf;
+  const { actions, names } = useAnimations(loadedAnimations, groupRef);
+
+  // 2. CLONACIÓN OPTIMIZADA con copia profunda
+  const scene = useMemo(() => {
+    // clone(true) para copia profunda del SkinnedMesh
+    const clone = gltf.scene.clone(true);
     
-    // Forzar escala directamente en el objeto raíz del GLTF
+    // Aplicar escala al objeto raíz
     clone.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
     
-    // Centrar el modelo
-    clone.position.set(0, 0, 0);
-    
-    // Actualizar matrices para que la escala se propague
-    clone.updateMatrixWorld(true);
-    
-    console.log(`[MixamoAvatar] Escala IMPERATIVA aplicada: ${AVATAR_SCALE}`);
+    // Recorrer para activar sombras y evitar frustum culling
+    clone.traverse((obj) => {
+      if ((obj as THREE.Mesh).isMesh) {
+        obj.castShadow = true;
+        obj.receiveShadow = true;
+        // Evita que desaparezca si la cámara está cerca
+        obj.frustumCulled = false;
+      }
+    });
+
+    console.log(`[MixamoAvatar] Modelo cargado, escala: ${AVATAR_SCALE}`);
     return clone;
   }, [gltf.scene]);
-  
-  // Reproducir la animación
-  useEffect(() => {
-    if (actions && gltf.animations.length > 0) {
-      const actionName = gltf.animations[0]?.name;
-      if (actionName && actions[actionName]) {
-        actions[actionName].reset().fadeIn(0.3).play();
-        return () => {
-          actions[actionName]?.fadeOut(0.3);
-        };
-      }
-    }
-  }, [actions, gltf.animations, currentAnimation]);
 
-  // Rotación según dirección
+  // 3. CONTROL DE ANIMACIÓN (usa animaciones del archivo base)
+  useEffect(() => {
+    // Buscar animación por nombre (idle o walk si existe)
+    const actionName = names.find(n => 
+      n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
+    ) || names[0];
+
+    if (actionName && actions[actionName]) {
+      actions[actionName].reset().fadeIn(0.2).play();
+      return () => {
+        actions[actionName]?.fadeOut(0.2);
+      };
+    }
+  }, [actions, names, isMoving]);
+
+  // 4. Rotación según dirección
   useFrame(() => {
     if (!groupRef.current) return;
-    
     const rotations: Record<string, number> = {
       left: -Math.PI / 2,
       right: Math.PI / 2,
@@ -110,8 +108,6 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
       front: 0,
       down: 0,
     };
-    
-    // Interpolación suave de rotación
     const targetRotation = rotations[direction] || 0;
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
       groupRef.current.rotation.y,
@@ -122,7 +118,7 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
-      <primitive object={clonedScene} />
+      <primitive object={scene} />
     </group>
   );
 };
