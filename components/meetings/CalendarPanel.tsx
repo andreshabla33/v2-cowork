@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting } from '../../types';
+import { googleCalendar, GoogleCalendarEvent } from '../../lib/googleCalendar';
 
 interface CalendarPanelProps {
   onJoinMeeting?: (salaId: string) => void;
@@ -10,13 +11,15 @@ interface CalendarPanelProps {
 export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) => {
   const { currentUser, activeWorkspace, theme } = useStore();
   const [meetings, setMeetings] = useState<ScheduledMeeting[]>([]);
+  const [googleEvents, setGoogleEvents] = useState<GoogleCalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'scheduled' | 'notes'>('scheduled');
   const [searchQuery, setSearchQuery] = useState('');
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [miembrosEspacio, setMiembrosEspacio] = useState<any[]>([]);
-  const [googleConnected, setGoogleConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(googleCalendar.isConnected());
+  const [syncingGoogle, setSyncingGoogle] = useState(false);
 
   const [newMeeting, setNewMeeting] = useState({
     titulo: '',
@@ -157,9 +160,49 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   };
 
   const connectGoogleCalendar = () => {
-    // TODO: Implementar OAuth con Google Calendar
-    alert('La integración con Google Calendar requiere configuración OAuth. Contacta al administrador.');
+    window.location.href = googleCalendar.getAuthUrl();
   };
+
+  const disconnectGoogleCalendar = () => {
+    googleCalendar.removeToken();
+    setGoogleConnected(false);
+    setGoogleEvents([]);
+  };
+
+  const syncGoogleEvents = useCallback(async () => {
+    if (!googleCalendar.isConnected()) return;
+    
+    setSyncingGoogle(true);
+    try {
+      const events = await googleCalendar.fetchEvents();
+      setGoogleEvents(events);
+    } catch (error: any) {
+      console.error('Error sincronizando Google Calendar:', error);
+      if (error.message === 'Token expirado') {
+        setGoogleConnected(false);
+      }
+    }
+    setSyncingGoogle(false);
+  }, []);
+
+  useEffect(() => {
+    const hash = window.location.hash;
+    if (hash.includes('access_token')) {
+      const token = googleCalendar.parseHashToken(hash);
+      if (token) {
+        googleCalendar.saveToken(token);
+        setGoogleConnected(true);
+        window.history.replaceState(null, '', window.location.pathname);
+        syncGoogleEvents();
+      }
+    }
+  }, [syncGoogleEvents]);
+
+  useEffect(() => {
+    if (googleConnected) {
+      syncGoogleEvents();
+    }
+  }, [googleConnected, syncGoogleEvents]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
@@ -558,15 +601,31 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
       {/* Google Calendar Button */}
       <div className="px-6 pb-4 pt-2">
-        <button
-          onClick={connectGoogleCalendar}
-          className={`flex items-center justify-center gap-2 px-4 py-2 mx-auto ${s.btnGoogle} rounded-xl text-sm font-medium transition-all hover:opacity-90`}
-        >
-          <svg className="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
-          </svg>
-          Conectar Google Calendar
-        </button>
+        {googleConnected ? (
+          <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
+              Google Calendar conectado
+              {syncingGoogle && <span className="opacity-60">(sincronizando...)</span>}
+            </div>
+            <button
+              onClick={disconnectGoogleCalendar}
+              className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-all"
+            >
+              Desconectar
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={connectGoogleCalendar}
+            className={`flex items-center justify-center gap-2 px-4 py-2 mx-auto ${s.btnGoogle} rounded-xl text-sm font-medium transition-all hover:opacity-90`}
+          >
+            <svg className="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
+            </svg>
+            Conectar Google Calendar
+          </button>
+        )}
       </div>
 
       {/* Modal Nueva Reunión */}
