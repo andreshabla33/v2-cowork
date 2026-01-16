@@ -65,21 +65,14 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   
   const { actions } = useAnimations(gltf.animations, groupRef);
   
-  // Clonar y aplicar escala fija (los modelos de Mixamo/optimizeglb tienen escala inconsistente)
+  // Escala para que el avatar mida ~1.4 unidades (igual que el chibi)
+  // El modelo original mide ~182 unidades, queremos ~1.4
+  const AVATAR_SCALE = 1.4 / 182; // ≈ 0.0077
+  
+  // Clonar la escena sin modificar la escala interna
   const clonedScene = useMemo(() => {
     const scene = gltf.scene.clone();
-    
-    // Escala fija muy pequeña - los modelos están en una escala enorme
-    // Probar con 0.01 primero, si sigue grande probar 0.001
-    const FIXED_SCALE = 0.01;
-    scene.scale.set(FIXED_SCALE, FIXED_SCALE, FIXED_SCALE);
-    
-    // Log para debug
-    const box = new THREE.Box3().setFromObject(scene);
-    const size = new THREE.Vector3();
-    box.getSize(size);
-    console.log(`[MixamoAvatar] Escala fija: ${FIXED_SCALE}, Altura resultante: ${size.y.toFixed(2)}`);
-    
+    console.log(`[MixamoAvatar] Escala aplicada al grupo: ${AVATAR_SCALE.toFixed(6)}`);
     return scene;
   }, [gltf.scene]);
   
@@ -118,7 +111,7 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   });
 
   return (
-    <group ref={groupRef} position={position} rotation={rotation}>
+    <group ref={groupRef} position={position} rotation={rotation} scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}>
       <primitive object={clonedScene} />
     </group>
   );
