@@ -67,13 +67,23 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   
   // Escala para que el avatar mida ~1.4 unidades (igual que el chibi)
   // El modelo original mide ~182 unidades, queremos ~1.4
-  const AVATAR_SCALE = 1.4 / 182; // ≈ 0.0077
+  const AVATAR_SCALE = 0.0077;
   
-  // Clonar la escena sin modificar la escala interna
+  // Clonar y aplicar escala IMPERATIVA (no como prop)
   const clonedScene = useMemo(() => {
-    const scene = gltf.scene.clone();
-    console.log(`[MixamoAvatar] Escala aplicada al grupo: ${AVATAR_SCALE.toFixed(6)}`);
-    return scene;
+    const clone = gltf.scene.clone();
+    
+    // Forzar escala directamente en el objeto raíz del GLTF
+    clone.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
+    
+    // Centrar el modelo
+    clone.position.set(0, 0, 0);
+    
+    // Actualizar matrices para que la escala se propague
+    clone.updateMatrixWorld(true);
+    
+    console.log(`[MixamoAvatar] Escala IMPERATIVA aplicada: ${AVATAR_SCALE}`);
+    return clone;
   }, [gltf.scene]);
   
   // Reproducir la animación
@@ -112,7 +122,7 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
 
   return (
     <group ref={groupRef} position={position} rotation={rotation}>
-      <primitive object={clonedScene} scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]} />
+      <primitive object={clonedScene} />
     </group>
   );
 };
