@@ -68,16 +68,12 @@ export interface AvatarColores {
 }
 
 interface MeshyAvatarProps {
-  position?: [number, number, number];
-  rotation?: [number, number, number];
   isMoving?: boolean;
   direction?: string;
   colores?: AvatarColores;
 }
 
 export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
-  position = [0, 0, 0],
-  rotation = [0, 0, 0],
   isMoving = false,
   direction = 'front',
   colores = {},
@@ -198,8 +194,6 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   return (
     <group 
       ref={groupRef} 
-      position={position} 
-      rotation={rotation}
       scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
     >
       <primitive object={scene} />
