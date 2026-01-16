@@ -47,11 +47,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         )
       `)
       .eq('espacio_id', activeWorkspace.id)
-      .gte('fecha_fin', new Date().toISOString())
       .order('fecha_inicio', { ascending: true });
 
+    console.log('Reuniones cargadas:', data, 'Error:', error);
+    
     if (!error && data) {
       setMeetings(data);
+    } else if (error) {
+      console.error('Error cargando reuniones:', error);
     }
     setLoading(false);
   }, [activeWorkspace?.id]);
