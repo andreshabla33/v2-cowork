@@ -129,12 +129,20 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       // Sincronizar con Google Calendar si está conectado
       if (googleConnected) {
         try {
-          await googleCalendar.createEvent({
+          const googleEvent = await googleCalendar.createEvent({
             summary: newMeeting.titulo.trim(),
-            description: `${newMeeting.descripcion.trim() || ''}\n\n🔗 Link: ${meetingLink}`,
+            description: newMeeting.descripcion.trim() || undefined,
             start: fechaInicio.toISOString(),
             end: fechaFin.toISOString()
           });
+          
+          // Si Google Meet se creó, actualizar el meeting_link con el link de Meet
+          if (googleEvent?.hangoutLink) {
+            await supabase
+              .from('reuniones_programadas')
+              .update({ meeting_link: googleEvent.hangoutLink })
+              .eq('id', meeting.id);
+          }
         } catch (err) {
           console.error('Error creando evento en Google Calendar:', err);
         }

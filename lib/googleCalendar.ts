@@ -90,7 +90,7 @@ export const googleCalendar = {
     start: string;
     end: string;
     attendees?: string[];
-  }): Promise<GoogleCalendarEvent> => {
+  }): Promise<GoogleCalendarEvent & { hangoutLink?: string }> => {
     const token = googleCalendar.getToken();
     if (!token) throw new Error('No hay token de Google Calendar');
 
@@ -99,11 +99,17 @@ export const googleCalendar = {
       description: event.description,
       start: { dateTime: event.start, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
       end: { dateTime: event.end, timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      attendees: event.attendees?.map(email => ({ email }))
+      attendees: event.attendees?.map(email => ({ email })),
+      conferenceData: {
+        createRequest: {
+          requestId: `meet-${Date.now()}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' }
+        }
+      }
     };
 
     const response = await fetch(
-      'https://www.googleapis.com/calendar/v3/calendars/primary/events',
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
       {
         method: 'POST',
         headers: {
@@ -119,6 +125,8 @@ export const googleCalendar = {
         googleCalendar.removeToken();
         throw new Error('Token expirado');
       }
+      const errorData = await response.json();
+      console.error('Google Calendar API Error:', errorData);
       throw new Error('Error al crear evento');
     }
 
