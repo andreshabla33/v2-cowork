@@ -1,11 +1,18 @@
 'use client';
 
-import React, { useRef, useEffect, useState } from 'react';
-import { useFrame } from '@react-three/fiber';
-import { useGLTF, useAnimations } from '@react-three/drei';
+import React, { useRef, useEffect, useMemo } from 'react';
+import { useFrame, useLoader } from '@react-three/fiber';
+import { useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 
 const SUPABASE_STORAGE_URL = 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars';
+
+// Configurar DRACOLoader
+const dracoLoader = new DRACOLoader();
+dracoLoader.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+dracoLoader.setDecoderConfig({ type: 'js' });
 
 // Mapeo de animaciones disponibles
 const ANIMATIONS = {
@@ -41,17 +48,20 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   const currentAnimation = isMoving ? 'walk' : animation;
   const modelUrl = ANIMATIONS[currentAnimation];
   
-  // Cargar el modelo GLB
-  const { scene, animations } = useGLTF(modelUrl);
-  const { actions, mixer } = useAnimations(animations, groupRef);
+  // Cargar el modelo GLB con DRACOLoader
+  const gltf = useLoader(GLTFLoader, modelUrl, (loader) => {
+    loader.setDRACOLoader(dracoLoader);
+  });
+  
+  const { actions } = useAnimations(gltf.animations, groupRef);
   
   // Clonar la escena para evitar problemas con múltiples instancias
-  const clonedScene = React.useMemo(() => scene.clone(), [scene]);
+  const clonedScene = useMemo(() => gltf.scene.clone(), [gltf.scene]);
   
   // Reproducir la animación
   useEffect(() => {
-    if (actions && animations.length > 0) {
-      const actionName = animations[0]?.name;
+    if (actions && gltf.animations.length > 0) {
+      const actionName = gltf.animations[0]?.name;
       if (actionName && actions[actionName]) {
         actions[actionName].reset().fadeIn(0.3).play();
         return () => {
@@ -59,7 +69,7 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
         };
       }
     }
-  }, [actions, animations, currentAnimation]);
+  }, [actions, gltf.animations, currentAnimation]);
 
   // Rotación según dirección
   useFrame(() => {
@@ -88,10 +98,5 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
     </group>
   );
 };
-
-// Precargar modelos para mejor rendimiento
-Object.values(ANIMATIONS).forEach((url) => {
-  useGLTF.preload(url);
-});
 
 export default MixamoAvatar;
