@@ -1,7 +1,4 @@
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '628870318014-35io6nhdj8rld9de0ng5voorrmr2neq4.apps.googleusercontent.com';
-const GOOGLE_REDIRECT_URI = typeof window !== 'undefined' 
-  ? window.location.origin
-  : '';
+const GOOGLE_CLIENT_ID = '628870318014-35io6nhdj8rld9de0ng5voorrmr2neq4.apps.googleusercontent.com';
 
 const SCOPES = [
   'https://www.googleapis.com/auth/calendar.readonly',
@@ -20,9 +17,10 @@ export interface GoogleCalendarEvent {
 
 export const googleCalendar = {
   getAuthUrl: () => {
+    const redirectUri = window.location.origin;
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
-      redirect_uri: GOOGLE_REDIRECT_URI,
+      redirect_uri: redirectUri,
       response_type: 'token',
       scope: SCOPES,
       include_granted_scopes: 'true',

@@ -126,9 +126,32 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         await supabase.from('reunion_participantes').insert(participantesData);
       }
 
+      // Sincronizar con Google Calendar si está conectado
+      if (googleConnected) {
+        try {
+          const googleEvent = await googleCalendar.createEvent({
+            summary: newMeeting.titulo.trim(),
+            description: newMeeting.descripcion.trim() || undefined,
+            start: fechaInicio.toISOString(),
+            end: fechaFin.toISOString()
+          });
+          
+          // Guardar el google_event_id en la reunión
+          if (googleEvent?.id) {
+            await supabase
+              .from('reuniones_programadas')
+              .update({ google_event_id: googleEvent.id })
+              .eq('id', meeting.id);
+          }
+        } catch (err) {
+          console.error('Error creando evento en Google Calendar:', err);
+        }
+      }
+
       setShowScheduleModal(false);
       resetNewMeeting();
       loadMeetings();
+      syncGoogleEvents();
     }
   };
 
