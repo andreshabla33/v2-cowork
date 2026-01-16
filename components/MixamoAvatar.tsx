@@ -105,12 +105,20 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN del modelo (solo una vez)
+  // 2. CLONACIÓN del modelo y CENTRADO usando bounding box
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
-    // Resetear posición del modelo a origen
-    clone.position.set(0, 0, 0);
+    // Calcular bounding box para centrar el modelo
+    const box = new THREE.Box3().setFromObject(clone);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    
+    console.log('[MeshyAvatar] BoundingBox center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
+    console.log('[MeshyAvatar] BoundingBox size:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+    
+    // Mover el modelo para que su centro esté en el origen (solo X y Z, Y en el suelo)
+    clone.position.set(-center.x, -box.min.y, -center.z);
     
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
@@ -121,7 +129,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       }
     });
 
-    console.log('[MeshyAvatar] Modelo clonado - pos:', clone.position.x, clone.position.y, clone.position.z);
+    console.log('[MeshyAvatar] Modelo centrado - nueva pos:', clone.position.x.toFixed(2), clone.position.y.toFixed(2), clone.position.z.toFixed(2));
     return clone;
   }, [gltf.scene]);
   
