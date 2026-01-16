@@ -32,8 +32,9 @@ const ANIMATIONS_URLS = {
   turn: `${SUPABASE_STORAGE_URL}/Backward%20Right%20Turn`,
 };
 
-// Escala correcta para el avatar
-const AVATAR_SCALE = 0.0077;
+// Escala correcta para el avatar (Mixamo exporta en CM, Three.js usa M)
+// 0.01 es estándar, si sigue gigante usar 0.0077
+const AVATAR_SCALE = 0.01;
 
 interface MixamoAvatarProps {
   animation?: keyof typeof ANIMATIONS_URLS;
@@ -61,19 +62,20 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN SIN ESCALA (la escala se aplica al group contenedor)
+  // 2. CLONACIÓN Y CONFIGURACIÓN
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
-    // Solo configurar sombras
     clone.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         child.castShadow = true;
         child.receiveShadow = true;
+        // IMPORTANTE: Evita que desaparezca por error de escala
+        child.frustumCulled = false;
       }
     });
 
-    console.log(`[MixamoAvatar] Clone creado, escala se aplica al group`);
+    console.log(`[MixamoAvatar] Clone creado`);
     return clone;
   }, [gltf.scene]);
 
@@ -111,11 +113,13 @@ export const MixamoAvatar: React.FC<MixamoAvatarProps> = ({
   });
 
   return (
-    <group ref={groupRef} position={position} rotation={rotation}>
-      {/* ESCALA APLICADA AL GROUP CONTENEDOR DEL PRIMITIVE */}
-      <group scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}>
-        <primitive object={scene} />
-      </group>
+    <group 
+      ref={groupRef} 
+      position={position} 
+      rotation={rotation}
+      scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
+    >
+      <primitive object={scene} />
     </group>
   );
 };
