@@ -1,4 +1,4 @@
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '628870318014-35io6nhdj8rld9de0ng5voorrmr2neq4.apps.googleusercontent.com';
 const GOOGLE_REDIRECT_URI = typeof window !== 'undefined' 
   ? `${window.location.origin}/auth/google/callback`
   : '';
