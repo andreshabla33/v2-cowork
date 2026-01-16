@@ -105,11 +105,19 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN del modelo (sin modificar posición)
+  // 2. CLONACIÓN del modelo y debug de estructura
   const scene = useMemo(() => {
     const clone = gltf.scene.clone();
     
+    console.log('[MeshyAvatar] === DEBUG ESTRUCTURA ===');
+    console.log('[MeshyAvatar] Scene position:', clone.position.x, clone.position.y, clone.position.z);
+    console.log('[MeshyAvatar] Scene children:', clone.children.length);
+    
+    // Explorar jerarquía
     clone.traverse((child) => {
+      console.log('[MeshyAvatar] Child:', child.type, child.name, 
+                  'pos:', child.position.x.toFixed(2), child.position.y.toFixed(2), child.position.z.toFixed(2));
+      
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         mesh.castShadow = true;
@@ -117,8 +125,8 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         mesh.frustumCulled = false;
       }
     });
-
-    console.log('[MeshyAvatar] Modelo clonado');
+    
+    console.log('[MeshyAvatar] === FIN DEBUG ===');
     return clone;
   }, [gltf.scene]);
   
