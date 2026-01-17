@@ -103,8 +103,8 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. Cálculo de offset para centrar
-  const centerOffset = useMemo(() => {
+  // 2. Cálculo de offset para centrar y ESCALA AUTOMÁTICA
+  const { centerOffset, autoScale } = useMemo(() => {
     // Asegurar que la caja se calcule considerando todo (incluyendo skinned meshes)
     const box = new THREE.Box3().setFromObject(scene);
     const center = box.getCenter(new THREE.Vector3());
@@ -113,20 +113,38 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     console.log('[MeshyAvatar] BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
     console.log('[MeshyAvatar] BoundingBox Center:', center.x.toFixed(4), center.y.toFixed(4), center.z.toFixed(4));
     
-    // Si el tamaño es muy pequeño (ej. < 2m), NO aplicar escala 0.01
-    // Si el tamaño es grande (ej. > 100m), aplicar escala 0.01
+    // Calcular escala para normalizar altura a ~1.75m (altura humana promedio)
+    // Si la altura es 0 o muy pequeña (error), usar 1
+    const targetHeight = 1.75;
+    let scale = 1;
     
-    return new THREE.Vector3(-center.x, -box.min.y, -center.z);
+    if (size.y > 0.001) {
+      scale = targetHeight / size.y;
+    } else {
+      console.warn('[MeshyAvatar] Altura no detectada (0), usando escala 1');
+    }
+
+    // Offset para centrar (se aplicará al grupo escalado, así que usamos coordenadas locales relativas al centro)
+    // El objetivo es que (0,0,0) del mundo coincida con (center.x, min.y, center.z) del modelo
+    const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
+    
+    return { centerOffset: offset, autoScale: scale };
   }, [scene]);
 
-  // 3. Aplicación de colores
+  // 3. Aplicación de colores con Debug
   useEffect(() => {
     const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
+    console.log('[MeshyAvatar] Aplicando colores:', JSON.stringify(finalColors));
+    
+    let meshesFound = 0;
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
+        meshesFound++;
         const mesh = child as THREE.Mesh;
         const meshName = mesh.name.toLowerCase();
-        const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || '';
+        const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || 'unknown';
+        
+        console.log(`[MeshyAvatar Debug] Mesh encontrada: "${mesh.name}" Material: "${materialName}"`);
         
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
@@ -138,6 +156,8 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         
         if (colorKey && mesh.material) {
           const color = finalColors[colorKey];
+          console.log(`  -> Aplicando color ${colorKey} (${color}) a ${mesh.name}`);
+          
           if (Array.isArray(mesh.material)) {
             mesh.material.forEach((mat) => {
               if ((mat as THREE.MeshStandardMaterial).color) {
@@ -147,9 +167,12 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
           } else if ((mesh.material as THREE.MeshStandardMaterial).color) {
             (mesh.material as THREE.MeshStandardMaterial).color.set(color);
           }
+        } else {
+          console.log(`  -> No match found for mapping`);
         }
       }
     });
+    console.log(`[MeshyAvatar] Total meshes processed: ${meshesFound}`);
   }, [scene, coloresKey]);
 
   // 4. Animaciones
@@ -161,12 +184,6 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     if (actionName && actions[actionName]) {
       const action = actions[actionName];
       action.reset().fadeIn(0.2).play();
-      
-      // IMPORTANTE: Si la animación tiene root motion (mueve el personaje),
-      // necesitamos desactivarlo o compensarlo si queremos que el control sea manual.
-      // Sin embargo, para Mixamo/Meshy generalmente queremos que sigan el hueso root
-      // pero si el hueso root se desplaza, se separará del collider.
-      
       return () => {
         action.fadeOut(0.2);
       };
@@ -195,19 +212,15 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   return (
     <group ref={groupRef}>
       {/* Grupo interno para aplicar escala y offset de centrado */}
+      {/* Usamos autoScale en lugar de AVATAR_SCALE fijo */}
       <group 
-        scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
-        position={[centerOffset.x * AVATAR_SCALE, 0, centerOffset.z * AVATAR_SCALE]}
+        scale={[autoScale, autoScale, autoScale]}
+        position={[centerOffset.x * autoScale, 0, centerOffset.z * autoScale]}
       >
         <primitive object={scene} />
       </group>
       {/* Ayuda visual: Ejes (1m de largo) */}
-      <axesHelper args={[1]} />
-      {/* Ayuda visual: Caja envolvente del avatar (debug visual) */}
-      <mesh position={[0, 1, 0]} visible={false}>
-        <boxGeometry args={[0.5, 2, 0.5]} />
-        <meshBasicMaterial color="red" wireframe />
-      </mesh>
+      <axesHelper args={[0.5]} />
     </group>
   );
 };
