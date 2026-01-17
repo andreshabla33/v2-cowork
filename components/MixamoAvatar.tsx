@@ -134,10 +134,10 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     return { centerOffset: offset, autoScale: scale };
   }, [scene]);
 
-  // 3. Aplicación de colores con Debug
+  // 3. Aplicación de colores con Debug y Respeto de Texturas
   useEffect(() => {
     const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
-    console.log('[MeshyAvatar] Aplicando colores:', JSON.stringify(finalColors));
+    console.log('[MeshyAvatar] Aplicando colores/texturas...');
     
     let meshesFound = 0;
     scene.traverse((child) => {
@@ -145,10 +145,24 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         meshesFound++;
         const mesh = child as THREE.Mesh;
         const meshName = mesh.name.toLowerCase();
-        const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || 'unknown';
+        // @ts-ignore
+        const material = mesh.material as THREE.MeshStandardMaterial;
+        const materialName = material?.name?.toLowerCase() || 'unknown';
+        const hasTexture = !!material?.map;
         
-        console.log(`[MeshyAvatar Debug] Mesh encontrada: "${mesh.name}" Material: "${materialName}"`);
+        console.log(`[MeshyAvatar Debug] Mesh: "${mesh.name}" | Mat: "${materialName}" | Textura: ${hasTexture ? 'SÍ' : 'NO'}`);
         
+        // Si tiene textura, generalmente NO queremos sobreescribir el color, salvo que sea intencional.
+        // Meshy suele dar una textura atlas completa.
+        if (hasTexture) {
+          console.log(`  -> Conservando textura original de ${mesh.name}`);
+          // Asegurar que el color base sea blanco para no oscurecer la textura
+          if (material.color) material.color.set(0xffffff);
+          material.needsUpdate = true;
+          return;
+        }
+
+        // Si NO tiene textura, intentamos aplicar colores por partes
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
           if (meshName.includes(pattern) || materialName.includes(pattern)) {
@@ -157,21 +171,13 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
           }
         }
         
-        if (colorKey && mesh.material) {
+        if (colorKey) {
           const color = finalColors[colorKey];
-          console.log(`  -> Aplicando color ${colorKey} (${color}) a ${mesh.name}`);
-          
-          if (Array.isArray(mesh.material)) {
-            mesh.material.forEach((mat) => {
-              if ((mat as THREE.MeshStandardMaterial).color) {
-                (mat as THREE.MeshStandardMaterial).color.set(color);
-              }
-            });
-          } else if ((mesh.material as THREE.MeshStandardMaterial).color) {
-            (mesh.material as THREE.MeshStandardMaterial).color.set(color);
-          }
+          console.log(`  -> Aplicando color ${colorKey} (${color}) a ${mesh.name} (sin textura)`);
+          if (material.color) material.color.set(color);
         } else {
-          console.log(`  -> No match found for mapping`);
+          // Fallback suave si no encontramos mapeo
+          console.log(`  -> Sin mapeo específico para ${mesh.name}, manteniendo original`);
         }
       }
     });
