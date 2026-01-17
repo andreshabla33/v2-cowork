@@ -51,6 +51,9 @@ const MATERIAL_MAPPING: Record<string, keyof typeof DEFAULT_COLORS> = {
   'shoes': 'zapatos',
   'feet': 'zapatos',
   'foot': 'zapatos',
+  // Fallback para mallas genéricas de Meshy
+  'char1': 'ropa_principal', // Asumir que char1 es el cuerpo principal
+  'character': 'ropa_principal',
 };
 
 export interface AvatarColores {
