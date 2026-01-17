@@ -43,7 +43,7 @@ interface AppState {
   setActiveWorkspace: (workspace: Workspace | null, role?: Role) => void;
   setAuthFeedback: (feedback: { type: 'success' | 'error', message: string } | null) => void;
   
-  setPosition: (x: number, y: number, direction?: User['direction'], isSitting?: boolean, isMoving?: boolean) => void;
+  setPosition: (x: number, y: number, direction?: User['direction'], isSitting?: boolean, isMoving?: boolean, isRunning?: boolean) => void;
   updateAvatar: (config: AvatarConfig) => Promise<void>;
   updateStatus: (status: PresenceStatus, statusText?: string) => Promise<void>;
   toggleMic: () => void;
@@ -254,13 +254,14 @@ export const useStore = create<AppState>((set, get) => ({
     set({ session: null, view: 'dashboard', activeWorkspace: null, workspaces: [], initialized: true, isInitializing: false });
   },
 
-  setPosition: (x, y, direction, isSitting, isMoving) => set((state) => ({ 
+  setPosition: (x, y, direction, isSitting, isMoving, isRunning) => set((state) => ({ 
     currentUser: { 
       ...state.currentUser, 
       x, y, 
       direction: direction || state.currentUser.direction,
       isSitting: isSitting !== undefined ? isSitting : state.currentUser.isSitting,
-      isMoving: isMoving !== undefined ? isMoving : state.currentUser.isMoving
+      isMoving: isMoving !== undefined ? isMoving : state.currentUser.isMoving,
+      isRunning: isRunning !== undefined ? isRunning : state.currentUser.isRunning
     } 
   })),
 

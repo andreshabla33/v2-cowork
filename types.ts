@@ -42,6 +42,7 @@ export interface User {
   y: number;
   direction: 'front' | 'left' | 'right' | 'back';
   isMoving?: boolean;
+  isRunning?: boolean;
   isSitting?: boolean;
   isOnline: boolean;
   isPrivate?: boolean;

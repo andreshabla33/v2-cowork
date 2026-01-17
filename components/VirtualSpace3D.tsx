@@ -126,12 +126,13 @@ interface AvatarProps {
   status: PresenceStatus;
   isCurrentUser?: boolean;
   isMoving?: boolean;
+  isRunning?: boolean;
   isSitting?: boolean;
   direction?: string;
   reaction?: string | null;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, isSitting, direction, reaction }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, isRunning, isSitting, direction, reaction }) => {
   return (
     <group position={position}>
       {/* Avatar 3D - Mixamo o Procedural */}
@@ -139,6 +140,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         <Suspense fallback={null}>
           <MixamoAvatar
             isMoving={isMoving}
+            isRunning={isRunning}
             isSitting={isSitting}
             direction={direction}
             reaction={reaction}
@@ -223,17 +225,19 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
 // ============== JUGADOR CONTROLABLE (SIN FÍSICA) ==============
 interface PlayerProps {
   currentUser: User;
-  setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
+  setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean, isRunning: boolean) => void;
   reaction: string | null;
+  onTriggerReaction: (emoji: string) => void;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction, onTriggerReaction }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
     z: (currentUser.y || 400) / 16
   });
   const [isMoving, setIsMoving] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [direction, setDirection] = useState('front');
   const keysPressed = useRef<Set<string>>(new Set());
   const lastSyncTime = useRef(0);
@@ -250,38 +254,42 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) =
         return;
       }
       
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'ShiftLeft', 'ShiftRight'].includes(e.code)) {
         keysPressed.current.add(e.code);
-        console.log('[Player] Tecla presionada:', e.code, 'Keys activas:', Array.from(keysPressed.current));
-        e.preventDefault();
+        // e.preventDefault(); // Evitar scroll pero permitir Shift
+        if (!e.code.startsWith('Shift')) e.preventDefault();
       }
+
+      // Reacciones con teclas 1 y 2
+      if (e.key === '1') onTriggerReaction('🔥'); // Dance
+      if (e.key === '2') onTriggerReaction('👍'); // Cheer
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current.delete(e.code);
-      console.log('[Player] Tecla liberada:', e.code);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     window.addEventListener('keyup', handleKeyUp);
     
-    console.log('[Player] Eventos de teclado registrados correctamente');
-    
     return () => {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, []);
+  }, [onTriggerReaction]);
 
   useFrame((state, delta) => {
     let dx = 0, dy = 0;
     let newDirection = direction;
+    
+    const isShiftPressed = keysPressed.current.has('ShiftLeft') || keysPressed.current.has('ShiftRight');
+    const currentSpeed = isShiftPressed ? MOVE_SPEED * 2.5 : MOVE_SPEED;
 
     // Movimiento en 2D (corregido para vista isométrica)
-    if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = MOVE_SPEED * delta; newDirection = 'up'; }
-    if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -MOVE_SPEED * delta; newDirection = 'front'; }
-    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -MOVE_SPEED * delta; newDirection = 'left'; }
-    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = MOVE_SPEED * delta; newDirection = 'right'; }
+    if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = currentSpeed * delta; newDirection = 'up'; }
+    if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -currentSpeed * delta; newDirection = 'front'; }
+    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -currentSpeed * delta; newDirection = 'left'; }
+    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = currentSpeed * delta; newDirection = 'right'; }
 
     // Normalizar diagonal
     if (dx !== 0 && dy !== 0) {
@@ -295,8 +303,6 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) =
       // Actualizar posición (X horizontal, Z vertical en el mundo 3D visto desde arriba)
       positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
       positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
-      
-      console.log('[Player] Moviendo - Pos:', positionRef.current.x.toFixed(2), positionRef.current.z.toFixed(2), 'Dir:', newDirection);
     }
 
     // Mover el grupo del avatar directamente
@@ -306,6 +312,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) =
     }
 
     setIsMoving(moving);
+    setIsRunning(moving && isShiftPressed);
     if (newDirection !== direction) setDirection(newDirection);
 
     // Actualizar target para OrbitControls (NO mover la cámara directamente)
@@ -322,7 +329,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) =
         positionRef.current.z * 16,
         newDirection,
         shouldSit,
-        moving
+        moving,
+        moving && isShiftPressed // isRunning
       );
       lastSyncTime.current = now;
     }
@@ -337,6 +345,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) =
         status={currentUser.status}
         isCurrentUser={true}
         isMoving={isMoving}
+        isRunning={isRunning}
         isSitting={currentUser.isSitting}
         direction={direction}
         reaction={reaction}
@@ -357,6 +366,7 @@ const RemoteUsers: React.FC<{ users: User[]; remoteReaction: { emoji: string; fr
           name={user.name}
           status={user.status || PresenceStatus.AVAILABLE}
           isMoving={user.isMoving}
+          isRunning={user.isRunning}
           isSitting={user.isSitting}
           direction={user.direction || 'front'}
           reaction={remoteReaction && remoteReaction.from === user.id ? remoteReaction.emoji : null}
@@ -370,14 +380,15 @@ const RemoteUsers: React.FC<{ users: User[]; remoteReaction: { emoji: string; fr
 interface SceneProps {
   currentUser: User;
   onlineUsers: User[];
-  setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
+  setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean, isRunning: boolean) => void;
   theme: string;
   orbitControlsRef: React.MutableRefObject<any>;
   currentReaction: string | null;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
+  onTriggerReaction: (emoji: string) => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, currentReaction, remoteReaction }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, currentReaction, remoteReaction, onTriggerReaction }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -461,7 +472,12 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} reaction={currentReaction} />
+      <Player 
+        currentUser={currentUser} 
+        setPosition={setPosition} 
+        reaction={currentReaction} 
+        onTriggerReaction={onTriggerReaction} 
+      />
       
       {/* Usuarios remotos */}
       <RemoteUsers users={onlineUsers} remoteReaction={remoteReaction} />
@@ -1054,6 +1070,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             orbitControlsRef={orbitControlsRef}
             currentReaction={currentReaction}
             remoteReaction={remoteReaction}
+            onTriggerReaction={handleTriggerReaction}
           />
         </Suspense>
       </Canvas>

@@ -75,14 +75,16 @@ export interface AvatarColores {
 
 interface MeshyAvatarProps {
   isMoving?: boolean;
-  isSitting?: boolean; // Nuevo prop
+  isRunning?: boolean; // Nuevo prop
+  isSitting?: boolean;
   direction?: string;
-  reaction?: string | null; // Nuevo prop
+  reaction?: string | null;
   colores?: AvatarColores;
 }
 
 export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   isMoving = false,
+  isRunning = false,
   isSitting = false,
   direction = 'front',
   reaction = null,
@@ -229,7 +231,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     } else if (isSitting) {
       actionName = 'sit';
     } else if (isMoving) {
-      actionName = 'walk'; // O 'run' si implementas sprint
+      actionName = isRunning ? 'run' : 'walk';
     }
 
     const currentAction = actions[actionName];
