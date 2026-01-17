@@ -1,17 +1,17 @@
 'use client';
 
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import { useFrame, useLoader } from '@react-three/fiber';
+import { useFrame, useLoader, useGraph } from '@react-three/fiber';
 import { useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+import { clone } from 'three/examples/jsm/utils/SkeletonUtils.js';
 
 const SUPABASE_STORAGE_URL = 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars';
 
-// Configurar DRACOLoader (singleton para evitar múltiples instancias)
+// Configurar DRACOLoader
 let dracoLoader: DRACOLoader | null = null;
-
 const getDracoLoader = () => {
   if (!dracoLoader) {
     dracoLoader = new DRACOLoader();
@@ -21,13 +21,10 @@ const getDracoLoader = () => {
   return dracoLoader;
 };
 
-// URL del modelo base Meshy AI (liviano ~315KB)
 const MODEL_URL = `${SUPABASE_STORAGE_URL}/Meshy_AI_Character_output.glb`;
-
-// Escala del avatar Meshy AI - 0.01 para convertir de cm a metros
 const AVATAR_SCALE = 0.01;
 
-// Colores por defecto para el avatar
+// ... (resto de constantes de colores igual)
 const DEFAULT_COLORS = {
   piel: '#f5d0c5',
   ojos: '#4a90d9',
@@ -37,8 +34,6 @@ const DEFAULT_COLORS = {
   zapatos: '#1f2937',
 };
 
-// Mapeo de nombres de materiales/meshes a partes del cuerpo
-// Ajustar según los nombres reales en el modelo Meshy AI
 const MATERIAL_MAPPING: Record<string, keyof typeof DEFAULT_COLORS> = {
   'skin': 'piel',
   'body': 'piel',
@@ -79,12 +74,9 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   colores = {},
 }) => {
   const groupRef = useRef<THREE.Group>(null);
-  
-  // Referencia estable para colores (evita re-renders)
   const coloresRef = useRef(colores);
   const [coloresKey, setColoresKey] = useState(0);
-  
-  // Solo actualizar cuando los colores realmente cambian
+
   useEffect(() => {
     const prev = coloresRef.current;
     const changed = Object.keys({ ...prev, ...colores }).some(
@@ -93,63 +85,43 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     if (changed) {
       coloresRef.current = colores;
       setColoresKey(k => k + 1);
-      console.log('[MeshyAvatar] Colores actualizados');
     }
   }, [colores]);
 
-  // 1. CARGA ESTÁTICA del modelo base Meshy AI
   const gltf = useLoader(GLTFLoader, MODEL_URL, (loader) => {
     loader.setDRACOLoader(getDracoLoader());
   });
 
+  // 1. Clonado CORRECTO para SkinnedMesh usando SkeletonUtils.clone
+  const scene = useMemo(() => {
+    const clonedScene = clone(gltf.scene);
+    return clonedScene;
+  }, [gltf.scene]);
+
+  // Necesario para useAnimations con SkeletonUtils clone
+  const { nodes } = useGraph(scene);
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. CLONACIÓN del modelo y debug de estructura
-  const scene = useMemo(() => {
-    const clone = gltf.scene.clone();
-    
-    console.log('[MeshyAvatar] === DEBUG ESTRUCTURA ===');
-    console.log('[MeshyAvatar] Scene position:', clone.position.x, clone.position.y, clone.position.z);
-    console.log('[MeshyAvatar] Scene children:', clone.children.length);
-    
-    // Explorar jerarquía
-    clone.traverse((child) => {
-      console.log('[MeshyAvatar] Child:', child.type, child.name, 
-                  'pos:', child.position.x.toFixed(2), child.position.y.toFixed(2), child.position.z.toFixed(2));
-      
-      if ((child as THREE.Mesh).isMesh) {
-        const mesh = child as THREE.Mesh;
-        mesh.castShadow = true;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-      }
-    });
-    
-    console.log('[MeshyAvatar] === FIN DEBUG ===');
-    return clone;
-  }, [gltf.scene]);
-  
-  // Calcular offset de centrado (solo una vez)
+  // 2. Cálculo de offset para centrar
   const centerOffset = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(gltf.scene);
+    // Asegurar que la caja se calcule considerando todo (incluyendo skinned meshes)
+    const box = new THREE.Box3().setFromObject(scene);
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     
-    console.log('[MeshyAvatar] BoundingBox center:', center.x.toFixed(2), center.y.toFixed(2), center.z.toFixed(2));
-    console.log('[MeshyAvatar] BoundingBox size:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+    console.log('[MeshyAvatar] BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
+    console.log('[MeshyAvatar] BoundingBox Center:', center.x.toFixed(4), center.y.toFixed(4), center.z.toFixed(4));
     
-    // Offset para centrar: mover X y Z al origen, Y al suelo
-    const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
-    console.log('[MeshyAvatar] Offset aplicado:', offset.x.toFixed(2), offset.y.toFixed(2), offset.z.toFixed(2));
+    // Si el tamaño es muy pequeño (ej. < 2m), NO aplicar escala 0.01
+    // Si el tamaño es grande (ej. > 100m), aplicar escala 0.01
     
-    return offset;
-  }, [gltf.scene]);
-  
-  // 3. APLICACIÓN DE COLORES (solo cuando cambian)
+    return new THREE.Vector3(-center.x, -box.min.y, -center.z);
+  }, [scene]);
+
+  // 3. Aplicación de colores
   useEffect(() => {
     const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
-    
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
@@ -157,7 +129,6 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         const materialName = (mesh.material as THREE.Material)?.name?.toLowerCase() || '';
         
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
-        
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
           if (meshName.includes(pattern) || materialName.includes(pattern)) {
             colorKey = key;
@@ -179,36 +150,32 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         }
       }
     });
-    
-    console.log('[MeshyAvatar] Colores aplicados al modelo');
   }, [scene, coloresKey]);
 
-  // 4. CONTROL DE ANIMACIÓN - DESACTIVADO TEMPORALMENTE PARA DEBUG
-  // useEffect(() => {
-  //   const actionName = names.find(n => 
-  //     n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
-  //   ) || names[0];
+  // 4. Animaciones
+  useEffect(() => {
+    const actionName = names.find(n => 
+      n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
+    ) || names[0];
 
-  //   if (actionName && actions[actionName]) {
-  //     actions[actionName].reset().fadeIn(0.2).play();
-  //     return () => {
-  //       actions[actionName]?.fadeOut(0.2);
-  //     };
-  //   }
-  // }, [actions, names, isMoving]);
+    if (actionName && actions[actionName]) {
+      const action = actions[actionName];
+      action.reset().fadeIn(0.2).play();
+      
+      // IMPORTANTE: Si la animación tiene root motion (mueve el personaje),
+      // necesitamos desactivarlo o compensarlo si queremos que el control sea manual.
+      // Sin embargo, para Mixamo/Meshy generalmente queremos que sigan el hueso root
+      // pero si el hueso root se desplaza, se separará del collider.
+      
+      return () => {
+        action.fadeOut(0.2);
+      };
+    }
+  }, [actions, names, isMoving]);
 
-  // 5. Rotación según dirección + Log de posición del grupo padre
+  // 5. Rotación del grupo
   useFrame(() => {
     if (!groupRef.current) return;
-    
-    // Log para debug - ver posición del grupo
-    const worldPos = new THREE.Vector3();
-    groupRef.current.getWorldPosition(worldPos);
-    
-    // Solo log cada 60 frames para no saturar
-    if (Math.random() < 0.02) {
-      console.log('[MixamoAvatar DEBUG] WorldPos:', worldPos.x.toFixed(2), worldPos.y.toFixed(2), worldPos.z.toFixed(2));
-    }
     
     const rotations: Record<string, number> = {
       left: -Math.PI / 2,
@@ -225,32 +192,24 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     );
   });
 
-  // Agregar scene al grupo manualmente
-  useEffect(() => {
-    if (!groupRef.current || !scene) return;
-    
-    // Limpiar hijos previos (cubo de debug)
-    while (groupRef.current.children.length > 0) {
-      groupRef.current.remove(groupRef.current.children[0]);
-    }
-    
-    // Aplicar solo escala, sin offset por ahora
-    scene.scale.set(AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE);
-    scene.position.set(0, 0, 0);
-    
-    // Agregar al grupo
-    groupRef.current.add(scene);
-    
-    console.log('[MeshyAvatar] Scene agregado - pos:', scene.position.x, scene.position.y, scene.position.z);
-    
-    return () => {
-      if (groupRef.current && scene) {
-        groupRef.current.remove(scene);
-      }
-    };
-  }, [scene]);
-
-  return <group ref={groupRef} />;
+  return (
+    <group ref={groupRef}>
+      {/* Grupo interno para aplicar escala y offset de centrado */}
+      <group 
+        scale={[AVATAR_SCALE, AVATAR_SCALE, AVATAR_SCALE]}
+        position={[centerOffset.x * AVATAR_SCALE, 0, centerOffset.z * AVATAR_SCALE]}
+      >
+        <primitive object={scene} />
+      </group>
+      {/* Ayuda visual: Ejes (1m de largo) */}
+      <axesHelper args={[1]} />
+      {/* Ayuda visual: Caja envolvente del avatar (debug visual) */}
+      <mesh position={[0, 1, 0]} visible={false}>
+        <boxGeometry args={[0.5, 2, 0.5]} />
+        <meshBasicMaterial color="red" wireframe />
+      </mesh>
+    </group>
+  );
 };
 
 export default MixamoAvatar;
