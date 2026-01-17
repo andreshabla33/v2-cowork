@@ -106,66 +106,52 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. Cálculo de offset para centrar y ESCALA AUTOMÁTICA
+  // 2. Cálculo de offset para centrar (Escala fija 1.0 para debug)
   const { centerOffset, autoScale } = useMemo(() => {
-    // Asegurar que la caja se calcule considerando todo (incluyendo skinned meshes)
     const box = new THREE.Box3().setFromObject(scene);
-    const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
+    const center = box.getCenter(new THREE.Vector3());
     
     console.log('[MeshyAvatar] BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
-    console.log('[MeshyAvatar] BoundingBox Center:', center.x.toFixed(4), center.y.toFixed(4), center.z.toFixed(4));
     
-    // Calcular escala para normalizar altura a ~1.75m (altura humana promedio)
-    // Si la altura es 0 o muy pequeña (error), usar 1
-    const targetHeight = 1.75;
-    let scale = 1;
-    
-    if (size.y > 0.001) {
-      scale = targetHeight / size.y;
-    } else {
-      console.warn('[MeshyAvatar] Altura no detectada (0), usando escala 1');
-    }
+    // Auto-scale desactivado por reportes de "gigante". Usamos 1.0.
+    // Si el modelo es muy pequeño (0.0166), 1.0 lo dejará pequeño.
+    // Si era gigante con 100x, entonces 1.0 es 100 veces más chico.
+    const fixedScale = 1.0; 
 
-    // Offset para centrar (se aplicará al grupo escalado, así que usamos coordenadas locales relativas al centro)
-    // El objetivo es que (0,0,0) del mundo coincida con (center.x, min.y, center.z) del modelo
     const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
     
-    return { centerOffset: offset, autoScale: scale };
+    return { centerOffset: offset, autoScale: fixedScale };
   }, [scene]);
 
-  // 3. Aplicación de colores con Debug y Respeto de Texturas
+  // 3. Aplicación de colores con Debug Extendido
   useEffect(() => {
     const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
-    console.log('[MeshyAvatar] Aplicando colores/texturas...');
     
-    let meshesFound = 0;
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
-        meshesFound++;
         const mesh = child as THREE.Mesh;
-        const meshName = mesh.name.toLowerCase();
         // @ts-ignore
         const material = mesh.material as THREE.MeshStandardMaterial;
-        const materialName = material?.name?.toLowerCase() || 'unknown';
-        const hasTexture = !!material?.map;
+        const matName = material?.name || 'sin_nombre';
         
-        console.log(`[MeshyAvatar Debug] Mesh: "${mesh.name}" | Mat: "${materialName}" | Textura: ${hasTexture ? 'SÍ' : 'NO'}`);
+        // Verificar texturas y Vertex Colors
+        const hasTexture = !!material.map || !!material.emissiveMap;
+        const hasVertexColors = material.vertexColors === true;
         
-        // Si tiene textura, generalmente NO queremos sobreescribir el color, salvo que sea intencional.
-        // Meshy suele dar una textura atlas completa.
-        if (hasTexture) {
-          console.log(`  -> Conservando textura original de ${mesh.name}`);
-          // Asegurar que el color base sea blanco para no oscurecer la textura
-          if (material.color) material.color.set(0xffffff);
+        console.log(`[MeshyAvatar Debug] Mesh: "${mesh.name}" | Map: ${hasTexture} | VColors: ${hasVertexColors}`);
+
+        if (hasTexture || hasVertexColors) {
+          console.log(`  -> Preservando apariencia original de ${mesh.name}`);
+          material.color.set(0xffffff);
           material.needsUpdate = true;
           return;
         }
 
-        // Si NO tiene textura, intentamos aplicar colores por partes
+        // Solo colorear si no tiene ni textura ni vertex colors
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
-          if (meshName.includes(pattern) || materialName.includes(pattern)) {
+          if (mesh.name.toLowerCase().includes(pattern) || matName.toLowerCase().includes(pattern)) {
             colorKey = key;
             break;
           }
@@ -173,15 +159,10 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
         
         if (colorKey) {
           const color = finalColors[colorKey];
-          console.log(`  -> Aplicando color ${colorKey} (${color}) a ${mesh.name} (sin textura)`);
-          if (material.color) material.color.set(color);
-        } else {
-          // Fallback suave si no encontramos mapeo
-          console.log(`  -> Sin mapeo específico para ${mesh.name}, manteniendo original`);
+          material.color.set(color);
         }
       }
     });
-    console.log(`[MeshyAvatar] Total meshes processed: ${meshesFound}`);
   }, [scene, coloresKey]);
 
   // 4. Animaciones
