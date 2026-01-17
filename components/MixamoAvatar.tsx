@@ -51,9 +51,7 @@ const MATERIAL_MAPPING: Record<string, keyof typeof DEFAULT_COLORS> = {
   'shoes': 'zapatos',
   'feet': 'zapatos',
   'foot': 'zapatos',
-  // Fallback para mallas genéricas de Meshy
-  'char1': 'ropa_principal', // Asumir que char1 es el cuerpo principal
-  'character': 'ropa_principal',
+  // Eliminado fallback agresivo para evitar teñir todo de azul
 };
 
 export interface AvatarColores {
@@ -106,22 +104,62 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   const { animations: loadedAnimations } = gltf;
   const { actions, names } = useAnimations(loadedAnimations, groupRef);
 
-  // 2. Cálculo de offset para centrar (Escala fija 1.0 para debug)
+  // 2. Cálculo de offset para centrar y ESCALA AUTOMÁTICA ROBUSTA
   const { centerOffset, autoScale } = useMemo(() => {
-    const box = new THREE.Box3().setFromObject(scene);
+    // Calcular bounding box iterando geometrías para mayor precisión en SkinnedMesh
+    const box = new THREE.Box3();
+    let hasMeshes = false;
+    
+    scene.traverse((child) => {
+      if ((child as THREE.Mesh).isMesh) {
+        const mesh = child as THREE.Mesh;
+        // Usar la geometría base para el tamaño, ya que la caja del objeto puede estar mal en T-pose
+        if (mesh.geometry) {
+          mesh.geometry.computeBoundingBox();
+          if (mesh.geometry.boundingBox) {
+            // Transformar la caja de la geometría al espacio del mundo (o local del root)
+            // Nota: Esto asume escala 1 en los hijos, lo cual suele ser cierto.
+            box.union(mesh.geometry.boundingBox);
+            hasMeshes = true;
+          }
+        }
+      }
+    });
+
+    // Fallback si no hay meshes o cálculo falló
+    if (!hasMeshes || box.isEmpty()) {
+      box.setFromObject(scene);
+    }
+
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
     
-    console.log('[MeshyAvatar] BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
+    console.log('[MeshyAvatar] Robust BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
     
-    // Auto-scale desactivado por reportes de "gigante". Usamos 1.0.
-    // Si el modelo es muy pequeño (0.0166), 1.0 lo dejará pequeño.
-    // Si era gigante con 100x, entonces 1.0 es 100 veces más chico.
-    const fixedScale = 1.0; 
+    // Auto-escalado: Objetivo 1.5m (Estilo Avatar/Chibi equilibrado)
+    const TARGET_HEIGHT = 1.5;
+    let scale = 1;
+    
+    // Lógica de seguridad para el escalado
+    if (size.y > 0.01) {
+      scale = TARGET_HEIGHT / size.y;
+      
+      // Evitar escalas extremas (errores de medición)
+      if (scale > 1000 || scale < 0.001) {
+        console.warn(`[MeshyAvatar] Escala calculada extrema (${scale}), forzando 1.0`);
+        scale = 1;
+      } else {
+        console.log(`[MeshyAvatar] Auto-Scale: ${size.y.toFixed(4)}m -> ${TARGET_HEIGHT}m (Factor: ${scale.toFixed(4)})`);
+      }
+    } else {
+      console.warn('[MeshyAvatar] Altura detectada inválida, usando escala 1');
+    }
 
+    // Offset para centrar en (0,0,0)
+    // El offset se calcula inverso al centro de la caja original
     const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
     
-    return { centerOffset: offset, autoScale: fixedScale };
+    return { centerOffset: offset, autoScale: scale };
   }, [scene]);
 
   // 3. Aplicación de colores con Debug Extendido
