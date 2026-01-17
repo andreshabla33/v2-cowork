@@ -247,8 +247,6 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       >
         <primitive object={scene} />
       </group>
-      {/* Ayuda visual: Ejes (1m de largo) */}
-      <axesHelper args={[0.5]} />
     </group>
   );
 };
