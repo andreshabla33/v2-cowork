@@ -126,11 +126,12 @@ interface AvatarProps {
   status: PresenceStatus;
   isCurrentUser?: boolean;
   isMoving?: boolean;
+  isSitting?: boolean;
   direction?: string;
   reaction?: string | null;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, direction, reaction }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, isMoving, isSitting, direction, reaction }) => {
   return (
     <group position={position}>
       {/* Avatar 3D - Mixamo o Procedural */}
@@ -138,7 +139,9 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         <Suspense fallback={null}>
           <MixamoAvatar
             isMoving={isMoving}
+            isSitting={isSitting}
             direction={direction}
+            reaction={reaction}
           />
         </Suspense>
       ) : (
@@ -221,9 +224,10 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
 interface PlayerProps {
   currentUser: User;
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
+  reaction: string | null;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, reaction }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -310,11 +314,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
     // Sincronizar posición con el store (factor 16 para consistencia)
     const now = state.clock.getElapsedTime();
     if (now - lastSyncTime.current > 0.1) {
+      // Si se mueve, deja de estar sentado. Si no, mantiene el estado actual.
+      const shouldSit = moving ? false : (currentUser.isSitting || false);
+      
       setPosition(
         positionRef.current.x * 16,
         positionRef.current.z * 16,
         newDirection,
-        false,
+        shouldSit,
         moving
       );
       lastSyncTime.current = now;
@@ -330,15 +337,16 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
         status={currentUser.status}
         isCurrentUser={true}
         isMoving={isMoving}
+        isSitting={currentUser.isSitting}
         direction={direction}
-        reaction={null}
+        reaction={reaction}
       />
     </group>
   );
 };
 
 // ============== USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[] }> = ({ users }) => {
+const RemoteUsers: React.FC<{ users: User[]; remoteReaction: { emoji: string; from: string } | null }> = ({ users, remoteReaction }) => {
   return (
     <>
       {users.map((user) => (
@@ -348,8 +356,10 @@ const RemoteUsers: React.FC<{ users: User[] }> = ({ users }) => {
           config={user.avatarConfig}
           name={user.name}
           status={user.status || PresenceStatus.AVAILABLE}
-          isMoving={false}
+          isMoving={user.isMoving}
+          isSitting={user.isSitting}
           direction={user.direction || 'front'}
+          reaction={remoteReaction && remoteReaction.from === user.id ? remoteReaction.emoji : null}
         />
       ))}
     </>
@@ -363,9 +373,11 @@ interface SceneProps {
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
   theme: string;
   orbitControlsRef: React.MutableRefObject<any>;
+  currentReaction: string | null;
+  remoteReaction: { emoji: string; from: string; fromName: string } | null;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, currentReaction, remoteReaction }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -449,10 +461,10 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} />
+      <Player currentUser={currentUser} setPosition={setPosition} reaction={currentReaction} />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} />
+      <RemoteUsers users={onlineUsers} remoteReaction={remoteReaction} />
     </>
   );
 };
@@ -1040,6 +1052,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             setPosition={setPosition}
             theme={theme}
             orbitControlsRef={orbitControlsRef}
+            currentReaction={currentReaction}
+            remoteReaction={remoteReaction}
           />
         </Suspense>
       </Canvas>

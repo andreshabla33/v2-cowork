@@ -22,6 +22,17 @@ const getDracoLoader = () => {
 };
 
 const MODEL_URL = `${SUPABASE_STORAGE_URL}/Meshy_AI_Character_output.glb`;
+
+// URLs de animaciones separadas
+const ANIMATION_URLS = {
+  idle: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Hip_Hop_Dance_2_withSkin.glb`, // Fallback temporal para Idle
+  walk: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Walking_withSkin.glb`,
+  run: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Running_withSkin.glb`,
+  sit: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Stand_to_Sit_Transition_M_withSkin.glb`,
+  cheer: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Cheer_with_Both_Hands_withSkin.glb`,
+  dance: `${SUPABASE_STORAGE_URL}/Meshy_AI_Animation_Hip_Hop_Dance_2_withSkin.glb`,
+};
+
 const AVATAR_SCALE = 0.01;
 
 // ... (resto de constantes de colores igual)
@@ -51,7 +62,6 @@ const MATERIAL_MAPPING: Record<string, keyof typeof DEFAULT_COLORS> = {
   'shoes': 'zapatos',
   'feet': 'zapatos',
   'foot': 'zapatos',
-  // Eliminado fallback agresivo para evitar teñir todo de azul
 };
 
 export interface AvatarColores {
@@ -65,13 +75,17 @@ export interface AvatarColores {
 
 interface MeshyAvatarProps {
   isMoving?: boolean;
+  isSitting?: boolean; // Nuevo prop
   direction?: string;
+  reaction?: string | null; // Nuevo prop
   colores?: AvatarColores;
 }
 
 export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
   isMoving = false,
+  isSitting = false,
   direction = 'front',
+  reaction = null,
   colores = {},
 }) => {
   const groupRef = useRef<THREE.Group>(null);
@@ -89,36 +103,56 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     }
   }, [colores]);
 
+  // 1. Cargar Modelo Base
   const gltf = useLoader(GLTFLoader, MODEL_URL, (loader) => {
     loader.setDRACOLoader(getDracoLoader());
   });
 
-  // 1. Clonado CORRECTO para SkinnedMesh usando SkeletonUtils.clone
+  // 2. Cargar Animaciones Externas
+  const animGltfs = useLoader(GLTFLoader, Object.values(ANIMATION_URLS) as string[], (loader) => {
+    loader.setDRACOLoader(getDracoLoader());
+  });
+
+  // 3. Clonado del modelo base (SkinnedMesh)
   const scene = useMemo(() => {
     const clonedScene = clone(gltf.scene);
     return clonedScene;
   }, [gltf.scene]);
 
-  // Necesario para useAnimations con SkeletonUtils clone
-  const { nodes } = useGraph(scene);
-  const { animations: loadedAnimations } = gltf;
-  const { actions, names } = useAnimations(loadedAnimations, groupRef);
+  // 4. Preparar Animaciones
+  const animations = useMemo(() => {
+    const clips: THREE.AnimationClip[] = [];
+    const keys = Object.keys(ANIMATION_URLS) as (keyof typeof ANIMATION_URLS)[];
 
-  // 2. Cálculo de offset para centrar y ESCALA AUTOMÁTICA ROBUSTA
+    // Al pasar un array de URLs a useLoader, devuelve un array de GLTFs
+    if (Array.isArray(animGltfs)) {
+      animGltfs.forEach((animGltf, index) => {
+        const key = keys[index];
+        if (animGltf.animations && animGltf.animations.length > 0) {
+          const clip = animGltf.animations[0].clone();
+          clip.name = key;
+          clips.push(clip);
+        }
+      });
+    }
+
+    return clips;
+  }, [animGltfs]);
+
+  // 5. Setup Animation Hook
+  const { actions } = useAnimations(animations, groupRef);
+
+  // ... (Cálculo de offset igual)
   const { centerOffset, autoScale } = useMemo(() => {
-    // Calcular bounding box iterando geometrías para mayor precisión en SkinnedMesh
     const box = new THREE.Box3();
     let hasMeshes = false;
-    
+
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
-        // Usar la geometría base para el tamaño, ya que la caja del objeto puede estar mal en T-pose
         if (mesh.geometry) {
           mesh.geometry.computeBoundingBox();
           if (mesh.geometry.boundingBox) {
-            // Transformar la caja de la geometría al espacio del mundo (o local del root)
-            // Nota: Esto asume escala 1 en los hijos, lo cual suele ser cierto.
             box.union(mesh.geometry.boundingBox);
             hasMeshes = true;
           }
@@ -126,67 +160,47 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
       }
     });
 
-    // Fallback si no hay meshes o cálculo falló
     if (!hasMeshes || box.isEmpty()) {
       box.setFromObject(scene);
     }
 
     const size = box.getSize(new THREE.Vector3());
     const center = box.getCenter(new THREE.Vector3());
-    
-    console.log('[MeshyAvatar] Robust BoundingBox Size:', size.x.toFixed(4), size.y.toFixed(4), size.z.toFixed(4));
-    
-    // Auto-escalado: Objetivo 1.5m (Estilo Avatar/Chibi equilibrado)
+
+    // Auto-escalado: Objetivo 1.5m
     const TARGET_HEIGHT = 1.5;
     let scale = 1;
-    
-    // Lógica de seguridad para el escalado
+
     if (size.y > 0.01) {
       scale = TARGET_HEIGHT / size.y;
-      
-      // Evitar escalas extremas (errores de medición)
-      if (scale > 1000 || scale < 0.001) {
-        console.warn(`[MeshyAvatar] Escala calculada extrema (${scale}), forzando 1.0`);
-        scale = 1;
-      } else {
-        console.log(`[MeshyAvatar] Auto-Scale: ${size.y.toFixed(4)}m -> ${TARGET_HEIGHT}m (Factor: ${scale.toFixed(4)})`);
-      }
-    } else {
-      console.warn('[MeshyAvatar] Altura detectada inválida, usando escala 1');
+      if (scale > 1000 || scale < 0.001) scale = 1;
     }
 
-    // Offset para centrar en (0,0,0)
-    // El offset se calcula inverso al centro de la caja original
     const offset = new THREE.Vector3(-center.x, -box.min.y, -center.z);
-    
+
     return { centerOffset: offset, autoScale: scale };
   }, [scene]);
 
-  // 3. Aplicación de colores con Debug Extendido
+  // ... (Aplicación de colores igual)
   useEffect(() => {
     const finalColors = { ...DEFAULT_COLORS, ...coloresRef.current };
-    
+
     scene.traverse((child) => {
       if ((child as THREE.Mesh).isMesh) {
         const mesh = child as THREE.Mesh;
         // @ts-ignore
         const material = mesh.material as THREE.MeshStandardMaterial;
         const matName = material?.name || 'sin_nombre';
-        
-        // Verificar texturas y Vertex Colors
+
         const hasTexture = !!material.map || !!material.emissiveMap;
         const hasVertexColors = material.vertexColors === true;
-        
-        console.log(`[MeshyAvatar Debug] Mesh: "${mesh.name}" | Map: ${hasTexture} | VColors: ${hasVertexColors}`);
 
         if (hasTexture || hasVertexColors) {
-          console.log(`  -> Preservando apariencia original de ${mesh.name}`);
           material.color.set(0xffffff);
           material.needsUpdate = true;
           return;
         }
 
-        // Solo colorear si no tiene ni textura ni vertex colors
         let colorKey: keyof typeof DEFAULT_COLORS | null = null;
         for (const [pattern, key] of Object.entries(MATERIAL_MAPPING)) {
           if (mesh.name.toLowerCase().includes(pattern) || matName.toLowerCase().includes(pattern)) {
@@ -194,7 +208,7 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
             break;
           }
         }
-        
+
         if (colorKey) {
           const color = finalColors[colorKey];
           material.color.set(color);
@@ -203,25 +217,48 @@ export const MixamoAvatar: React.FC<MeshyAvatarProps> = ({
     });
   }, [scene, coloresKey]);
 
-  // 4. Animaciones
+  // 6. Lógica de Reproducción de Animaciones
   useEffect(() => {
-    const actionName = names.find(n => 
-      n.toLowerCase().includes(isMoving ? 'walk' : 'idle')
-    ) || names[0];
+    // Prioridad: Reacción > Sentado > Moviendo > Idle
+    let actionName = 'idle';
 
-    if (actionName && actions[actionName]) {
-      const action = actions[actionName];
-      action.reset().fadeIn(0.2).play();
+    if (reaction) {
+      if (reaction === '👍' || reaction.includes('cheer')) actionName = 'cheer';
+      else if (reaction === '🔥' || reaction.includes('dance')) actionName = 'dance';
+      else actionName = 'cheer'; // Default reaction fallback
+    } else if (isSitting) {
+      actionName = 'sit';
+    } else if (isMoving) {
+      actionName = 'walk'; // O 'run' si implementas sprint
+    }
+
+    const currentAction = actions[actionName];
+
+    if (currentAction) {
+      // Transición suave
+      currentAction.reset().fadeIn(0.2).play();
+
+      // Configuración de loop
+      if (actionName === 'sit') {
+        currentAction.setLoop(THREE.LoopOnce, 1);
+        currentAction.clampWhenFinished = true;
+      } else if (actionName === 'cheer' || actionName === 'dance') {
+        currentAction.setLoop(THREE.LoopRepeat, Infinity); // O LoopOnce si prefieres que termine
+      } else {
+        currentAction.setLoop(THREE.LoopRepeat, Infinity);
+      }
+
+      // Detener otras animaciones
       return () => {
-        action.fadeOut(0.2);
+        currentAction.fadeOut(0.2);
       };
     }
-  }, [actions, names, isMoving]);
+  }, [actions, isMoving, isSitting, reaction]);
 
-  // 5. Rotación del grupo
+  // 7. Rotación del grupo
   useFrame(() => {
     if (!groupRef.current) return;
-    
+
     const rotations: Record<string, number> = {
       left: -Math.PI / 2,
       right: Math.PI / 2,
