@@ -79,12 +79,196 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   const grabacionIdRef = useRef<string>('');
   const emotionHistoryRef = useRef<EmotionAnalysisData[]>([]);
   const transcriptRef = useRef<string>('');
+  
+  // MediaPipe Face Landmarker para análisis de emociones
+  const faceLandmarkerRef = useRef<any>(null);
+  const emotionIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const localVideoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Estado de emociones en tiempo real
+  const [currentEmotion, setCurrentEmotion] = useState<EmotionType>('neutral');
+  const [engagementScore, setEngagementScore] = useState(0.5);
 
   const isRecording = processingState.step === 'recording';
 
   const updateState = useCallback((updates: Partial<ProcessingState>) => {
     setProcessingState(prev => ({ ...prev, ...updates }));
   }, []);
+
+  // ==================== ANÁLISIS DE EMOCIONES (MediaPipe) ====================
+  const MEDIAPIPE_VISION_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
+  
+  const loadMediaPipeFaceLandmarker = useCallback(async (): Promise<boolean> => {
+    try {
+      console.log('🎭 Cargando MediaPipe Face Landmarker...');
+      
+      const vision = await import(
+        /* webpackIgnore: true */ 
+        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest'
+      );
+      
+      const { FaceLandmarker, FilesetResolver } = vision;
+      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+
+      const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
+        baseOptions: {
+          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
+          delegate: 'GPU',
+        },
+        outputFaceBlendshapes: true,
+        outputFacialTransformationMatrixes: true,
+        runningMode: 'VIDEO',
+        numFaces: 1,
+      });
+
+      faceLandmarkerRef.current = faceLandmarker;
+      console.log('✅ MediaPipe Face Landmarker cargado - 52 blendshapes activos');
+      return true;
+
+    } catch (err) {
+      console.error('⚠️ Error cargando MediaPipe (continuará sin análisis de emociones):', err);
+      return false;
+    }
+  }, []);
+
+  const detectEmotionsFromBlendshapes = useCallback((blendshapes: Record<string, number>): { emotion: EmotionType; confidence: number } => {
+    const emotions: Record<string, number> = {
+      happy: 0,
+      sad: 0,
+      angry: 0,
+      surprised: 0,
+      fearful: 0,
+      disgusted: 0,
+      neutral: 0.3,
+    };
+
+    // Mapeo de blendshapes a emociones
+    const smileScore = ((blendshapes['mouthSmileLeft'] || 0) + (blendshapes['mouthSmileRight'] || 0)) / 2;
+    const frownScore = ((blendshapes['mouthFrownLeft'] || 0) + (blendshapes['mouthFrownRight'] || 0)) / 2;
+    const browDownScore = ((blendshapes['browDownLeft'] || 0) + (blendshapes['browDownRight'] || 0)) / 2;
+    const eyeWideScore = ((blendshapes['eyeWideLeft'] || 0) + (blendshapes['eyeWideRight'] || 0)) / 2;
+    const noseSneerScore = ((blendshapes['noseSneerLeft'] || 0) + (blendshapes['noseSneerRight'] || 0)) / 2;
+
+    emotions.happy = smileScore * 0.7 + (blendshapes['cheekSquintLeft'] || 0) * 0.3;
+    emotions.sad = frownScore * 0.6 + (blendshapes['browInnerUp'] || 0) * 0.4;
+    emotions.angry = browDownScore * 0.5 + (blendshapes['mouthPressLeft'] || 0) * 0.3;
+    emotions.surprised = eyeWideScore * 0.5 + (blendshapes['jawOpen'] || 0) * 0.5;
+    emotions.disgusted = noseSneerScore * 0.7;
+
+    // Encontrar emoción dominante
+    let maxEmotion: EmotionType = 'neutral';
+    let maxScore = 0.25; // Umbral mínimo
+    
+    for (const [emotion, score] of Object.entries(emotions)) {
+      if (score > maxScore) {
+        maxScore = score;
+        maxEmotion = emotion as EmotionType;
+      }
+    }
+
+    return { emotion: maxEmotion, confidence: Math.min(1, maxScore) };
+  }, []);
+
+  const calculateEngagementScore = useCallback((blendshapes: Record<string, number>): number => {
+    let score = 0.5;
+
+    // Factores positivos de engagement
+    const positiveFactors = ['mouthSmileLeft', 'mouthSmileRight', 'eyeSquintLeft', 'eyeSquintRight', 'browInnerUp'];
+    // Factores negativos (distracción)
+    const negativeFactors = ['eyeBlinkLeft', 'eyeBlinkRight', 'eyeLookDownLeft', 'eyeLookDownRight'];
+
+    positiveFactors.forEach(factor => {
+      score += (blendshapes[factor] || 0) * 0.1;
+    });
+
+    negativeFactors.forEach(factor => {
+      score -= (blendshapes[factor] || 0) * 0.08;
+    });
+
+    return Math.max(0, Math.min(1, score));
+  }, []);
+
+  const analyzeVideoFrame = useCallback(() => {
+    if (!faceLandmarkerRef.current || !localVideoRef.current) return;
+    
+    const video = localVideoRef.current;
+    if (video.readyState < 2) return;
+
+    try {
+      const results = faceLandmarkerRef.current.detectForVideo(video, performance.now());
+
+      if (results.faceBlendshapes?.length > 0) {
+        const blendshapeCategories = results.faceBlendshapes[0].categories;
+        const blendshapes: Record<string, number> = {};
+        
+        blendshapeCategories.forEach((shape: any) => {
+          blendshapes[shape.categoryName] = shape.score;
+        });
+
+        const { emotion, confidence } = detectEmotionsFromBlendshapes(blendshapes);
+        const engagement = calculateEngagementScore(blendshapes);
+        const currentTime = (Date.now() - startTimeRef.current) / 1000;
+
+        // Actualizar estado
+        setCurrentEmotion(emotion);
+        setEngagementScore(engagement);
+
+        // Guardar en historial
+        emotionHistoryRef.current.push({
+          timestamp_segundos: currentTime,
+          emocion_dominante: emotion,
+          engagement_score: engagement,
+        });
+
+        // Log cada 10 segundos
+        if (Math.floor(currentTime) % 10 === 0 && emotionHistoryRef.current.length > 0) {
+          console.log(`🎭 Emoción: ${emotion} (${Math.round(confidence * 100)}%) | Engagement: ${Math.round(engagement * 100)}%`);
+        }
+      }
+    } catch (err) {
+      // Silenciar errores de análisis para no interrumpir grabación
+    }
+  }, [detectEmotionsFromBlendshapes, calculateEngagementScore]);
+
+  const startEmotionAnalysis = useCallback(async () => {
+    // Buscar el elemento de video local
+    const videoElements = document.querySelectorAll('video');
+    for (const video of videoElements) {
+      if (video.srcObject === stream) {
+        localVideoRef.current = video as HTMLVideoElement;
+        break;
+      }
+    }
+
+    if (!localVideoRef.current) {
+      console.log('⚠️ No se encontró elemento de video para análisis de emociones');
+      return;
+    }
+
+    const loaded = await loadMediaPipeFaceLandmarker();
+    if (!loaded) return;
+
+    // Analizar cada segundo
+    emotionIntervalRef.current = setInterval(() => {
+      analyzeVideoFrame();
+    }, 1000);
+
+    console.log('🎭 Análisis de microexpresiones iniciado (52 blendshapes)');
+  }, [stream, loadMediaPipeFaceLandmarker, analyzeVideoFrame]);
+
+  const stopEmotionAnalysis = useCallback(() => {
+    if (emotionIntervalRef.current) {
+      clearInterval(emotionIntervalRef.current);
+      emotionIntervalRef.current = null;
+    }
+    
+    faceLandmarkerRef.current?.close?.();
+    faceLandmarkerRef.current = null;
+    localVideoRef.current = null;
+    
+    console.log('🛑 Análisis de microexpresiones detenido');
+  }, []);
+  // ==================== FIN ANÁLISIS DE EMOCIONES ====================
 
   const startRecording = useCallback(async () => {
     if (!stream) {
@@ -141,13 +325,17 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
 
       updateState({ step: 'recording', progress: 0, message: 'Grabando...', duration: 0 });
       onRecordingStateChange?.(true);
-      console.log('🔴 Grabación con análisis iniciada');
+      
+      // Iniciar análisis de microexpresiones (en paralelo)
+      startEmotionAnalysis();
+      
+      console.log('🔴 Grabación con análisis de emociones iniciada');
 
     } catch (err: any) {
       console.error('Error iniciando grabación:', err);
       updateState({ step: 'error', message: err.message || 'Error al iniciar grabación' });
     }
-  }, [stream, espacioId, userId, updateState, onRecordingStateChange]);
+  }, [stream, espacioId, userId, updateState, onRecordingStateChange, startEmotionAnalysis]);
 
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -157,12 +345,16 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         clearInterval(durationIntervalRef.current);
         durationIntervalRef.current = null;
       }
+      
+      // Detener análisis de emociones
+      stopEmotionAnalysis();
 
       mediaRecorderRef.current.stop();
       onRecordingStateChange?.(false);
-      console.log('⏹️ Grabación detenida, iniciando procesamiento...');
+      
+      console.log(`⏹️ Grabación detenida - ${emotionHistoryRef.current.length} muestras de emociones capturadas`);
     }
-  }, [updateState, onRecordingStateChange]);
+  }, [updateState, onRecordingStateChange, stopEmotionAnalysis]);
 
   const processRecording = useCallback(async () => {
     try {
@@ -173,10 +365,32 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       const transcript = await transcribeAudio(blob);
       transcriptRef.current = transcript;
 
-      updateState({ step: 'analyzing', progress: 50, message: 'Analizando comportamiento...' });
+      updateState({ step: 'analyzing', progress: 50, message: 'Guardando análisis de emociones...' });
+      
+      // Guardar análisis de emociones en Supabase
+      const emotionData = emotionHistoryRef.current;
+      if (emotionData.length > 0) {
+        const emotionRecords = emotionData.map((e, i) => ({
+          id: crypto.randomUUID(),
+          grabacion_id: grabacionIdRef.current,
+          timestamp_segundos: e.timestamp_segundos,
+          emocion_dominante: e.emocion_dominante,
+          engagement_score: e.engagement_score,
+          participante_id: userId,
+          participante_nombre: userName,
+        }));
+        
+        // Insertar en lotes de 50
+        for (let i = 0; i < emotionRecords.length; i += 50) {
+          const batch = emotionRecords.slice(i, i + 50);
+          await supabase.from('analisis_comportamiento').insert(batch);
+        }
+        
+        console.log(`✅ ${emotionData.length} registros de emociones guardados`);
+      }
       
       updateState({ step: 'generating_summary', progress: 70, message: 'Generando resumen con IA...' });
-      const aiSummary = await generateAISummary(transcript, duration);
+      const aiSummary = await generateAISummary(transcript, duration, emotionData);
 
       await supabase.from('grabaciones').update({
         estado: 'completed',
@@ -237,15 +451,29 @@ La reunión duró aproximadamente ${Math.round(duration / 60)} minutos con ${dur
     }
   };
 
-  const generateAISummary = async (transcript: string, duration: number): Promise<AISummaryResult> => {
+  const generateAISummary = async (transcript: string, duration: number, emotions: EmotionAnalysisData[] = []): Promise<AISummaryResult> => {
     try {
+      // Calcular métricas de emociones
+      const avgEngagement = emotions.length > 0 
+        ? emotions.reduce((sum, e) => sum + e.engagement_score, 0) / emotions.length 
+        : 0.5;
+      
+      const emotionCounts: Record<string, number> = {};
+      emotions.forEach(e => {
+        emotionCounts[e.emocion_dominante] = (emotionCounts[e.emocion_dominante] || 0) + 1;
+      });
+      const dominantEmotion = Object.entries(emotionCounts)
+        .sort((a, b) => b[1] - a[1])[0]?.[0] || 'neutral';
+      
+      console.log(`📊 Métricas de emociones: Engagement promedio ${Math.round(avgEngagement * 100)}%, Emoción dominante: ${dominantEmotion}`);
+      
       const { data, error } = await supabase.functions.invoke('generar-resumen-ai', {
         body: {
           grabacion_id: grabacionIdRef.current,
           espacio_id: espacioId,
           creador_id: userId,
           transcripcion: transcript,
-          emociones: emotionHistoryRef.current.slice(-50),
+          emociones: emotions.slice(-50),
           duracion_segundos: duration,
           participantes: [userName],
           reunion_titulo: reunionTitulo,
