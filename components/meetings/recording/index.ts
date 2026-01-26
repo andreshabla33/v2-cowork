@@ -18,3 +18,4 @@ export { RecordingIndicator } from './RecordingIndicator';
 export { RecordingConsent } from './RecordingConsent';
 export { TranscriptionTimeline } from './TranscriptionTimeline';
 export { AISummaryPanel } from './AISummaryPanel';
+export { RecordingManager } from './RecordingManager';

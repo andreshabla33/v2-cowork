@@ -8,6 +8,7 @@ import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
+import { RecordingManager } from './meetings/recording/RecordingManager';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -1378,6 +1379,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           <span className="opacity-70">o flechas para mover</span>
         </div>
       </div>
+      
+      {/* Recording Manager con análisis de IA */}
+      {hasActiveCall && (
+        <RecordingManager
+          espacioId={activeWorkspace?.id || ''}
+          userId={session?.user?.id || ''}
+          userName={currentUser.name}
+          reunionTitulo={`Reunión ${new Date().toLocaleDateString()}`}
+          stream={stream}
+          onRecordingStateChange={(recording) => {
+            setIsRecording(recording);
+          }}
+          onProcessingComplete={(summary) => {
+            console.log('✅ Resumen AI generado:', summary);
+          }}
+        />
+      )}
     </div>
   );
 };
