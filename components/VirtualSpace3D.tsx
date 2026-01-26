@@ -498,6 +498,7 @@ const StableVideo: React.FC<{ stream: MediaStream | null; muted?: boolean; class
 // ============== VIDEO HUD (burbuja con cámara) ==============
 interface VideoHUDProps {
   userName: string;
+  visitorId: string;
   micOn: boolean;
   camOn: boolean;
   sharingOn: boolean;
@@ -516,13 +517,16 @@ interface VideoHUDProps {
   onTogglePrivacy: () => void;
   onToggleRecording: () => void;
   onTriggerReaction: (emoji: string) => void;
+  onWaveUser: (userId: string) => void;
   currentReaction: string | null;
   theme: string;
+  speakingUsers: Set<string>;
+  userDistances: Map<string, number>;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, isPrivate, isRecording, recordingDuration, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
-  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onToggleRecording, onTriggerReaction, currentReaction, theme
+  userName, visitorId, micOn, camOn, sharingOn, isPrivate, isRecording, recordingDuration, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
+  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onToggleRecording, onTriggerReaction, onWaveUser, currentReaction, theme, speakingUsers, userDistances
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -532,6 +536,14 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const [reactionFading, setReactionFading] = useState(false);
+  const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
+  
+  // Calcular layout basado en número de usuarios
+  const totalUsers = usersInCall.length + 1; // +1 por el usuario local
+  const useGridLayout = totalUsers >= 3;
+  
+  // Indicador de speaking para usuario local
+  const isSpeakingLocal = speakingUsers.has(visitorId);
 
   useEffect(() => {
     if (localVideoRef.current && stream) {
@@ -598,16 +610,32 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         </div>
       )}
 
-      <div className="absolute left-6 top-1/2 -translate-y-1/2 flex flex-col gap-4 pointer-events-auto z-50">
+      <div className={`absolute left-6 top-1/2 -translate-y-1/2 pointer-events-auto z-50 ${
+        useGridLayout 
+          ? 'grid grid-cols-2 gap-3 max-w-[440px]' 
+          : 'flex flex-col gap-4'
+      }`}>
         {/* Indicador de privacidad */}
         {isPrivate && (
-          <div className="bg-amber-500 text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1">
+          <div className={`bg-amber-500 text-black px-3 py-1 rounded-full text-xs font-bold flex items-center gap-1 ${useGridLayout ? 'col-span-2' : ''}`}>
             <IconPrivacy on={true} /> Conversación privada
           </div>
         )}
 
         {/* Burbuja local (tu cámara) */}
-        <div className="relative bg-black rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
+        <div className={`relative bg-black rounded-[28px] overflow-hidden shadow-2xl group transition-all duration-300 ${
+          useGridLayout ? 'w-[200px] h-[130px]' : 'w-52 h-36'
+        } ${isSpeakingLocal ? 'border-2 border-green-500 ring-2 ring-green-500/30' : 'border border-white/10'}`}>
+          {/* Indicador de speaking */}
+          {isSpeakingLocal && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5 z-30">
+              <div className="w-1 h-3 bg-green-500 rounded-full animate-sound-wave-1"></div>
+              <div className="w-1 h-4 bg-green-500 rounded-full animate-sound-wave-2"></div>
+              <div className="w-1 h-2 bg-green-500 rounded-full animate-sound-wave-3"></div>
+              <div className="w-1 h-4 bg-green-500 rounded-full animate-sound-wave-2"></div>
+              <div className="w-1 h-3 bg-green-500 rounded-full animate-sound-wave-1"></div>
+            </div>
+          )}
           {/* Reacción actual */}
           {currentReaction && (
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-2xl z-20 pointer-events-none animate-fade-in-out">
@@ -681,8 +709,30 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbujas de usuarios cercanos */}
         {usersInCall.map((u) => {
           const remoteStream = remoteStreams.get(u.id);
+          const isSpeaking = speakingUsers.has(u.id);
+          const distance = userDistances.get(u.id) || 100;
+          const isWaving = waveAnimation === u.id;
+          
           return (
-            <div key={u.id} className="relative bg-zinc-900 rounded-[28px] overflow-hidden border border-white/10 shadow-2xl group w-52 h-36">
+            <div key={u.id} className={`relative bg-zinc-900 rounded-[28px] overflow-hidden shadow-2xl group transition-all duration-300 ${
+              useGridLayout ? 'w-[200px] h-[130px]' : 'w-52 h-36'
+            } ${isSpeaking ? 'border-2 border-green-500 ring-2 ring-green-500/30 scale-105' : 'border border-white/10'}`}>
+              {/* Indicador de speaking remoto */}
+              {isSpeaking && (
+                <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 flex gap-0.5 z-30">
+                  <div className="w-1 h-3 bg-green-500 rounded-full animate-sound-wave-1"></div>
+                  <div className="w-1 h-4 bg-green-500 rounded-full animate-sound-wave-2"></div>
+                  <div className="w-1 h-2 bg-green-500 rounded-full animate-sound-wave-3"></div>
+                  <div className="w-1 h-4 bg-green-500 rounded-full animate-sound-wave-2"></div>
+                  <div className="w-1 h-3 bg-green-500 rounded-full animate-sound-wave-1"></div>
+                </div>
+              )}
+              {/* Wave animation overlay */}
+              {isWaving && (
+                <div className="absolute inset-0 bg-indigo-500/20 flex items-center justify-center z-20 animate-pulse">
+                  <span className="text-4xl animate-bounce">👋</span>
+                </div>
+              )}
               {remoteStream ? (
                 <StableVideo stream={remoteStream} className="absolute inset-0 w-full h-full object-cover" />
               ) : (
@@ -698,13 +748,35 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   {remoteReaction.emoji}
                 </div>
               )}
-              <div className="absolute top-3 left-3 flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
-                <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
-                <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[100px]">{u.name}</span>
+              {/* Header con nombre y estado */}
+              <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
+                <div className="flex items-center gap-2 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
+                  <div className={`w-2 h-2 rounded-full ${u.isMicOn ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                  <span className="text-[10px] font-bold uppercase tracking-wide text-white truncate max-w-[80px]">{u.name}</span>
+                </div>
+                {/* Indicador de distancia (audio espacial) */}
+                <div className="bg-black/60 backdrop-blur-md px-1.5 py-0.5 rounded text-[9px] text-white/70">
+                  {distance < 50 ? '🔊' : distance < 100 ? '🔉' : '🔈'}
+                </div>
               </div>
-              <button onClick={() => setExpandedId(u.id)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white opacity-0 group-hover:opacity-100 transition-all">
-                <IconExpand on={false}/>
-              </button>
+              {/* Controles en hover */}
+              <div className="absolute bottom-3 left-3 right-3 flex justify-between items-center opacity-0 group-hover:opacity-100 transition-all">
+                {/* Botón Wave */}
+                <button 
+                  onClick={() => {
+                    onWaveUser(u.id);
+                    setWaveAnimation(u.id);
+                    setTimeout(() => setWaveAnimation(null), 2000);
+                  }} 
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-amber-500 text-white hover:bg-amber-400 transition-all"
+                  title={`Saludar a ${u.name}`}
+                >
+                  👋
+                </button>
+                <button onClick={() => setExpandedId(u.id)} className="w-8 h-8 rounded-full flex items-center justify-center bg-indigo-600 text-white hover:bg-indigo-500 transition-all">
+                  <IconExpand on={false}/>
+                </button>
+              </div>
             </div>
           );
         })}
@@ -763,6 +835,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
+  
+  // Estado para speaker detection
+  const [speakingUsers, setSpeakingUsers] = useState<Set<string>>(new Set());
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const analyserNodesRef = useRef<Map<string, AnalyserNode>>(new Map());
+  
+  // Estado para wave/invite
+  const [incomingWave, setIncomingWave] = useState<{ from: string; fromName: string } | null>(null);
 
   // Detectar usuarios en proximidad
   const usersInCall = useMemo(() => {
@@ -773,6 +853,83 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   }, [onlineUsers, currentUser.x, currentUser.y]);
 
   const hasActiveCall = usersInCall.length > 0;
+  
+  // Calcular distancias de usuarios para audio espacial
+  const userDistances = useMemo(() => {
+    const distances = new Map<string, number>();
+    usersInCall.forEach(u => {
+      const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
+      distances.set(u.id, dist);
+    });
+    return distances;
+  }, [usersInCall, currentUser.x, currentUser.y]);
+  
+  // Speaker detection - analizar nivel de audio
+  useEffect(() => {
+    if (!stream) return;
+    
+    // Crear AudioContext si no existe
+    if (!audioContextRef.current) {
+      audioContextRef.current = new AudioContext();
+    }
+    
+    const audioContext = audioContextRef.current;
+    const analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    
+    const source = audioContext.createMediaStreamSource(stream);
+    source.connect(analyser);
+    
+    const dataArray = new Uint8Array(analyser.frequencyBinCount);
+    
+    const checkAudioLevel = () => {
+      analyser.getByteFrequencyData(dataArray);
+      const average = dataArray.reduce((a, b) => a + b, 0) / dataArray.length;
+      
+      // Si el promedio es mayor a 30, el usuario local está hablando
+      setSpeakingUsers(prev => {
+        const newSet = new Set(prev);
+        if (average > 30 && session?.user?.id) {
+          newSet.add(session.user.id);
+        } else if (session?.user?.id) {
+          newSet.delete(session.user.id);
+        }
+        return newSet;
+      });
+    };
+    
+    const intervalId = setInterval(checkAudioLevel, 100);
+    
+    return () => {
+      clearInterval(intervalId);
+      source.disconnect();
+    };
+  }, [stream, session?.user?.id]);
+  
+  // Audio espacial - ajustar volumen según distancia
+  useEffect(() => {
+    remoteStreams.forEach((remoteStream, oderId) => {
+      const distance = userDistances.get(oderId) || PROXIMITY_RADIUS;
+      const volume = Math.max(0.1, 1 - (distance / PROXIMITY_RADIUS));
+      
+      // Aplicar volumen a los elementos de audio
+      const audioElements = document.querySelectorAll(`video[data-user-id="${oderId}"]`);
+      audioElements.forEach(el => {
+        (el as HTMLVideoElement).volume = volume;
+      });
+    });
+  }, [remoteStreams, userDistances]);
+  
+  // Función para enviar wave a un usuario
+  const handleWaveUser = useCallback((userId: string) => {
+    if (webrtcChannelRef.current && session?.user?.id) {
+      webrtcChannelRef.current.send({
+        type: 'broadcast',
+        event: 'wave',
+        payload: { to: userId, from: session.user.id, fromName: currentUser.name }
+      });
+    }
+  }, [session?.user?.id, currentUser.name]);
 
   // Activar mic/cam cuando hay usuarios cerca
   useEffect(() => {
@@ -1165,6 +1322,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       {hasActiveCall && (
         <VideoHUD
           userName={currentUser.name}
+          visitorId={session?.user?.id || ''}
           micOn={!!currentUser.isMicOn}
           camOn={!!currentUser.isCameraOn}
           sharingOn={!!currentUser.isScreenSharing}
@@ -1183,13 +1341,35 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           onTogglePrivacy={togglePrivacy}
           onToggleRecording={handleToggleRecording}
           onTriggerReaction={handleTriggerReaction}
+          onWaveUser={handleWaveUser}
           currentReaction={currentReaction}
           theme={theme}
+          speakingUsers={speakingUsers}
+          userDistances={userDistances}
         />
       )}
       
       {/* Minimapa */}
       <Minimap currentUser={currentUser} users={onlineUsers} workspace={activeWorkspace} />
+      
+      {/* Notificación de Wave entrante */}
+      {incomingWave && (
+        <div className="fixed top-20 right-4 z-[201] animate-slide-in">
+          <div className="bg-amber-500 text-black px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3">
+            <span className="text-3xl animate-wave">👋</span>
+            <div>
+              <p className="font-bold text-sm">{incomingWave.fromName}</p>
+              <p className="text-xs opacity-80">te está saludando</p>
+            </div>
+            <button 
+              onClick={() => setIncomingWave(null)}
+              className="ml-2 w-6 h-6 rounded-full bg-black/20 flex items-center justify-center hover:bg-black/30"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
       
       {/* Controles de ayuda */}
       <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-xs">
