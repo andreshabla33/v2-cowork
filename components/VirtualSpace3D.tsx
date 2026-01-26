@@ -1125,6 +1125,29 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         </Suspense>
       </Canvas>
       
+      {/* Banner de grabación - VISIBLE PARA TODOS */}
+      {isRecording && (
+        <div className="fixed top-0 left-0 right-0 z-[200] flex justify-center pointer-events-none animate-slide-down">
+          <div className="bg-red-600 text-white px-6 py-2.5 rounded-b-2xl flex items-center gap-3 shadow-2xl border-b border-x border-red-400/30 pointer-events-auto">
+            <span className="relative flex h-3 w-3">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+            </span>
+            <span className="font-bold text-sm tracking-wide">REC</span>
+            <span className="font-mono text-sm bg-red-700/50 px-2 py-0.5 rounded">
+              {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:{String(recordingDuration % 60).padStart(2, '0')}
+            </span>
+            <span className="text-red-100 text-xs hidden sm:block">Esta reunión se está grabando</span>
+            <button 
+              onClick={handleToggleRecording}
+              className="ml-2 bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs font-medium transition-colors"
+            >
+              Detener
+            </button>
+          </div>
+        </div>
+      )}
+      
       {/* Botón de resetear vista */}
       <button
         onClick={handleResetView}
