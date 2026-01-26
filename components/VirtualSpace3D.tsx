@@ -60,6 +60,13 @@ const IconExpand = ({ on }: { on: boolean }) => (
   </svg>
 );
 
+const IconRecord = ({ on }: { on: boolean }) => (
+  <svg className="w-4 h-4" fill={on ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+    <circle cx="12" cy="12" r="6" strokeWidth="2.5" />
+    {on && <circle cx="12" cy="12" r="3" fill="currentColor" />}
+  </svg>
+);
+
 // --- Minimap Component ---
 const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = ({ currentUser, users, workspace }) => {
   if (!workspace) return null;
@@ -495,6 +502,8 @@ interface VideoHUDProps {
   camOn: boolean;
   sharingOn: boolean;
   isPrivate: boolean;
+  isRecording: boolean;
+  recordingDuration: number;
   usersInCall: User[];
   stream: MediaStream | null;
   screenStream: MediaStream | null;
@@ -505,14 +514,15 @@ interface VideoHUDProps {
   onToggleCam: () => void;
   onToggleShare: () => void;
   onTogglePrivacy: () => void;
+  onToggleRecording: () => void;
   onTriggerReaction: (emoji: string) => void;
   currentReaction: string | null;
   theme: string;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, micOn, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
-  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onTriggerReaction, currentReaction, theme
+  userName, micOn, camOn, sharingOn, isPrivate, isRecording, recordingDuration, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
+  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onToggleRecording, onTriggerReaction, currentReaction, theme
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
@@ -629,6 +639,9 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             <button onClick={onTogglePrivacy} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${isPrivate ? 'bg-amber-500 text-white shadow-lg' : 'bg-white/20 text-white hover:bg-white/40'}`}>
               <IconPrivacy on={isPrivate}/>
             </button>
+            <button onClick={onToggleRecording} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${isRecording ? 'bg-red-600 text-white shadow-lg animate-pulse' : 'bg-white/20 text-white hover:bg-white/40'}`} title={isRecording ? 'Detener grabación' : 'Iniciar grabación'}>
+              <IconRecord on={isRecording}/>
+            </button>
             <div className="relative">
               <button onClick={() => setShowEmojis(!showEmojis)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md border border-white/10 text-white hover:bg-white/40 transition-all">
                 <IconReaction />
@@ -743,6 +756,13 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [currentReaction, setCurrentReaction] = useState<string | null>(null);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
   const orbitControlsRef = useRef<any>(null);
+  
+  // Estado de grabación
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const recordedChunksRef = useRef<Blob[]>([]);
 
   // Detectar usuarios en proximidad
   const usersInCall = useMemo(() => {
@@ -764,6 +784,65 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       if (currentUser.isPrivate) setPrivacy(false);
     }
   }, [hasActiveCall]);
+
+  // Toggle grabación
+  const handleToggleRecording = useCallback(async () => {
+    if (isRecording) {
+      // Detener grabación
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+        mediaRecorderRef.current.stop();
+      }
+      if (recordingIntervalRef.current) {
+        clearInterval(recordingIntervalRef.current);
+        recordingIntervalRef.current = null;
+      }
+      setIsRecording(false);
+      setRecordingDuration(0);
+    } else {
+      // Iniciar grabación
+      if (!stream) {
+        alert('Necesitas tener la cámara o micrófono activo para grabar');
+        return;
+      }
+      
+      try {
+        recordedChunksRef.current = [];
+        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
+        
+        recorder.ondataavailable = (e) => {
+          if (e.data.size > 0) {
+            recordedChunksRef.current.push(e.data);
+          }
+        };
+        
+        recorder.onstop = async () => {
+          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
+          console.log('Grabación finalizada:', blob.size, 'bytes');
+          // Aquí se puede subir a Supabase Storage
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `reunion_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
+          a.click();
+          URL.revokeObjectURL(url);
+        };
+        
+        mediaRecorderRef.current = recorder;
+        recorder.start(1000);
+        setIsRecording(true);
+        
+        // Iniciar contador
+        const startTime = Date.now();
+        recordingIntervalRef.current = setInterval(() => {
+          setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
+        }, 1000);
+        
+      } catch (err) {
+        console.error('Error iniciando grabación:', err);
+        alert('No se pudo iniciar la grabación');
+      }
+    }
+  }, [isRecording, stream]);
 
   // Trigger reaction con auto-clear y envío a otros usuarios
   const handleTriggerReaction = useCallback((emoji: string) => {
@@ -1067,6 +1146,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           camOn={!!currentUser.isCameraOn}
           sharingOn={!!currentUser.isScreenSharing}
           isPrivate={!!currentUser.isPrivate}
+          isRecording={isRecording}
+          recordingDuration={recordingDuration}
           usersInCall={usersInCall}
           stream={stream}
           screenStream={screenStream}
@@ -1077,6 +1158,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           onToggleCam={toggleCamera}
           onToggleShare={handleToggleScreenShare}
           onTogglePrivacy={togglePrivacy}
+          onToggleRecording={handleToggleRecording}
           onTriggerReaction={handleTriggerReaction}
           currentReaction={currentReaction}
           theme={theme}
