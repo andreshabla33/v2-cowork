@@ -1112,13 +1112,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   }, [session?.user?.id]);
 
   const handleOffer = useCallback(async (offer: RTCSessionDescriptionInit, fromId: string) => {
-    const pc = createPeerConnection(fromId);
+    // Reutilizar conexión existente si existe (para renegociaciones)
+    let pc = peerConnectionsRef.current.get(fromId);
+    const isRenegotiation = !!pc;
+    
+    if (!pc) {
+      pc = createPeerConnection(fromId);
+    }
+    
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
     const answer = await pc.createAnswer();
     await pc.setLocalDescription(answer);
+    
     if (webrtcChannelRef.current) {
       webrtcChannelRef.current.send({ type: 'broadcast', event: 'answer', payload: { answer, to: fromId, from: session?.user?.id } });
     }
+    
+    console.log(isRenegotiation ? 'Renegotiation completed with' : 'New connection established with', fromId);
   }, [createPeerConnection, session?.user?.id]);
 
   const handleAnswer = useCallback(async (answer: RTCSessionDescriptionInit, fromId: string) => {
