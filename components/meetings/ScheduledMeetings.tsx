@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting, MeetingParticipant } from '../../types';
+import { googleCalendar } from '../../lib/googleCalendar';
 
 interface ScheduledMeetingsProps {
   onJoinMeeting?: (salaId: string) => void;
@@ -15,6 +16,7 @@ export const ScheduledMeetings: React.FC<ScheduledMeetingsProps> = ({ onJoinMeet
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [miembrosEspacio, setMiembrosEspacio] = useState<any[]>([]);
+  const [googleConnected, setGoogleConnected] = useState(googleCalendar.isConnected());
 
   const [newMeeting, setNewMeeting] = useState({
     titulo: '',
@@ -97,6 +99,53 @@ export const ScheduledMeetings: React.FC<ScheduledMeetingsProps> = ({ onJoinMeet
       ? new Date(`${newMeeting.fecha}T${newMeeting.hora_fin}`)
       : new Date(fechaInicio.getTime() + 60 * 60 * 1000);
 
+    // Variables para Google Calendar
+    const meetingCode = Math.random().toString(36).substring(2, 10);
+    let meetingLink = `${window.location.origin}/meet/${meetingCode}`;
+    let googleEventId: string | null = null;
+
+    // Obtener emails de participantes para invitaciones
+    let participantesEmails: string[] = [];
+    if (newMeeting.participantes.length > 0) {
+      const { data: usuariosData } = await supabase
+        .from('usuarios')
+        .select('id, email')
+        .in('id', newMeeting.participantes);
+      
+      if (usuariosData) {
+        participantesEmails = usuariosData
+          .map((u: any) => u.email)
+          .filter((email: any): email is string => !!email);
+      }
+    }
+
+    // Crear evento en Google Calendar si está conectado
+    if (googleConnected) {
+      try {
+        const descripcionCompleta = newMeeting.descripcion.trim() 
+          ? `${newMeeting.descripcion.trim()}\n\n---\nReunión creada en Cowork Virtual`
+          : 'Reunión creada en Cowork Virtual';
+
+        const googleEvent = await googleCalendar.createEvent({
+          summary: newMeeting.titulo.trim(),
+          description: descripcionCompleta,
+          start: fechaInicio.toISOString(),
+          end: fechaFin.toISOString(),
+          attendees: participantesEmails,
+          sendUpdates: 'all'
+        });
+        
+        if (googleEvent) {
+          googleEventId = googleEvent.id;
+          if (googleEvent.hangoutLink) {
+            meetingLink = googleEvent.hangoutLink;
+          }
+        }
+      } catch (err) {
+        console.error('Error creando evento en Google Calendar:', err);
+      }
+    }
+
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -106,7 +155,9 @@ export const ScheduledMeetings: React.FC<ScheduledMeetingsProps> = ({ onJoinMeet
         fecha_inicio: fechaInicio.toISOString(),
         fecha_fin: fechaFin.toISOString(),
         creado_por: currentUser.id,
-        recordatorio_minutos: newMeeting.recordatorio_minutos
+        recordatorio_minutos: newMeeting.recordatorio_minutos,
+        meeting_link: meetingLink,
+        google_event_id: googleEventId
       })
       .select()
       .single();
@@ -145,7 +196,17 @@ export const ScheduledMeetings: React.FC<ScheduledMeetingsProps> = ({ onJoinMeet
     loadMeetings();
   };
 
-  const deleteMeeting = async (meetingId: string) => {
+  const deleteMeeting = async (meetingId: string, googleEventId?: string) => {
+    // Eliminar de Google Calendar primero (notifica a invitados)
+    if (googleConnected && googleEventId) {
+      try {
+        await googleCalendar.deleteEvent(googleEventId, 'all');
+      } catch (err) {
+        console.error('Error eliminando de Google Calendar:', err);
+      }
+    }
+    
+    // Eliminar de Supabase
     await supabase.from('reuniones_programadas').delete().eq('id', meetingId);
     loadMeetings();
   };
@@ -426,7 +487,7 @@ export const ScheduledMeetings: React.FC<ScheduledMeetingsProps> = ({ onJoinMeet
 
                         {isCreator(meeting) && (
                           <button
-                            onClick={() => deleteMeeting(meeting.id)}
+                            onClick={() => deleteMeeting(meeting.id, meeting.google_event_id)}
                             className="p-2 bg-red-500/10 hover:bg-red-500/30 text-red-400 rounded-lg transition-all"
                             title="Cancelar reunión"
                           >

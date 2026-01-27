@@ -845,13 +845,15 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   // Estado para wave/invite
   const [incomingWave, setIncomingWave] = useState<{ from: string; fromName: string } | null>(null);
 
-  // Detectar usuarios en proximidad
+  // Detectar usuarios en proximidad (excluyendo al usuario actual)
   const usersInCall = useMemo(() => {
     return onlineUsers.filter(u => {
+      // Excluir al usuario actual
+      if (u.id === session?.user?.id) return false;
       const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
       return dist < PROXIMITY_RADIUS;
     });
-  }, [onlineUsers, currentUser.x, currentUser.y]);
+  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id]);
 
   const hasActiveCall = usersInCall.length > 0;
   
@@ -1033,41 +1035,65 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       }
     };
 
+    // Contador de video tracks por peer para detectar screen share
+    let videoTrackCount = 0;
+    
     pc.ontrack = (event) => {
       console.log('Received remote track from', peerId, 'kind:', event.track.kind, 'label:', event.track.label, 'streamId:', event.streams[0]?.id);
-      const stream = event.streams[0];
+      const remoteStream = event.streams[0];
       const trackLabel = event.track.label.toLowerCase();
       
-      // Detectar si es screen share por label
-      const isScreenShare = event.track.kind === 'video' && 
-        (trackLabel.includes('screen') || 
+      // Detectar si es screen share por label O si es el segundo video track
+      const isScreenShareByLabel = trackLabel.includes('screen') || 
          trackLabel.includes('display') ||
          trackLabel.includes('window') ||
-         trackLabel.includes('monitor'));
+         trackLabel.includes('monitor');
+      
+      // Contar video tracks - el segundo video track es screen share
+      if (event.track.kind === 'video') {
+        videoTrackCount++;
+      }
+      
+      const isScreenShare = event.track.kind === 'video' && (isScreenShareByLabel || videoTrackCount > 1);
       
       if (isScreenShare) {
         console.log('Detected SCREEN SHARE from', peerId);
         setRemoteScreenStreams(prev => {
           const newMap = new Map(prev);
-          newMap.set(peerId, stream);
+          newMap.set(peerId, remoteStream);
           return newMap;
         });
-      } else {
-        // Es cámara normal
+      } else if (event.track.kind === 'video') {
+        // Es cámara normal (solo video tracks)
         console.log('Detected CAMERA from', peerId);
         setRemoteStreams(prev => {
           const newMap = new Map(prev);
-          newMap.set(peerId, stream);
+          newMap.set(peerId, remoteStream);
+          return newMap;
+        });
+      } else if (event.track.kind === 'audio') {
+        // Audio track - agregar al stream existente o crear nuevo
+        console.log('Detected AUDIO from', peerId);
+        setRemoteStreams(prev => {
+          const newMap = new Map(prev);
+          const existingStream = newMap.get(peerId);
+          if (existingStream) {
+            // Si ya hay stream, el audio ya está incluido
+            return prev;
+          }
+          newMap.set(peerId, remoteStream);
           return newMap;
         });
       }
     };
 
     pc.onconnectionstatechange = () => {
+      console.log('Connection state with', peerId, ':', pc.connectionState);
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         pc.close();
         peerConnectionsRef.current.delete(peerId);
         setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+        setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
       }
     };
 
@@ -1136,15 +1162,38 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
   }, [activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate]);
 
-  // Iniciar llamadas cuando hay usuarios cerca
+  // Limpiar conexiones cuando usuarios se alejan
   useEffect(() => {
-    if (!hasActiveCall || !activeStreamRef.current) return;
+    const usersInCallIds = new Set(usersInCall.map(u => u.id));
+    
+    // Cerrar conexiones de usuarios que ya no están en proximidad
+    peerConnectionsRef.current.forEach((pc, peerId) => {
+      if (!usersInCallIds.has(peerId)) {
+        console.log('Closing connection with user who left proximity:', peerId);
+        pc.close();
+        peerConnectionsRef.current.delete(peerId);
+        setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+        setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+      }
+    });
+  }, [usersInCall]);
+
+  // Iniciar llamadas cuando hay usuarios cerca Y tenemos stream
+  useEffect(() => {
+    if (!hasActiveCall || !session?.user?.id || !activeStreamRef.current) return;
+    
     usersInCall.forEach(user => {
-      if (!peerConnectionsRef.current.has(user.id) && session?.user?.id && session.user.id < user.id) {
+      // Usar hash numérico para comparación consistente
+      const myIdHash = session.user.id.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
+      const theirIdHash = user.id.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
+      const shouldInitiate = myIdHash < theirIdHash || (myIdHash === theirIdHash && session.user.id < user.id);
+      
+      if (!peerConnectionsRef.current.has(user.id) && shouldInitiate) {
+        console.log('Initiating call to:', user.id, user.name);
         initiateCall(user.id);
       }
     });
-  }, [usersInCall, hasActiveCall, initiateCall, session?.user?.id]);
+  }, [usersInCall, hasActiveCall, initiateCall, session?.user?.id, stream]);
 
   // Agregar screen share a conexiones existentes cuando se inicia
   useEffect(() => {
@@ -1181,6 +1230,48 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       }
     });
   }, [screenStream, hasActiveCall, session?.user?.id]);
+
+  // Renegociar conexiones existentes cuando el stream local cambia
+  useEffect(() => {
+    if (!stream || !hasActiveCall || peerConnectionsRef.current.size === 0) return;
+    
+    console.log('Stream changed, renegotiating with existing peers');
+    
+    peerConnectionsRef.current.forEach(async (pc, peerId) => {
+      // Verificar si necesitamos agregar tracks
+      const senders = pc.getSenders();
+      const hasVideoSender = senders.some(s => s.track?.kind === 'video');
+      const hasAudioSender = senders.some(s => s.track?.kind === 'audio');
+      
+      let needsRenegotiation = false;
+      
+      stream.getTracks().forEach(track => {
+        const hasSender = senders.some(s => s.track?.id === track.id);
+        if (!hasSender) {
+          console.log('Adding new track to peer:', peerId, track.kind);
+          pc.addTrack(track, stream);
+          needsRenegotiation = true;
+        }
+      });
+      
+      // Renegociar si se agregaron tracks
+      if (needsRenegotiation) {
+        try {
+          const offer = await pc.createOffer();
+          await pc.setLocalDescription(offer);
+          if (webrtcChannelRef.current) {
+            webrtcChannelRef.current.send({
+              type: 'broadcast',
+              event: 'offer',
+              payload: { offer, to: peerId, from: session?.user?.id }
+            });
+          }
+        } catch (err) {
+          console.error('Error renegotiating after stream change:', err);
+        }
+      }
+    });
+  }, [stream, hasActiveCall, session?.user?.id]);
 
   // Manejar stream de video
   useEffect(() => {

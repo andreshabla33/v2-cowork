@@ -97,10 +97,57 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       ? new Date(`${newMeeting.fecha}T${newMeeting.hora_fin}`)
       : new Date(fechaInicio.getTime() + 60 * 60 * 1000);
 
-    // Generar link de meeting único
+    // Generar link de meeting único (se actualizará con Google Meet si está conectado)
     const meetingCode = Math.random().toString(36).substring(2, 10);
-    const meetingLink = `${window.location.origin}/meet/${meetingCode}`;
+    let meetingLink = `${window.location.origin}/meet/${meetingCode}`;
+    let googleEventId: string | null = null;
 
+    // Obtener emails de participantes para invitaciones
+    let participantesEmails: string[] = [];
+    if (newMeeting.participantes.length > 0) {
+      const { data: usuariosData } = await supabase
+        .from('usuarios')
+        .select('id, email')
+        .in('id', newMeeting.participantes);
+      
+      if (usuariosData) {
+        participantesEmails = usuariosData
+          .map(u => u.email)
+          .filter((email): email is string => !!email);
+      }
+    }
+
+    // Crear evento en Google Calendar PRIMERO si está conectado
+    if (googleConnected) {
+      try {
+        const descripcionCompleta = newMeeting.descripcion.trim() 
+          ? `${newMeeting.descripcion.trim()}\n\n---\nReunión creada en Cowork Virtual`
+          : 'Reunión creada en Cowork Virtual';
+
+        const googleEvent = await googleCalendar.createEvent({
+          summary: newMeeting.titulo.trim(),
+          description: descripcionCompleta,
+          start: fechaInicio.toISOString(),
+          end: fechaFin.toISOString(),
+          attendees: participantesEmails, // Envía invitaciones por email
+          sendUpdates: 'all' // Notificar a todos los invitados
+        });
+        
+        if (googleEvent) {
+          googleEventId = googleEvent.id;
+          
+          // Usar Google Meet link si se creó
+          if (googleEvent.hangoutLink) {
+            meetingLink = googleEvent.hangoutLink;
+          }
+        }
+      } catch (err) {
+        console.error('Error creando evento en Google Calendar:', err);
+        // Continuar sin Google Calendar
+      }
+    }
+
+    // Crear reunión en Supabase
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -111,12 +158,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         fecha_fin: fechaFin.toISOString(),
         creado_por: currentUser.id,
         recordatorio_minutos: newMeeting.recordatorio_minutos,
-        meeting_link: meetingLink
+        meeting_link: meetingLink,
+        google_event_id: googleEventId
       })
       .select()
       .single();
 
     if (!error && meeting) {
+      // Insertar participantes
       if (newMeeting.participantes.length > 0) {
         const participantesData = newMeeting.participantes.map(uid => ({
           reunion_id: meeting.id,
@@ -124,28 +173,6 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
           estado: 'pendiente'
         }));
         await supabase.from('reunion_participantes').insert(participantesData);
-      }
-
-      // Sincronizar con Google Calendar si está conectado
-      if (googleConnected) {
-        try {
-          const googleEvent = await googleCalendar.createEvent({
-            summary: newMeeting.titulo.trim(),
-            description: newMeeting.descripcion.trim() || undefined,
-            start: fechaInicio.toISOString(),
-            end: fechaFin.toISOString()
-          });
-          
-          // Si Google Meet se creó, actualizar el meeting_link con el link de Meet
-          if (googleEvent?.hangoutLink) {
-            await supabase
-              .from('reuniones_programadas')
-              .update({ meeting_link: googleEvent.hangoutLink })
-              .eq('id', meeting.id);
-          }
-        } catch (err) {
-          console.error('Error creando evento en Google Calendar:', err);
-        }
       }
 
       setShowScheduleModal(false);
@@ -178,16 +205,26 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   };
 
   const deleteMeeting = async (meetingId: string, googleEventId?: string) => {
-    // Eliminar de Supabase
-    await supabase.from('reuniones_programadas').delete().eq('id', meetingId);
-    
-    // Eliminar de Google Calendar si está conectado y tiene ID
+    // Eliminar de Google Calendar PRIMERO si está conectado y tiene ID
+    // Esto envía notificación de cancelación a los invitados
     if (googleConnected && googleEventId) {
       try {
-        await googleCalendar.deleteEvent(googleEventId);
+        await googleCalendar.deleteEvent(googleEventId, 'all'); // 'all' = notificar a invitados
+        console.log('Evento eliminado de Google Calendar:', googleEventId);
       } catch (err) {
         console.error('Error eliminando de Google Calendar:', err);
+        // Continuar con la eliminación local aunque falle Google
       }
+    }
+    
+    // Eliminar de Supabase (esto activará el trigger que notifica a participantes)
+    const { error } = await supabase
+      .from('reuniones_programadas')
+      .delete()
+      .eq('id', meetingId);
+    
+    if (error) {
+      console.error('Error eliminando reunión:', error);
     }
     
     loadMeetings();

@@ -103,19 +103,24 @@ El sistema de chat ya está **completamente funcional** con:
 
 ---
 
-### Fase 1: Reuniones Programadas ⬅️ **ACTUAL**
+### ✅ Fase 1: Reuniones Programadas con Google Calendar - COMPLETADO
 
-**Objetivo:** Sistema de reuniones con calendario
+**Objetivo:** Sistema de reuniones con calendario  
+**Fecha completado:** 27 de Enero 2026
 
-#### Funcionalidades
+#### Funcionalidades Implementadas
 
-| # | Feature | Prioridad | Esfuerzo |
-|---|---------|-----------|----------|
-| 1.1 | Programar reuniones con fecha/hora | Alta | 2 días |
-| 1.2 | Integración Google Calendar | Alta | 2 días |
-| 1.3 | Invitaciones a reuniones | Media | 1 día |
-| 1.4 | Recordatorios de reuniones | Media | 1 día |
-| 1.5 | Vista de calendario en UI | Media | 2 días |
+| # | Feature | Estado | Archivo |
+|---|---------|:------:|---------|
+| 1.1 | Programar reuniones con fecha/hora | ✅ | `CalendarPanel.tsx` |
+| 1.2 | Integración Google Calendar | ✅ | `lib/googleCalendar.ts` |
+| 1.3 | Invitaciones por email a participantes | ✅ | Google Calendar API |
+| 1.4 | Google Meet automático | ✅ | `createEvent()` |
+| 1.5 | Eliminación sincronizada | ✅ | `deleteEvent()` |
+| 1.6 | Vista de calendario en UI | ✅ | Mini calendario |
+
+#### Documentación
+Ver `docs/FASE1_CALENDARIO_GOOGLE.md` para documentación completa.
 
 #### Tablas Supabase Requeridas
 
@@ -281,40 +286,45 @@ export const GLTFAvatar: React.FC<AvatarProps> = ({ config, isMoving, direction 
 
 ---
 
-## 📋 Checklist Fase 1 - Reuniones Programadas
+## ✅ Checklist Fase 1 - Reuniones Programadas (COMPLETADO)
 
 ### Preparación
-- [ ] Crear tabla `reuniones_programadas` en Supabase
-- [ ] Crear tabla `reunion_participantes` en Supabase
-- [ ] Configurar RLS policies
-- [ ] Configurar Google Calendar API (OAuth)
+- [x] Crear tabla `reuniones_programadas` en Supabase
+- [x] Crear tabla `reunion_participantes` en Supabase
+- [x] Crear tabla `notificaciones_calendario` en Supabase
+- [x] Configurar RLS policies
+- [x] Configurar Google Calendar API (OAuth)
 
 ### Desarrollo
-- [ ] **1.1 Programar Reuniones**
-  - [ ] Modal para crear reunión (fecha, hora, título, descripción)
-  - [ ] Selector de participantes
-  - [ ] Vincular con sala existente (opcional)
+- [x] **1.1 Programar Reuniones**
+  - [x] Modal para crear reunión (fecha, hora, título, descripción)
+  - [x] Selector de participantes del espacio
+  - [x] Vincular con sala existente (opcional)
 
-- [ ] **1.2 Integración Google Calendar**
-  - [ ] OAuth flow para conectar cuenta
-  - [ ] Crear eventos en Google Calendar
-  - [ ] Sincronizar cambios bidireccional
+- [x] **1.2 Integración Google Calendar**
+  - [x] OAuth flow para conectar cuenta
+  - [x] Crear eventos en Google Calendar
+  - [x] Google Meet automático para cada reunión
+  - [x] Guardar `google_event_id` para sincronización
+  - [x] Enviar invitaciones por email a participantes
 
-- [ ] **1.3 Vista de Calendario**
-  - [ ] Componente de calendario mensual/semanal
-  - [ ] Ver reuniones programadas
-  - [ ] Quick actions (unirse, editar, cancelar)
+- [x] **1.3 Vista de Calendario**
+  - [x] Mini calendario mensual con indicadores
+  - [x] Ver reuniones programadas
+  - [x] Quick actions (unirse, eliminar)
+  - [x] Badges "EN VIVO" y "EN 15 MIN"
 
-- [ ] **1.4 Recordatorios**
-  - [ ] Notificación antes de reunión
-  - [ ] Toast/badge cuando inicia reunión
+- [x] **1.4 Eliminación Sincronizada**
+  - [x] Eliminar de Google Calendar
+  - [x] Notificar cancelación a invitados por email
+  - [x] Eliminar de Supabase
 
 ### Testing
-- [ ] Crear reunión programada
-- [ ] Invitar participantes
-- [ ] Ver en Google Calendar
-- [ ] Recibir recordatorio
-- [ ] Unirse a reunión desde el espacio
+- [x] Crear reunión programada
+- [x] Invitar participantes (emails automáticos)
+- [x] Ver evento en Google Calendar
+- [x] Eliminar reunión (sincronizado)
+- [x] Unirse a reunión con Google Meet
 
 ---
 

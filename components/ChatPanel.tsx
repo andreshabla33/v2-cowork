@@ -111,10 +111,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       console.log('Miembros IDs:', data, 'Error:', error, 'CurrentUserId:', currentUserId);
       
       if (data && data.length > 0) {
-        // Filtrar el usuario actual y obtener datos de usuarios
-        const otrosIds = data
-          .map((m: any) => m.usuario_id)
-          .filter((id: string) => id !== currentUserId);
+        // Filtrar el usuario actual y obtener IDs únicos (evitar duplicados)
+        const otrosIds = [...new Set(
+          data
+            .map((m: any) => m.usuario_id)
+            .filter((id: string) => id !== currentUserId)
+        )];
         
         if (otrosIds.length > 0) {
           const { data: usuarios } = await supabase
@@ -123,7 +125,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
             .in('id', otrosIds);
           
           console.log('Usuarios encontrados:', usuarios);
-          setMiembrosEspacio(usuarios || []);
+          // Eliminar posibles duplicados por ID
+          const uniqueUsuarios = usuarios?.filter((u: any, index: number, self: any[]) => 
+            index === self.findIndex((t: any) => t.id === u.id)
+          ) || [];
+          setMiembrosEspacio(uniqueUsuarios);
         }
       }
     };
