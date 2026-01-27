@@ -858,12 +858,17 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
           const remoteScreen = remoteScreenStreams.get(u.id);
           if (!remoteScreen) return null;
           return (
-            <div key={`screen-${u.id}`} className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/50 shadow-2xl group w-52 h-36">
+            <div key={`screen-${u.id}`} className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/30 shadow-2xl group w-52 h-36">
               <StableVideo stream={remoteScreen} className="w-full h-full object-cover" />
-              <div className="absolute top-3 left-3 bg-green-600 backdrop-blur-md px-2 py-1 rounded-lg">
-                <span className="text-[10px] font-bold uppercase tracking-wide text-white">{u.name} - Pantalla</span>
+              {/* Label minimalista y transparente */}
+              <div className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-md opacity-60 group-hover:opacity-100 transition-opacity">
+                <span className="text-[8px] font-medium text-white/80 truncate max-w-[80px] block">{u.name.split(' ')[0]}</span>
               </div>
-              <button onClick={() => setExpandedId(`screen-${u.id}`)} className="absolute bottom-3 right-3 w-8 h-8 rounded-full flex items-center justify-center bg-green-600 text-white opacity-0 group-hover:opacity-100 transition-all">
+              {/* Icono de pantalla pequeño */}
+              <div className="absolute top-2 right-2 w-5 h-5 rounded-md bg-green-500/20 backdrop-blur-sm flex items-center justify-center opacity-60">
+                <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              </div>
+              <button onClick={() => setExpandedId(`screen-${u.id}`)} className="absolute bottom-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 backdrop-blur-sm text-white/70 opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-all">
                 <IconExpand on={false}/>
               </button>
             </div>
