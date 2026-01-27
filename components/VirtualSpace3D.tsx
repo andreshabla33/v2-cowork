@@ -856,7 +856,8 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbujas de screen share de otros usuarios */}
         {usersInCall.map((u) => {
           const remoteScreen = remoteScreenStreams.get(u.id);
-          if (!remoteScreen) return null;
+          // Solo mostrar si hay un stream con video tracks activos
+          if (!remoteScreen || remoteScreen.getVideoTracks().length === 0) return null;
           return (
             <div key={`screen-${u.id}`} className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/30 shadow-2xl group w-52 h-36">
               <StableVideo stream={remoteScreen} className="w-full h-full object-cover" />
@@ -1321,47 +1322,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     });
   }, [screenStream, hasActiveCall, session?.user?.id]);
 
-  // Renegociar conexiones existentes cuando el stream local cambia
-  useEffect(() => {
-    if (!stream || !hasActiveCall || peerConnectionsRef.current.size === 0) return;
-    
-    console.log('Stream changed, renegotiating with existing peers');
-    
-    peerConnectionsRef.current.forEach(async (pc, peerId) => {
-      // Verificar si necesitamos agregar tracks
-      const senders = pc.getSenders();
-      const hasVideoSender = senders.some(s => s.track?.kind === 'video');
-      const hasAudioSender = senders.some(s => s.track?.kind === 'audio');
-      
-      let needsRenegotiation = false;
-      
-      stream.getTracks().forEach(track => {
-        const hasSender = senders.some(s => s.track?.id === track.id);
-        if (!hasSender) {
-          console.log('Adding new track to peer:', peerId, track.kind);
-          pc.addTrack(track, stream);
-          needsRenegotiation = true;
-        }
-      });
-      
-      // Renegociar si se agregaron tracks
-      if (needsRenegotiation) {
-        try {
-          const offer = await pc.createOffer();
-          await pc.setLocalDescription(offer);
-          if (webrtcChannelRef.current) {
-            webrtcChannelRef.current.send({
-              type: 'broadcast',
-              event: 'offer',
-              payload: { offer, to: peerId, from: session?.user?.id }
-            });
-          }
-        } catch (err) {
-          console.error('Error renegotiating after stream change:', err);
-        }
-      }
-    });
-  }, [stream, hasActiveCall, session?.user?.id]);
+  // NOTA: La renegociación automática cuando el stream cambia fue removida
+  // porque causaba conflictos de SDP (m-lines order mismatch).
+  // Los tracks se agregan al crear la conexión inicial en createPeerConnection.
 
   // Manejar stream de video
   useEffect(() => {
