@@ -538,6 +538,8 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const [reactionFading, setReactionFading] = useState(false);
   const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
+  const [zoomLevel, setZoomLevel] = useState(1);
+  const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   
   // Calcular layout basado en número de usuarios
   const totalUsers = usersInCall.length + 1; // +1 por el usuario local
@@ -581,29 +583,98 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
 
   return (
     <>
-      {/* Overlay expandido */}
+      {/* Overlay expandido con zoom - UI 2026 Glassmorphism */}
       {expandedId && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[100] flex items-center justify-center" onClick={() => setExpandedId(null)}>
-          <div className="relative w-[80vw] h-[80vh] max-w-4xl bg-black rounded-[40px] overflow-hidden border border-white/10 shadow-2xl" onClick={e => e.stopPropagation()}>
-            {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId?.startsWith('screen-') && remoteScreenStreams.get(expandedId.replace('screen-', ''))) || (expandedId && remoteStreams.get(expandedId)) ? (
-              <StableVideo 
-                stream={expandedId === 'local' ? stream : expandedId === 'screen' ? screenStream : expandedId?.startsWith('screen-') ? remoteScreenStreams.get(expandedId.replace('screen-', '')) || null : remoteStreams.get(expandedId) || null}
-                muted={expandedId === 'local'}
-                className={`w-full h-full object-contain ${expandedId === 'local' ? 'mirror' : ''}`}
-              />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center">
-                <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
-                  {expandedId === 'local' ? userName.charAt(0) : usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-xl z-[100] flex items-center justify-center" onClick={() => { setExpandedId(null); setZoomLevel(1); setPanPosition({ x: 0, y: 0 }); }}>
+          <div className="relative w-[90vw] h-[90vh] max-w-6xl bg-gradient-to-br from-zinc-900/80 to-black/90 rounded-[32px] overflow-hidden border border-white/5 shadow-[0_32px_64px_-12px_rgba(0,0,0,0.8)]" onClick={e => e.stopPropagation()}>
+            {/* Video container con zoom y pan */}
+            <div 
+              className="w-full h-full overflow-hidden cursor-grab active:cursor-grabbing"
+              style={{ 
+                transform: `scale(${zoomLevel}) translate(${panPosition.x}px, ${panPosition.y}px)`,
+                transition: 'transform 0.2s ease-out'
+              }}
+            >
+              {(expandedId === 'local' && stream) || (expandedId === 'screen' && screenStream) || (expandedId?.startsWith('screen-') && remoteScreenStreams.get(expandedId.replace('screen-', ''))) || (expandedId && remoteStreams.get(expandedId)) ? (
+                <StableVideo 
+                  stream={expandedId === 'local' ? stream : expandedId === 'screen' ? screenStream : expandedId?.startsWith('screen-') ? remoteScreenStreams.get(expandedId.replace('screen-', '')) || null : remoteStreams.get(expandedId) || null}
+                  muted={expandedId === 'local'}
+                  className={`w-full h-full object-contain ${expandedId === 'local' ? 'mirror' : ''}`}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="w-32 h-32 rounded-full bg-zinc-800 flex items-center justify-center text-6xl font-black text-white">
+                    {expandedId === 'local' ? userName.charAt(0) : usersInCall.find(u => u.id === expandedId)?.name.charAt(0) || '?'}
+                  </div>
                 </div>
+              )}
+            </div>
+
+            {/* Header glassmorphism */}
+            <div className="absolute top-4 left-4 right-4 flex items-center justify-between">
+              <div className="bg-white/5 backdrop-blur-2xl px-4 py-2 rounded-2xl border border-white/10">
+                <span className="text-sm font-medium text-white/90">
+                  {expandedId === 'local' ? 'Tu cámara' : expandedId === 'screen' ? 'Tu pantalla' : expandedId?.startsWith('screen-') ? `${usersInCall.find(u => u.id === expandedId?.replace('screen-', ''))?.name || 'Usuario'} - Pantalla` : usersInCall.find(u => u.id === expandedId)?.name || 'Usuario'}
+                </span>
               </div>
-            )}
-            <button onClick={() => setExpandedId(null)} className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20">
-              <IconExpand on={true} />
-            </button>
+              <button 
+                onClick={() => { setExpandedId(null); setZoomLevel(1); setPanPosition({ x: 0, y: 0 }); }} 
+                className="w-10 h-10 rounded-2xl bg-white/5 backdrop-blur-2xl border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 hover:text-white transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            {/* Controles de zoom flotantes - estilo minimalista 2026 */}
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/5 backdrop-blur-2xl px-2 py-2 rounded-2xl border border-white/10 shadow-lg">
+              {/* Zoom out */}
+              <button 
+                onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))}
+                disabled={zoomLevel <= 0.5}
+                className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" /></svg>
+              </button>
+              
+              {/* Zoom indicator */}
+              <div className="px-3 py-1.5 min-w-[60px] text-center">
+                <span className="text-sm font-mono text-white/90">{Math.round(zoomLevel * 100)}%</span>
+              </div>
+              
+              {/* Zoom in */}
+              <button 
+                onClick={() => setZoomLevel(z => Math.min(3, z + 0.25))}
+                disabled={zoomLevel >= 3}
+                className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-white transition-all"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              </button>
+
+              {/* Divider */}
+              <div className="w-px h-6 bg-white/10"></div>
+              
+              {/* Reset zoom */}
+              <button 
+                onClick={() => { setZoomLevel(1); setPanPosition({ x: 0, y: 0 }); }}
+                className="w-10 h-10 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center text-white transition-all"
+                title="Restablecer zoom"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+              </button>
+
+              {/* Fullscreen */}
+              <button 
+                onClick={() => setZoomLevel(z => z === 1 ? 1.5 : 1)}
+                className="w-10 h-10 rounded-xl bg-indigo-500/20 hover:bg-indigo-500/30 flex items-center justify-center text-indigo-400 transition-all"
+                title="Ajustar pantalla"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+              </button>
+            </div>
+
             {/* Reacción en pantalla expandida */}
             {currentReaction && (
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-5xl pointer-events-none animate-fade-in-out">
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-6xl pointer-events-none animate-fade-in-out">
                 {currentReaction}
               </div>
             )}
