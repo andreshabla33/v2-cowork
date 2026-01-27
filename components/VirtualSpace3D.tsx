@@ -1353,7 +1353,24 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         // No hay proximidad ni screen sharing - apagar cámara/mic
         if (activeStreamRef.current) {
           console.log('Stopping camera/mic - no active call');
-          activeStreamRef.current.getTracks().forEach(track => {
+          
+          // Primero remover los tracks de todas las conexiones activas
+          const tracks = activeStreamRef.current.getTracks();
+          peerConnectionsRef.current.forEach((pc, peerId) => {
+            pc.getSenders().forEach(sender => {
+              if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
+                console.log('Removing track from peer connection:', peerId, sender.track.kind);
+                try {
+                  pc.removeTrack(sender);
+                } catch (e) {
+                  console.warn('Error removing track from PC:', e);
+                }
+              }
+            });
+          });
+
+          // Luego detener los tracks
+          tracks.forEach(track => {
             console.log('Stopping track:', track.kind, track.label);
             track.stop();
           });
