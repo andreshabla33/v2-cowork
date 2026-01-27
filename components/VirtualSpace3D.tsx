@@ -825,6 +825,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeScreenRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
+  const peerVideoTrackCountRef = useRef<Map<string, number>>(new Map()); // Rastrear video tracks por peer
   const webrtcChannelRef = useRef<any>(null);
   const [currentReaction, setCurrentReaction] = useState<string | null>(null);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
@@ -1035,42 +1036,44 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       }
     };
 
-    // Contador de video tracks por peer para detectar screen share
-    let videoTrackCount = 0;
+    // Inicializar contador de video tracks para este peer
+    peerVideoTrackCountRef.current.set(peerId, 0);
     
     pc.ontrack = (event) => {
       console.log('Received remote track from', peerId, 'kind:', event.track.kind, 'label:', event.track.label, 'streamId:', event.streams[0]?.id);
       const remoteStream = event.streams[0];
       const trackLabel = event.track.label.toLowerCase();
       
-      // Detectar si es screen share por label O si es el segundo video track
+      // Detectar si es screen share por label
       const isScreenShareByLabel = trackLabel.includes('screen') || 
          trackLabel.includes('display') ||
          trackLabel.includes('window') ||
          trackLabel.includes('monitor');
       
-      // Contar video tracks - el segundo video track es screen share
       if (event.track.kind === 'video') {
-        videoTrackCount++;
-      }
-      
-      const isScreenShare = event.track.kind === 'video' && (isScreenShareByLabel || videoTrackCount > 1);
-      
-      if (isScreenShare) {
-        console.log('Detected SCREEN SHARE from', peerId);
-        setRemoteScreenStreams(prev => {
-          const newMap = new Map(prev);
-          newMap.set(peerId, remoteStream);
-          return newMap;
-        });
-      } else if (event.track.kind === 'video') {
-        // Es cámara normal (solo video tracks)
-        console.log('Detected CAMERA from', peerId);
-        setRemoteStreams(prev => {
-          const newMap = new Map(prev);
-          newMap.set(peerId, remoteStream);
-          return newMap;
-        });
+        // Incrementar contador de video tracks para este peer
+        const currentCount = (peerVideoTrackCountRef.current.get(peerId) || 0) + 1;
+        peerVideoTrackCountRef.current.set(peerId, currentCount);
+        
+        // El segundo video track es screen share (o si tiene label de screen)
+        const isScreenShare = isScreenShareByLabel || currentCount > 1;
+        
+        if (isScreenShare) {
+          console.log('Detected SCREEN SHARE from', peerId, '(track #' + currentCount + ')');
+          setRemoteScreenStreams(prev => {
+            const newMap = new Map(prev);
+            newMap.set(peerId, remoteStream);
+            return newMap;
+          });
+        } else {
+          // Es cámara normal (primer video track)
+          console.log('Detected CAMERA from', peerId, '(track #' + currentCount + ')');
+          setRemoteStreams(prev => {
+            const newMap = new Map(prev);
+            newMap.set(peerId, remoteStream);
+            return newMap;
+          });
+        }
       } else if (event.track.kind === 'audio') {
         // Audio track - agregar al stream existente o crear nuevo
         console.log('Detected AUDIO from', peerId);
@@ -1078,7 +1081,6 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           const newMap = new Map(prev);
           const existingStream = newMap.get(peerId);
           if (existingStream) {
-            // Si ya hay stream, el audio ya está incluido
             return prev;
           }
           newMap.set(peerId, remoteStream);
@@ -1092,6 +1094,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
         pc.close();
         peerConnectionsRef.current.delete(peerId);
+        peerVideoTrackCountRef.current.delete(peerId);
         setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
         setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
       }
@@ -1172,6 +1175,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         console.log('Closing connection with user who left proximity:', peerId);
         pc.close();
         peerConnectionsRef.current.delete(peerId);
+        peerVideoTrackCountRef.current.delete(peerId);
         setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
         setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
       }
