@@ -928,8 +928,24 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     return onlineUsers.filter(u => {
       // Excluir al usuario actual
       if (u.id === session?.user?.id) return false;
+      
+      // Validar coordenadas
+      if (typeof u.x !== 'number' || typeof u.y !== 'number' || typeof currentUser.x !== 'number' || typeof currentUser.y !== 'number') {
+        return false;
+      }
+
       const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
-      return dist < PROXIMITY_RADIUS;
+      
+      const inProximity = dist < PROXIMITY_RADIUS;
+      
+      // Log solo cuando cambia el estado de proximidad o cada cierto tiempo podría ser ruidoso
+      // Pero para depurar este caso específico, vamos a loguear si está cerca
+      if (inProximity) {
+         console.log(`[PROXIMITY] User ${u.name} (${u.id}) is CLOSE. Dist: ${dist.toFixed(2)} < ${PROXIMITY_RADIUS}`);
+         console.log(`[PROXIMITY] Coords: Me(${currentUser.x}, ${currentUser.y}) vs Them(${u.x}, ${u.y})`);
+      }
+      
+      return inProximity;
     });
   }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id]);
 
