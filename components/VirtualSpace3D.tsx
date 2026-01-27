@@ -1326,60 +1326,96 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   // porque causaba conflictos de SDP (m-lines order mismatch).
   // Los tracks se agregan al crear la conexión inicial en createPeerConnection.
 
+  // Flag para evitar condiciones de carrera en getUserMedia
+  const isProcessingStreamRef = useRef(false);
+
   // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
+    let mounted = true;
+
     const manageStream = async () => {
+      // Evitar ejecuciones simultáneas
+      if (isProcessingStreamRef.current) return;
+      
       const shouldHaveStream = hasActiveCall || currentUser.isScreenSharing;
       console.log('ManageStream - hasActiveCall:', hasActiveCall, 'isScreenSharing:', currentUser.isScreenSharing, 'shouldHaveStream:', shouldHaveStream);
       
-      if (shouldHaveStream) {
-        if (!activeStreamRef.current) {
-          try {
+      try {
+        isProcessingStreamRef.current = true;
+
+        if (shouldHaveStream) {
+          if (!activeStreamRef.current) {
             console.log('Requesting camera/mic access...');
             const newStream = await navigator.mediaDevices.getUserMedia({ 
               video: { width: 640, height: 480 }, 
               audio: true 
             });
+            
+            if (!mounted) {
+              // Si el componente se desmontó mientras cargaba, limpiar inmediatamente
+              newStream.getTracks().forEach(t => t.stop());
+              return;
+            }
+
+            // Verificar nuevamente si aún necesitamos el stream (por si cambió el estado mientras cargaba)
+            if (!hasActiveCall && !currentUser.isScreenSharing) {
+              console.log('Stream loaded but no longer needed, stopping...');
+              newStream.getTracks().forEach(t => t.stop());
+              return;
+            }
+
             activeStreamRef.current = newStream;
             setStream(newStream);
             console.log('Camera/mic stream started');
-          } catch (err) { console.error("Media error:", err); }
-        }
-        if (activeStreamRef.current) {
-          activeStreamRef.current.getAudioTracks().forEach(track => track.enabled = !!currentUser.isMicOn);
-          activeStreamRef.current.getVideoTracks().forEach(track => track.enabled = !!currentUser.isCameraOn);
-        }
-      } else {
-        // No hay proximidad ni screen sharing - apagar cámara/mic
-        if (activeStreamRef.current) {
-          console.log('Stopping camera/mic - no active call');
+          }
           
-          // Primero remover los tracks de todas las conexiones activas
-          const tracks = activeStreamRef.current.getTracks();
-          peerConnectionsRef.current.forEach((pc, peerId) => {
-            pc.getSenders().forEach(sender => {
-              if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
-                console.log('Removing track from peer connection:', peerId, sender.track.kind);
-                try {
-                  pc.removeTrack(sender);
-                } catch (e) {
-                  console.warn('Error removing track from PC:', e);
+          // Actualizar estado de tracks
+          if (activeStreamRef.current) {
+            activeStreamRef.current.getAudioTracks().forEach(track => track.enabled = !!currentUser.isMicOn);
+            activeStreamRef.current.getVideoTracks().forEach(track => track.enabled = !!currentUser.isCameraOn);
+          }
+        } else {
+          // No hay proximidad ni screen sharing - apagar cámara/mic
+          if (activeStreamRef.current) {
+            console.log('Stopping camera/mic - no active call');
+            
+            // Primero remover los tracks de todas las conexiones activas
+            const tracks = activeStreamRef.current.getTracks();
+            peerConnectionsRef.current.forEach((pc, peerId) => {
+              pc.getSenders().forEach(sender => {
+                if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
+                  try {
+                    pc.removeTrack(sender);
+                  } catch (e) {
+                    console.warn('Error removing track from PC:', e);
+                  }
                 }
-              }
+              });
             });
-          });
 
-          // Luego detener los tracks
-          tracks.forEach(track => {
-            console.log('Stopping track:', track.kind, track.label);
-            track.stop();
-          });
-          activeStreamRef.current = null;
-          setStream(null);
+            // Luego detener los tracks
+            tracks.forEach(track => {
+              console.log('Stopping track:', track.kind, track.label);
+              track.stop();
+            });
+            activeStreamRef.current = null;
+            setStream(null);
+          }
+        }
+      } catch (err) {
+        console.error("Media error:", err);
+      } finally {
+        if (mounted) {
+          isProcessingStreamRef.current = false;
         }
       }
     };
+
     manageStream();
+
+    return () => {
+      mounted = false;
+    };
   }, [currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, hasActiveCall]);
 
   // Manejar screen share
