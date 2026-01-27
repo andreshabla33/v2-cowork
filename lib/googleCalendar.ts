@@ -41,11 +41,24 @@ export interface CreateEventResponse extends GoogleCalendarEvent {
 export const googleCalendar = {
   getAuthUrl: () => {
     // IMPORTANTE: La URI debe coincidir EXACTAMENTE con la registrada en Google Cloud Console
-    // En la captura se ve que termina en '/', así que nos aseguramos de enviarla así.
     let redirectUri = window.location.origin;
-    if (!redirectUri.endsWith('/')) {
-      redirectUri += '/';
+    
+    // Si estamos en el dominio de producción, forzamos la URI exacta registrada
+    if (redirectUri.includes('mvp-cowork.vercel.app')) {
+      redirectUri = 'https://mvp-cowork.vercel.app/';
+    } else {
+      // Para otros entornos (localhost, previews), aseguramos trailing slash si es necesario
+      // pero solo si no lo tiene
+      if (!redirectUri.endsWith('/')) {
+        redirectUri += '/';
+      }
     }
+
+    console.log('[GoogleCalendar] Auth Config:', {
+      origin: window.location.origin,
+      finalRedirectUri: redirectUri,
+      clientIdPrefix: GOOGLE_CLIENT_ID.substring(0, 10) + '...'
+    });
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
