@@ -1326,18 +1326,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   // porque causaba conflictos de SDP (m-lines order mismatch).
   // Los tracks se agregan al crear la conexión inicial en createPeerConnection.
 
-  // Manejar stream de video
+  // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
     const manageStream = async () => {
-      if (hasActiveCall || currentUser.isScreenSharing) {
+      const shouldHaveStream = hasActiveCall || currentUser.isScreenSharing;
+      console.log('ManageStream - hasActiveCall:', hasActiveCall, 'isScreenSharing:', currentUser.isScreenSharing, 'shouldHaveStream:', shouldHaveStream);
+      
+      if (shouldHaveStream) {
         if (!activeStreamRef.current) {
           try {
+            console.log('Requesting camera/mic access...');
             const newStream = await navigator.mediaDevices.getUserMedia({ 
               video: { width: 640, height: 480 }, 
               audio: true 
             });
             activeStreamRef.current = newStream;
             setStream(newStream);
+            console.log('Camera/mic stream started');
           } catch (err) { console.error("Media error:", err); }
         }
         if (activeStreamRef.current) {
@@ -1345,8 +1350,13 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           activeStreamRef.current.getVideoTracks().forEach(track => track.enabled = !!currentUser.isCameraOn);
         }
       } else {
+        // No hay proximidad ni screen sharing - apagar cámara/mic
         if (activeStreamRef.current) {
-          activeStreamRef.current.getTracks().forEach(track => track.stop());
+          console.log('Stopping camera/mic - no active call');
+          activeStreamRef.current.getTracks().forEach(track => {
+            console.log('Stopping track:', track.kind, track.label);
+            track.stop();
+          });
           activeStreamRef.current = null;
           setStream(null);
         }
