@@ -40,25 +40,26 @@ export interface CreateEventResponse extends GoogleCalendarEvent {
 
 export const googleCalendar = {
   getAuthUrl: () => {
+    // VERSION DEPURACION: 2.0 (Slash fix + Logs)
+    console.log('[GoogleCalendar] Generating Auth URL...');
+    console.log('[GoogleCalendar] Current window.location.origin:', window.location.origin);
+    
     // IMPORTANTE: La URI debe coincidir EXACTAMENTE con la registrada en Google Cloud Console
     let redirectUri = window.location.origin;
     
     // Si estamos en el dominio de producción, forzamos la URI exacta registrada
+    // Aseguramos https y slash final
     if (redirectUri.includes('mvp-cowork.vercel.app')) {
       redirectUri = 'https://mvp-cowork.vercel.app/';
     } else {
       // Para otros entornos (localhost, previews), aseguramos trailing slash si es necesario
-      // pero solo si no lo tiene
       if (!redirectUri.endsWith('/')) {
         redirectUri += '/';
       }
     }
 
-    console.log('[GoogleCalendar] Auth Config:', {
-      origin: window.location.origin,
-      finalRedirectUri: redirectUri,
-      clientIdPrefix: GOOGLE_CLIENT_ID.substring(0, 10) + '...'
-    });
+    console.log('[GoogleCalendar] FINAL Redirect URI to send:', redirectUri);
+    console.log('[GoogleCalendar] Client ID:', GOOGLE_CLIENT_ID);
 
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
@@ -68,7 +69,11 @@ export const googleCalendar = {
       include_granted_scopes: 'true',
       prompt: 'consent'
     });
-    return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    
+    const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+    console.log('[GoogleCalendar] Full Auth URL:', authUrl);
+    
+    return authUrl;
   },
 
   parseHashToken: (hash: string): string | null => {

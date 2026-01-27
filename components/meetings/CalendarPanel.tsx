@@ -232,7 +232,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   };
 
   const connectGoogleCalendar = () => {
-    window.location.href = googleCalendar.getAuthUrl();
+    const authUrl = googleCalendar.getAuthUrl();
+    // Extraer la redirect_uri para mostrarla en el alert (solo para depuración)
+    const urlObj = new URL(authUrl);
+    const redirectUriSent = urlObj.searchParams.get('redirect_uri');
+    
+    if (confirm(`DEBUG: Se enviará a Google la siguiente URI de redirección:\n\n${redirectUriSent}\n\n¿Coincide EXACTAMENTE con la de Google Console?`)) {
+      window.location.href = authUrl;
+    }
   };
 
   const disconnectGoogleCalendar = () => {
