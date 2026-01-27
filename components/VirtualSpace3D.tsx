@@ -963,9 +963,18 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       return inProximity;
     });
     
+    // Si no hay nadie cerca y estoy compartiendo pantalla, detener
+    if (users.length === 0 && currentUser.isScreenSharing) {
+       console.log('No users in proximity, stopping screen share automatically');
+       // Usamos setTimeout para no bloquear el render actual
+       setTimeout(() => {
+          handleToggleScreenShare();
+       }, 0);
+    }
+    
     connectedUsersRef.current = nextConnectedUsers;
     return users;
-  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id]);
+  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id, currentUser.isScreenSharing]);
 
   const hasActiveCall = usersInCall.length > 0;
   
