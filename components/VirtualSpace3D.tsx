@@ -922,31 +922,49 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   
   // Estado para wave/invite
   const [incomingWave, setIncomingWave] = useState<{ from: string; fromName: string } | null>(null);
+  
+  // Ref para tracking de histéresis (evitar parpadeo en el límite de proximidad)
+  const connectedUsersRef = useRef<Set<string>>(new Set());
 
   // Detectar usuarios en proximidad (excluyendo al usuario actual)
   const usersInCall = useMemo(() => {
-    return onlineUsers.filter(u => {
+    const nextConnectedUsers = new Set<string>();
+    
+    const users = onlineUsers.filter(u => {
       // Excluir al usuario actual
       if (u.id === session?.user?.id) return false;
       
-      // Validar coordenadas
-      if (typeof u.x !== 'number' || typeof u.y !== 'number' || typeof currentUser.x !== 'number' || typeof currentUser.y !== 'number') {
+      // Validar coordenadas (ignorar 0,0 que suele ser inicialización)
+      if ((u.x === 0 && u.y === 0) || typeof u.x !== 'number' || typeof u.y !== 'number' || typeof currentUser.x !== 'number' || typeof currentUser.y !== 'number') {
         return false;
       }
 
       const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
       
-      const inProximity = dist < PROXIMITY_RADIUS;
+      const wasInCall = connectedUsersRef.current.has(u.id);
       
-      // Log solo cuando cambia el estado de proximidad o cada cierto tiempo podría ser ruidoso
-      // Pero para depurar este caso específico, vamos a loguear si está cerca
+      // HISTÉRESIS: 
+      // Si ya estaba conectado, usamos un radio mayor (1.2x) para desconectar.
+      // Esto evita que la conexión oscile cuando se está en el borde.
+      const threshold = wasInCall ? PROXIMITY_RADIUS * 1.2 : PROXIMITY_RADIUS;
+      
+      const inProximity = dist < threshold;
+      
       if (inProximity) {
-         console.log(`[PROXIMITY] User ${u.name} (${u.id}) is CLOSE. Dist: ${dist.toFixed(2)} < ${PROXIMITY_RADIUS}`);
-         console.log(`[PROXIMITY] Coords: Me(${currentUser.x}, ${currentUser.y}) vs Them(${u.x}, ${u.y})`);
+         nextConnectedUsers.add(u.id);
+         // Log solo al entrar
+         if (!wasInCall) {
+           console.log(`[PROXIMITY ENTER] User ${u.name} entered. Dist: ${dist.toFixed(1)} < ${PROXIMITY_RADIUS}`);
+         }
+      } else if (wasInCall) {
+         console.log(`[PROXIMITY EXIT] User ${u.name} exited. Dist: ${dist.toFixed(1)} > ${threshold.toFixed(1)} (Radius: ${PROXIMITY_RADIUS})`);
       }
       
       return inProximity;
     });
+    
+    connectedUsersRef.current = nextConnectedUsers;
+    return users;
   }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id]);
 
   const hasActiveCall = usersInCall.length > 0;
@@ -1344,17 +1362,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
   // Flag para evitar condiciones de carrera en getUserMedia
   const isProcessingStreamRef = useRef(false);
+  // Ref para re-ejecutar manageStream si hubo un cambio mientras procesaba
+  const pendingUpdateRef = useRef(false);
+  // Ref para acceder al estado actual dentro de la función asíncrona
+  const shouldHaveStreamRef = useRef(false);
+  shouldHaveStreamRef.current = hasActiveCall || currentUser.isScreenSharing;
 
   // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
     let mounted = true;
 
     const manageStream = async () => {
-      // Evitar ejecuciones simultáneas
-      if (isProcessingStreamRef.current) return;
+      // Si ya está procesando, marcar que necesitamos una actualización al terminar
+      if (isProcessingStreamRef.current) {
+        console.log('ManageStream busy, marking pending update...');
+        pendingUpdateRef.current = true;
+        return;
+      }
       
-      const shouldHaveStream = hasActiveCall || currentUser.isScreenSharing;
-      console.log('ManageStream - hasActiveCall:', hasActiveCall, 'isScreenSharing:', currentUser.isScreenSharing, 'shouldHaveStream:', shouldHaveStream);
+      const shouldHaveStream = shouldHaveStreamRef.current;
+      console.log('ManageStream starting - shouldHaveStream:', shouldHaveStream);
       
       try {
         isProcessingStreamRef.current = true;
@@ -1368,16 +1395,15 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             });
             
             if (!mounted) {
-              // Si el componente se desmontó mientras cargaba, limpiar inmediatamente
               newStream.getTracks().forEach(t => t.stop());
               return;
             }
 
-            // Verificar nuevamente si aún necesitamos el stream (por si cambió el estado mientras cargaba)
-            if (!hasActiveCall && !currentUser.isScreenSharing) {
-              console.log('Stream loaded but no longer needed, stopping...');
+            // Verificar si el estado cambió mientras esperábamos
+            if (!shouldHaveStreamRef.current) {
+              console.log('Stream loaded but no longer needed (state changed), stopping...');
               newStream.getTracks().forEach(t => t.stop());
-              return;
+              return; // Terminará en finally y disparará pending update si es necesario
             }
 
             activeStreamRef.current = newStream;
@@ -1395,8 +1421,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           if (activeStreamRef.current) {
             console.log('Stopping camera/mic - no active call');
             
-            // Primero remover los tracks de todas las conexiones activas
             const tracks = activeStreamRef.current.getTracks();
+            
+            // Remover tracks de conexiones activas
             peerConnectionsRef.current.forEach((pc, peerId) => {
               pc.getSenders().forEach(sender => {
                 if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
@@ -1409,7 +1436,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
               });
             });
 
-            // Luego detener los tracks
+            // Detener tracks
             tracks.forEach(track => {
               console.log('Stopping track:', track.kind, track.label);
               track.stop();
@@ -1423,14 +1450,24 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       } finally {
         if (mounted) {
           isProcessingStreamRef.current = false;
+          // Si hubo cambios pendientes mientras procesábamos, ejecutar de nuevo
+          if (pendingUpdateRef.current) {
+            console.log('Executing pending manageStream update...');
+            pendingUpdateRef.current = false;
+            manageStream();
+          }
         }
       }
     };
 
-    manageStream();
+    // Debounce de 500ms para evitar parpadeos rápidos
+    const timer = setTimeout(() => {
+      manageStream();
+    }, 500);
 
     return () => {
       mounted = false;
+      clearTimeout(timer);
     };
   }, [currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, hasActiveCall]);
 
