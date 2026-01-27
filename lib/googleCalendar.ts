@@ -40,7 +40,13 @@ export interface CreateEventResponse extends GoogleCalendarEvent {
 
 export const googleCalendar = {
   getAuthUrl: () => {
-    const redirectUri = window.location.origin;
+    // IMPORTANTE: La URI debe coincidir EXACTAMENTE con la registrada en Google Cloud Console
+    // En la captura se ve que termina en '/', así que nos aseguramos de enviarla así.
+    let redirectUri = window.location.origin;
+    if (!redirectUri.endsWith('/')) {
+      redirectUri += '/';
+    }
+
     const params = new URLSearchParams({
       client_id: GOOGLE_CLIENT_ID,
       redirect_uri: redirectUri,
