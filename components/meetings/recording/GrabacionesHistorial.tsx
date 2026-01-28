@@ -228,9 +228,13 @@ export const GrabacionesHistorial: React.FC = () => {
     return baseOptions;
   }, [cargoUsuario]);
 
-  // Cargar grabaciones
+  // Cargar grabaciones al montar o cambiar espacio
   useEffect(() => {
-    if (!activeWorkspace?.id) return;
+    console.log('GrabacionesHistorial: useEffect - activeWorkspace:', activeWorkspace?.id);
+    if (!activeWorkspace?.id) {
+      setIsLoading(false);
+      return;
+    }
     cargarGrabaciones();
   }, [activeWorkspace?.id]);
 
