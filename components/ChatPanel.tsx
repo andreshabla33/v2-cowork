@@ -677,7 +677,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>Mensajes Directos</h3>
             </div>
             <div className="space-y-0.5">
-              {grupos.filter(g => g.tipo === 'directo').map(g => {
+              {grupos.filter(g => g.tipo === 'directo' && g.nombre.includes(currentUser.id)).map(g => {
                 const unreadCount = unreadByChannel[g.id] || 0;
                 // Obtener el nombre del otro usuario del DM
                 const otherUserId = g.nombre.split('|').find((id: string) => id !== currentUser.id);
@@ -701,7 +701,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                   )}
                 </button>
               );})}
-              {grupos.filter(g => g.tipo === 'directo').length === 0 && (
+              {grupos.filter(g => g.tipo === 'directo' && g.nombre.includes(currentUser.id)).length === 0 && (
                 <p className="px-4 py-2 text-[9px] opacity-30 italic font-bold">Sin mensajes directos</p>
               )}
             </div>
