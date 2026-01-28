@@ -3,11 +3,11 @@
  * Diseño UI 2026 con micro-interacciones y diseño adaptativo
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useStore } from '../../../store/useStore';
 import { AnalysisDashboard } from './AnalysisDashboard';
-import { ResultadoAnalisis, TipoGrabacion } from './types/analysis';
+import { ResultadoAnalisis, TipoGrabacion, CargoLaboral, getTiposGrabacionDisponibles } from './types/analysis';
 
 interface Grabacion {
   id: string;
@@ -75,6 +75,95 @@ const TIPO_CONFIG: Record<string, { color: string; icon: string; label: string }
   reunion: { color: 'from-slate-500 to-gray-600', icon: '📹', label: 'Reunión' },
 };
 
+// Dropdown personalizado
+interface DropdownOption {
+  value: string;
+  label: string;
+  icon: string;
+}
+
+interface CustomDropdownProps {
+  options: DropdownOption[];
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  isArcade?: boolean;
+}
+
+const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, value, onChange, placeholder, isArcade }) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  const selectedOption = options.find(o => o.value === value);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  return (
+    <div ref={dropdownRef} className="relative">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all min-w-[160px] justify-between ${
+          isArcade 
+            ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41] hover:border-[#00ff41]' 
+            : 'bg-zinc-800 border border-white/10 text-white hover:border-white/30'
+        }`}
+      >
+        <span className="flex items-center gap-2">
+          <span>{selectedOption?.icon || '📋'}</span>
+          <span>{selectedOption?.label || placeholder}</span>
+        </span>
+        <svg 
+          className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+          fill="none" 
+          stroke="currentColor" 
+          viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      
+      {isOpen && (
+        <div className={`absolute top-full left-0 mt-2 w-full rounded-xl overflow-hidden shadow-2xl z-50 border ${
+          isArcade 
+            ? 'bg-black border-[#00ff41]/50' 
+            : 'bg-zinc-800 border-white/10'
+        }`}>
+          {options.map((option) => (
+            <button
+              key={option.value}
+              onClick={() => {
+                onChange(option.value);
+                setIsOpen(false);
+              }}
+              className={`w-full px-4 py-3 text-left text-sm flex items-center gap-2 transition-all ${
+                value === option.value 
+                  ? (isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-600/30 text-indigo-300')
+                  : (isArcade ? 'text-[#00ff41]/80 hover:bg-[#00ff41]/10' : 'text-zinc-300 hover:bg-white/5')
+              }`}
+            >
+              <span>{option.icon}</span>
+              <span>{option.label}</span>
+              {value === option.value && (
+                <svg className="w-4 h-4 ml-auto" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                </svg>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
 export const GrabacionesHistorial: React.FC = () => {
   const { activeWorkspace, session, theme } = useStore();
   const [grabaciones, setGrabaciones] = useState<Grabacion[]>([]);
@@ -86,6 +175,58 @@ export const GrabacionesHistorial: React.FC = () => {
   const [grabacionSeleccionada, setGrabacionSeleccionada] = useState<Grabacion | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
   const [resultadoAnalisis, setResultadoAnalisis] = useState<ResultadoAnalisis | null>(null);
+  const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral | null>(null);
+
+  // Cargar cargo del usuario
+  useEffect(() => {
+    const cargarCargo = async () => {
+      if (!session?.user?.id || !activeWorkspace?.id) return;
+      
+      const { data } = await supabase
+        .from('miembros_espacio')
+        .select('cargo')
+        .eq('usuario_id', session.user.id)
+        .eq('espacio_id', activeWorkspace.id)
+        .single();
+      
+      if (data?.cargo) {
+        setCargoUsuario(data.cargo as CargoLaboral);
+      }
+    };
+    cargarCargo();
+  }, [session?.user?.id, activeWorkspace?.id]);
+
+  // Opciones de filtro de estado
+  const estadoOptions: DropdownOption[] = [
+    { value: 'todos', label: 'Todos los estados', icon: '📊' },
+    { value: 'completado', label: 'Completados', icon: '✅' },
+    { value: 'procesando', label: 'Procesando', icon: '⏳' },
+    { value: 'error', label: 'Con error', icon: '❌' },
+  ];
+
+  // Opciones de tipo según cargo del usuario
+  const tipoOptions: DropdownOption[] = useMemo(() => {
+    const baseOptions: DropdownOption[] = [{ value: 'todos', label: 'Todos los tipos', icon: '🎬' }];
+    
+    if (cargoUsuario) {
+      const tiposDisponibles = getTiposGrabacionDisponibles(cargoUsuario);
+      tiposDisponibles.forEach(tipo => {
+        const config = TIPO_CONFIG[tipo];
+        if (config) {
+          baseOptions.push({ value: tipo, label: config.label, icon: config.icon });
+        }
+      });
+    } else {
+      // Si no hay cargo, mostrar todos los tipos
+      Object.entries(TIPO_CONFIG).forEach(([key, config]) => {
+        if (key !== 'reunion' && key !== 'rrhh') {
+          baseOptions.push({ value: key, label: config.label, icon: config.icon });
+        }
+      });
+    }
+    
+    return baseOptions;
+  }, [cargoUsuario]);
 
   // Cargar grabaciones
   useEffect(() => {
@@ -258,51 +399,43 @@ export const GrabacionesHistorial: React.FC = () => {
                 placeholder="🔍 Buscar en transcripciones..."
                 value={busqueda}
                 onChange={(e) => setBusqueda(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-xl text-sm transition-all ${
+                className={`w-full px-4 py-2.5 rounded-xl text-sm transition-all outline-none ${
                   isArcade 
                     ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41] placeholder-[#00ff41]/40 focus:border-[#00ff41]' 
-                    : 'bg-zinc-700/50 border border-white/10 text-white placeholder-zinc-500 focus:border-indigo-500'
+                    : 'bg-zinc-800 border border-white/10 text-white placeholder-zinc-500 focus:border-indigo-500'
                 }`}
               />
             </div>
 
-            {/* Filtro Estado */}
-            <select
+            {/* Filtro Estado - Dropdown personalizado */}
+            <CustomDropdown
+              options={estadoOptions}
               value={filtroEstado}
-              onChange={(e) => setFiltroEstado(e.target.value)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-medium ${
-                isArcade 
-                  ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41]' 
-                  : 'bg-zinc-700/50 border border-white/10 text-white'
-              }`}
-            >
-              <option value="todos">📊 Todos los estados</option>
-              <option value="completado">✅ Completados</option>
-              <option value="procesando">⏳ Procesando</option>
-              <option value="error">❌ Con error</option>
-            </select>
+              onChange={setFiltroEstado}
+              isArcade={isArcade}
+            />
 
-            {/* Filtro Tipo */}
-            <select
+            {/* Filtro Tipo - Dropdown personalizado con tipos según cargo */}
+            <CustomDropdown
+              options={tipoOptions}
               value={filtroTipo}
-              onChange={(e) => setFiltroTipo(e.target.value)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-medium ${
-                isArcade 
-                  ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41]' 
-                  : 'bg-zinc-700/50 border border-white/10 text-white'
-              }`}
-            >
-              <option value="todos">🎬 Todos los tipos</option>
-              <option value="rrhh_entrevista">🎯 Entrevistas</option>
-              <option value="rrhh_one_to_one">🤝 One-to-One</option>
-              <option value="deals">💼 Deals</option>
-              <option value="equipo">🚀 Equipo</option>
-            </select>
+              onChange={setFiltroTipo}
+              isArcade={isArcade}
+            />
           </div>
+          
+          {/* Indicador de cargo */}
+          {cargoUsuario && (
+            <div className={`mt-3 pt-3 border-t ${isArcade ? 'border-[#00ff41]/20' : 'border-white/5'}`}>
+              <p className={`text-xs ${isArcade ? 'text-[#00ff41]/40' : 'text-zinc-500'}`}>
+                👤 Filtrando por permisos de: <span className="font-semibold">{cargoUsuario.replace(/_/g, ' ')}</span>
+              </p>
+            </div>
+          )}
         </div>
 
-        {/* Loading */}
-        {isLoading && (
+        {/* Loading - solo muestra si está cargando */}
+        {isLoading ? (
           <div className="flex flex-col items-center justify-center py-20">
             <div className={`w-12 h-12 border-4 rounded-full animate-spin ${
               isArcade ? 'border-[#00ff41]/20 border-t-[#00ff41]' : 'border-indigo-500/20 border-t-indigo-500'
@@ -311,7 +444,7 @@ export const GrabacionesHistorial: React.FC = () => {
               Cargando grabaciones...
             </p>
           </div>
-        )}
+        ) : null}
 
         {/* Error */}
         {error && (
