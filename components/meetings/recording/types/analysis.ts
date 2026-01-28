@@ -1,10 +1,143 @@
 /**
  * Tipos e interfaces para el sistema de análisis conductual
  * Incluye definiciones para: RRHH, Deals, Reuniones de Equipo
+ * v2.1: Sistema de cargos laborales y permisos por rol
  */
+
+// ==================== CARGOS LABORALES Y PERMISOS ====================
+
+/**
+ * Cargos laborales que tienen acceso a análisis conductual
+ */
+export type CargoLaboral = 
+  // Ejecutivos
+  | 'ceo'
+  | 'coo'
+  // RRHH
+  | 'director_rrhh'
+  | 'coordinador_rrhh'
+  | 'reclutador'
+  // Comercial/Ventas
+  | 'director_comercial'
+  | 'coordinador_ventas'
+  | 'asesor_comercial'
+  // Equipos
+  | 'manager_equipo'
+  | 'team_lead'
+  | 'product_owner'
+  | 'scrum_master'
+  // Otros (sin acceso a análisis conductual)
+  | 'colaborador'
+  | 'otro';
+
+/**
+ * Tipos de grabación detallados (separando RRHH)
+ */
+export type TipoGrabacionDetallado = 
+  | 'rrhh_entrevista'    // Entrevista a candidatos
+  | 'rrhh_one_to_one'    // One-to-one con colaborador
+  | 'deals'              // Negociaciones comerciales
+  | 'equipo';            // Reuniones de equipo
+
+/**
+ * Matriz de permisos por cargo para cada tipo de análisis
+ */
+export const PERMISOS_ANALISIS: Record<CargoLaboral, {
+  rrhh_entrevista: boolean;
+  rrhh_one_to_one: boolean;
+  deals: boolean;
+  equipo: boolean;
+  ver_transcripcion: boolean;
+}> = {
+  // CEO - Acceso total
+  ceo: { rrhh_entrevista: true, rrhh_one_to_one: true, deals: true, equipo: true, ver_transcripcion: true },
+  // COO - Acceso total
+  coo: { rrhh_entrevista: true, rrhh_one_to_one: true, deals: true, equipo: true, ver_transcripcion: true },
+  // Director RRHH - Solo RRHH
+  director_rrhh: { rrhh_entrevista: true, rrhh_one_to_one: true, deals: false, equipo: false, ver_transcripcion: true },
+  // Coordinador RRHH - Solo RRHH
+  coordinador_rrhh: { rrhh_entrevista: true, rrhh_one_to_one: true, deals: false, equipo: false, ver_transcripcion: true },
+  // Reclutador - Solo entrevistas candidatos
+  reclutador: { rrhh_entrevista: true, rrhh_one_to_one: false, deals: false, equipo: false, ver_transcripcion: true },
+  // Director Comercial - Solo deals
+  director_comercial: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: true, equipo: false, ver_transcripcion: true },
+  // Coordinador Ventas - Solo deals
+  coordinador_ventas: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: true, equipo: false, ver_transcripcion: true },
+  // Asesor Comercial - Solo deals
+  asesor_comercial: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: true, equipo: false, ver_transcripcion: true },
+  // Manager de Equipo - Solo equipo
+  manager_equipo: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: true, ver_transcripcion: true },
+  // Team Lead - Solo equipo
+  team_lead: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: true, ver_transcripcion: true },
+  // Product Owner - Solo equipo
+  product_owner: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: true, ver_transcripcion: true },
+  // Scrum Master - Solo equipo
+  scrum_master: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: true, ver_transcripcion: true },
+  // Colaborador - Solo transcripción
+  colaborador: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: false, ver_transcripcion: true },
+  // Otro - Solo transcripción
+  otro: { rrhh_entrevista: false, rrhh_one_to_one: false, deals: false, equipo: false, ver_transcripcion: true },
+};
+
+/**
+ * Información de cargos para UI
+ */
+export const INFO_CARGOS: Record<CargoLaboral, {
+  nombre: string;
+  descripcion: string;
+  icono: string;
+  categoria: 'ejecutivo' | 'rrhh' | 'comercial' | 'equipo' | 'general';
+}> = {
+  ceo: { nombre: 'CEO', descripcion: 'Director Ejecutivo', icono: '👔', categoria: 'ejecutivo' },
+  coo: { nombre: 'COO', descripcion: 'Director de Operaciones', icono: '⚙️', categoria: 'ejecutivo' },
+  director_rrhh: { nombre: 'Director RRHH', descripcion: 'Director de Recursos Humanos', icono: '👥', categoria: 'rrhh' },
+  coordinador_rrhh: { nombre: 'Coordinador RRHH', descripcion: 'Coordinador de Recursos Humanos', icono: '📋', categoria: 'rrhh' },
+  reclutador: { nombre: 'Reclutador', descripcion: 'Especialista en Selección', icono: '🔍', categoria: 'rrhh' },
+  director_comercial: { nombre: 'Director Comercial', descripcion: 'Director de Ventas', icono: '📈', categoria: 'comercial' },
+  coordinador_ventas: { nombre: 'Coordinador Ventas', descripcion: 'Coordinador del equipo comercial', icono: '🎯', categoria: 'comercial' },
+  asesor_comercial: { nombre: 'Asesor Comercial', descripcion: 'Ejecutivo de ventas', icono: '💼', categoria: 'comercial' },
+  manager_equipo: { nombre: 'Manager', descripcion: 'Manager de Equipo', icono: '👨‍💼', categoria: 'equipo' },
+  team_lead: { nombre: 'Team Lead', descripcion: 'Líder Técnico', icono: '🚀', categoria: 'equipo' },
+  product_owner: { nombre: 'Product Owner', descripcion: 'Dueño del Producto', icono: '📦', categoria: 'equipo' },
+  scrum_master: { nombre: 'Scrum Master', descripcion: 'Facilitador Agile', icono: '🔄', categoria: 'equipo' },
+  colaborador: { nombre: 'Colaborador', descripcion: 'Miembro del equipo', icono: '👤', categoria: 'general' },
+  otro: { nombre: 'Otro', descripcion: 'Otro cargo', icono: '➕', categoria: 'general' },
+};
+
+/**
+ * Verificar si un cargo tiene permiso para ver análisis de un tipo de grabación
+ */
+export function tienePermisoAnalisis(cargo: CargoLaboral, tipoGrabacion: TipoGrabacionDetallado): boolean {
+  const permisos = PERMISOS_ANALISIS[cargo];
+  if (!permisos) return false;
+  return permisos[tipoGrabacion] ?? false;
+}
+
+/**
+ * Obtener tipos de grabación disponibles para un cargo
+ */
+export function getTiposGrabacionDisponibles(cargo: CargoLaboral): TipoGrabacionDetallado[] {
+  const permisos = PERMISOS_ANALISIS[cargo];
+  const tipos: TipoGrabacionDetallado[] = [];
+  
+  if (permisos.rrhh_entrevista) tipos.push('rrhh_entrevista');
+  if (permisos.rrhh_one_to_one) tipos.push('rrhh_one_to_one');
+  if (permisos.deals) tipos.push('deals');
+  if (permisos.equipo) tipos.push('equipo');
+  
+  return tipos;
+}
+
+/**
+ * Verificar si un cargo puede iniciar grabación con análisis
+ */
+export function puedeIniciarGrabacionConAnalisis(cargo: CargoLaboral): boolean {
+  return getTiposGrabacionDisponibles(cargo).length > 0;
+}
 
 // ==================== TIPOS BASE ====================
 
+// Tipo simplificado para compatibilidad
 export type TipoGrabacion = 'rrhh' | 'deals' | 'equipo';
 
 export type EmotionType = 'happy' | 'sad' | 'angry' | 'surprised' | 'fearful' | 'disgusted' | 'neutral' | 'contempt';
@@ -16,34 +149,42 @@ export type GestoType = 'manos_activas' | 'auto_toque' | 'brazos_cruzados' | 'ma
 // ==================== CONFIGURACIÓN POR TIPO ====================
 
 export interface ConfiguracionGrabacion {
-  tipo: TipoGrabacion;
+  tipo: TipoGrabacionDetallado;
+  tipoBase: TipoGrabacion;
   titulo: string;
   descripcion: string;
   icono: string;
   color: string;
+  colorAccent: string;
   requiereDisclaimer: boolean;
   disclaimerTexto?: string;
   metricas: string[];
+  cargosPermitidos: CargoLaboral[];
 }
 
-export const CONFIGURACIONES_GRABACION: Record<TipoGrabacion, ConfiguracionGrabacion> = {
-  rrhh: {
-    tipo: 'rrhh',
-    titulo: 'Entrevista RRHH',
-    descripcion: 'Entrevistas con candidatos o reuniones one-to-one',
-    icono: '👔',
+export const CONFIGURACIONES_GRABACION_DETALLADO: Record<TipoGrabacionDetallado, ConfiguracionGrabacion> = {
+  rrhh_entrevista: {
+    tipo: 'rrhh_entrevista',
+    tipoBase: 'rrhh',
+    titulo: 'Entrevista Candidatos',
+    descripcion: 'Entrevistas de selección con candidatos externos',
+    icono: '�',
     color: 'from-blue-600 to-indigo-600',
+    colorAccent: '#4f46e5',
     requiereDisclaimer: true,
-    disclaimerTexto: `⚠️ AVISO IMPORTANTE
+    disclaimerTexto: `⚠️ AVISO LEGAL - ENTREVISTA DE SELECCIÓN
 
-Este análisis es una herramienta de APOYO para la reflexión post-entrevista.
+Esta grabación incluye análisis conductual automatizado como herramienta de APOYO.
 
-• Los datos reflejan expresiones faciales observadas, NO estados mentales reales
-• No debe usarse como único criterio para decisiones de contratación
-• El candidato debe ser informado de que se realiza análisis conductual
-• Cumple con las normativas de protección de datos aplicables
+IMPORTANTE:
+• El candidato DEBE ser informado y dar consentimiento explícito
+• Los datos son indicadores observados, NO diagnósticos psicológicos
+• No debe usarse como único criterio de decisión
+• Cumple con GDPR y normativas de protección de datos
 
-Al continuar, confirmas que el participante ha dado su consentimiento.`,
+Al continuar, confirmas que:
+✓ El candidato ha sido informado del análisis
+✓ Has obtenido su consentimiento expreso`,
     metricas: [
       'congruencia_verbal_no_verbal',
       'nivel_nerviosismo',
@@ -52,13 +193,48 @@ Al continuar, confirmas que el participante ha dado su consentimiento.`,
       'momentos_incomodidad',
       'prediccion_fit_cultural',
     ],
+    cargosPermitidos: ['ceo', 'coo', 'director_rrhh', 'coordinador_rrhh', 'reclutador'],
+  },
+  rrhh_one_to_one: {
+    tipo: 'rrhh_one_to_one',
+    tipoBase: 'rrhh',
+    titulo: 'One-to-One',
+    descripcion: 'Reunión individual con colaborador del equipo',
+    icono: '💬',
+    color: 'from-cyan-600 to-blue-600',
+    colorAccent: '#0891b2',
+    requiereDisclaimer: true,
+    disclaimerTexto: `⚠️ AVISO LEGAL - REUNIÓN ONE-TO-ONE
+
+Esta grabación incluye análisis conductual como herramienta de desarrollo.
+
+IMPORTANTE:
+• El colaborador DEBE ser informado y dar consentimiento
+• Los datos apoyan la conversación, NO evalúan desempeño
+• Objetivo: mejorar comunicación y bienestar laboral
+• Cumple con normativas de privacidad laboral
+
+Al continuar, confirmas que:
+✓ El colaborador ha sido informado del análisis
+✓ Has obtenido su consentimiento expreso`,
+    metricas: [
+      'congruencia_verbal_no_verbal',
+      'nivel_comodidad',
+      'engagement_por_tema',
+      'momentos_preocupacion',
+      'señales_satisfaccion',
+      'apertura_comunicacion',
+    ],
+    cargosPermitidos: ['ceo', 'coo', 'director_rrhh', 'coordinador_rrhh'],
   },
   deals: {
     tipo: 'deals',
-    titulo: 'Reunión de Ventas',
-    descripcion: 'Deals, presentaciones comerciales y negociaciones',
+    tipoBase: 'deals',
+    titulo: 'Reunión Comercial',
+    descripcion: 'Negociaciones, presentaciones y cierre de deals',
     icono: '🤝',
     color: 'from-green-600 to-emerald-600',
+    colorAccent: '#059669',
     requiereDisclaimer: false,
     metricas: [
       'momentos_interes',
@@ -68,13 +244,16 @@ Al continuar, confirmas que el participante ha dado su consentimiento.`,
       'prediccion_probabilidad_cierre',
       'puntos_dolor_detectados',
     ],
+    cargosPermitidos: ['ceo', 'coo', 'director_comercial', 'coordinador_ventas', 'asesor_comercial'],
   },
   equipo: {
     tipo: 'equipo',
+    tipoBase: 'equipo',
     titulo: 'Reunión de Equipo',
-    descripcion: 'Reuniones de trabajo, brainstorming, presentación de ideas',
+    descripcion: 'Reuniones de trabajo, brainstorming, retrospectivas',
     icono: '👥',
     color: 'from-purple-600 to-violet-600',
+    colorAccent: '#7c3aed',
     requiereDisclaimer: false,
     metricas: [
       'participacion_por_persona',
@@ -84,7 +263,15 @@ Al continuar, confirmas que el participante ha dado su consentimiento.`,
       'dinamica_grupal',
       'prediccion_adopcion_ideas',
     ],
+    cargosPermitidos: ['ceo', 'coo', 'manager_equipo', 'team_lead', 'product_owner', 'scrum_master'],
   },
+};
+
+// Mantener compatibilidad con versión anterior
+export const CONFIGURACIONES_GRABACION: Record<TipoGrabacion, ConfiguracionGrabacion> = {
+  rrhh: CONFIGURACIONES_GRABACION_DETALLADO.rrhh_entrevista,
+  deals: CONFIGURACIONES_GRABACION_DETALLADO.deals,
+  equipo: CONFIGURACIONES_GRABACION_DETALLADO.equipo,
 };
 
 // ==================== ANÁLISIS FACIAL ====================

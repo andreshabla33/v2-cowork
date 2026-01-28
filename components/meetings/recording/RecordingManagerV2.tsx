@@ -14,12 +14,14 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useTranscription } from './useTranscription';
 import { useCombinedAnalysis, AnalisisResumenTiempoReal } from './useCombinedAnalysis';
-import { RecordingTypeSelector } from './RecordingTypeSelector';
+import { RecordingTypeSelectorV2 } from './RecordingTypeSelectorV2';
 import { AnalysisDashboard } from './AnalysisDashboard';
 import { 
-  TipoGrabacion, 
-  CONFIGURACIONES_GRABACION,
+  TipoGrabacionDetallado,
+  CargoLaboral,
+  CONFIGURACIONES_GRABACION_DETALLADO,
   ResultadoAnalisis,
+  tienePermisoAnalisis,
 } from './types/analysis';
 
 interface RecordingManagerV2Props {
@@ -28,6 +30,7 @@ interface RecordingManagerV2Props {
   userName: string;
   reunionTitulo?: string;
   stream: MediaStream | null;
+  cargoUsuario?: CargoLaboral; // Nuevo: cargo del usuario para permisos
   onRecordingStateChange?: (isRecording: boolean) => void;
   onProcessingComplete?: (resultado: ResultadoAnalisis | null) => void;
 }
@@ -45,6 +48,7 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
   userName,
   reunionTitulo,
   stream,
+  cargoUsuario = 'colaborador',
   onRecordingStateChange,
   onProcessingComplete,
 }) => {
@@ -55,7 +59,8 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
     message: '',
     duration: 0,
   });
-  const [tipoGrabacion, setTipoGrabacion] = useState<TipoGrabacion | null>(null);
+  const [tipoGrabacion, setTipoGrabacion] = useState<TipoGrabacionDetallado | null>(null);
+  const [conAnalisis, setConAnalisis] = useState<boolean>(true);
   const [showTypeSelector, setShowTypeSelector] = useState(false);
   const [showDashboard, setShowDashboard] = useState(false);
   const [resultado, setResultado] = useState<ResultadoAnalisis | null>(null);
@@ -71,7 +76,7 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
 
   const isRecording = processingState.step === 'recording';
-  const config = tipoGrabacion ? CONFIGURACIONES_GRABACION[tipoGrabacion] : null;
+  const config = tipoGrabacion ? CONFIGURACIONES_GRABACION_DETALLADO[tipoGrabacion] : null;
 
   // Hook de transcripción
   const {
@@ -88,9 +93,14 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
     },
   });
 
+  // Obtener tipo base para el hook de análisis (rrhh_entrevista y rrhh_one_to_one -> rrhh)
+  const tipoBase = tipoGrabacion 
+    ? CONFIGURACIONES_GRABACION_DETALLADO[tipoGrabacion].tipoBase 
+    : 'equipo';
+
   // Hook de análisis combinado (se inicializa cuando se selecciona tipo)
   const combinedAnalysis = useCombinedAnalysis({
-    tipoGrabacion: tipoGrabacion || 'equipo',
+    tipoGrabacion: tipoBase,
     grabacionId: grabacionIdRef.current || 'pending',
     participantes: [{ id: userId, nombre: userName }],
     onAnalisisUpdate: (resumen) => {
@@ -113,10 +123,11 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
   }, [isRecording]);
 
   // Manejar selección de tipo
-  const handleTypeSelect = useCallback((tipo: TipoGrabacion) => {
+  const handleTypeSelect = useCallback((tipo: TipoGrabacionDetallado, analisis: boolean) => {
     setTipoGrabacion(tipo);
+    setConAnalisis(analisis);
     setShowTypeSelector(false);
-    startRecording(tipo);
+    startRecording(tipo, analisis);
   }, []);
 
   // Buscar elemento de video
@@ -133,7 +144,7 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
   }, [stream]);
 
   // Iniciar grabación
-  const startRecording = useCallback(async (tipo: TipoGrabacion) => {
+  const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true) => {
     if (!stream) {
       updateState({ step: 'error', message: 'No hay stream de audio/video disponible' });
       return;
@@ -199,7 +210,7 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
       updateState({ 
         step: 'recording', 
         progress: 0, 
-        message: `Grabando ${CONFIGURACIONES_GRABACION[tipo].titulo}...`, 
+        message: `Grabando ${CONFIGURACIONES_GRABACION_DETALLADO[tipo].titulo}...`, 
         duration: 0 
       });
       onRecordingStateChange?.(true);
@@ -408,11 +419,12 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
 
   return (
     <>
-      {/* Selector de tipo */}
-      <RecordingTypeSelector
+      {/* Selector de tipo con permisos por cargo */}
+      <RecordingTypeSelectorV2
         isOpen={showTypeSelector}
         onClose={() => setShowTypeSelector(false)}
         onSelect={handleTypeSelect}
+        cargoUsuario={cargoUsuario}
       />
 
       {/* Dashboard de resultados */}

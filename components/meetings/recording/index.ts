@@ -47,5 +47,17 @@ export { RecordingManager } from './RecordingManager';
 
 // Componentes - Avanzados (v2.0)
 export { RecordingTypeSelector } from './RecordingTypeSelector';
+export { RecordingTypeSelectorV2 } from './RecordingTypeSelectorV2';
 export { AnalysisDashboard } from './AnalysisDashboard';
 export { RecordingManagerV2 } from './RecordingManagerV2';
+
+// Re-exportar tipos y funciones de permisos
+export type { CargoLaboral, TipoGrabacionDetallado } from './types/analysis';
+export {
+  PERMISOS_ANALISIS,
+  INFO_CARGOS,
+  CONFIGURACIONES_GRABACION_DETALLADO,
+  tienePermisoAnalisis,
+  getTiposGrabacionDisponibles,
+  puedeIniciarGrabacionConAnalisis,
+} from './types/analysis';

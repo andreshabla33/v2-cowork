@@ -1650,6 +1650,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       </div>
       
       {/* Recording Manager V2 con análisis conductual avanzado */}
+      {/* TODO: Obtener cargoUsuario desde miembros_espacio.cargo o perfil de usuario */}
       {hasActiveCall && (
         <RecordingManagerV2
           espacioId={activeWorkspace?.id || ''}
@@ -1657,6 +1658,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           userName={currentUser.name}
           reunionTitulo={`Reunión ${new Date().toLocaleDateString()}`}
           stream={stream}
+          cargoUsuario={currentUser.cargo as any || 'colaborador'}
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
           }}

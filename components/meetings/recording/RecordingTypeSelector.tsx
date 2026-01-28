@@ -1,44 +1,81 @@
 /**
- * RecordingTypeSelector - Selector de tipo de grabación con disclaimer condicional
- * Aparece al presionar grabar para seleccionar: RRHH, Deals, Equipo
+ * RecordingTypeSelector v2.0 - Selector de tipo de grabación con UX 2026
+ * 
+ * Características UX 2026:
+ * - Micro-interacciones avanzadas con motion design
+ * - Interfaces adaptativas según cargo del usuario
+ * - Diseño emocional con feedback visual
+ * - Minimalismo con profundidad y capas
+ * - Accesibilidad first
  */
 
-import React, { useState } from 'react';
-import { TipoGrabacion, CONFIGURACIONES_GRABACION, ConfiguracionGrabacion } from './types/analysis';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  TipoGrabacionDetallado, 
+  CargoLaboral,
+  CONFIGURACIONES_GRABACION_DETALLADO,
+  getTiposGrabacionDisponibles,
+  puedeIniciarGrabacionConAnalisis,
+  INFO_CARGOS,
+} from './types/analysis';
 
 interface RecordingTypeSelectorProps {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (tipo: TipoGrabacion) => void;
+  onSelect: (tipo: TipoGrabacionDetallado, conAnalisis: boolean) => void;
+  cargoUsuario: CargoLaboral;
 }
 
 export const RecordingTypeSelector: React.FC<RecordingTypeSelectorProps> = ({
   isOpen,
   onClose,
   onSelect,
+  cargoUsuario,
 }) => {
-  const [selectedType, setSelectedType] = useState<TipoGrabacion | null>(null);
+  const [selectedType, setSelectedType] = useState<TipoGrabacionDetallado | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
+  const [hoveredType, setHoveredType] = useState<TipoGrabacionDetallado | null>(null);
+
+  // Tipos disponibles según cargo
+  const tiposDisponibles = useMemo(() => 
+    getTiposGrabacionDisponibles(cargoUsuario), 
+    [cargoUsuario]
+  );
+  
+  const puedeAnalizar = useMemo(() => 
+    puedeIniciarGrabacionConAnalisis(cargoUsuario),
+    [cargoUsuario]
+  );
+
+  // Animación de entrada
+  useEffect(() => {
+    if (isOpen) {
+      setIsAnimating(true);
+      const timer = setTimeout(() => setIsAnimating(false), 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
-  const handleTypeClick = (tipo: TipoGrabacion) => {
-    const config = CONFIGURACIONES_GRABACION[tipo];
+  const handleTypeClick = (tipo: TipoGrabacionDetallado) => {
+    const config = CONFIGURACIONES_GRABACION_DETALLADO[tipo];
     setSelectedType(tipo);
     
     if (config.requiereDisclaimer) {
       setShowDisclaimer(true);
       setDisclaimerAccepted(false);
     } else {
-      onSelect(tipo);
+      onSelect(tipo, true);
       resetState();
     }
   };
 
   const handleDisclaimerAccept = () => {
     if (selectedType) {
-      onSelect(selectedType);
+      onSelect(selectedType, true);
       resetState();
     }
   };
@@ -49,10 +86,17 @@ export const RecordingTypeSelector: React.FC<RecordingTypeSelectorProps> = ({
     setDisclaimerAccepted(false);
   };
 
+  const handleGrabarSinAnalisis = () => {
+    // Grabación simple sin análisis conductual
+    onSelect('equipo', false);
+    resetState();
+  };
+
   const resetState = () => {
     setSelectedType(null);
     setShowDisclaimer(false);
     setDisclaimerAccepted(false);
+    setHoveredType(null);
   };
 
   const handleClose = () => {
