@@ -218,16 +218,27 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     }
     
     // Eliminar de Supabase (esto activará el trigger que notifica a participantes)
-    const { error } = await supabase
+    
+    // Actualización optimista: eliminar de la UI inmediatamente
+    setMeetings(prev => prev.filter(m => m.id !== meetingId));
+    
+    const { error, count } = await supabase
       .from('reuniones_programadas')
-      .delete()
+      .delete({ count: 'exact' })
       .eq('id', meetingId);
     
     if (error) {
       console.error('Error eliminando reunión:', error);
+      // Revertir si hubo error (recargar)
+      loadMeetings();
+      alert('Error al eliminar la reunión: ' + error.message);
+    } else if (count === 0) {
+      // Si no se borró nada (por RLS), recargar para mostrar estado real
+      console.warn('No se pudo eliminar la reunión (posible restricción de permisos)');
+      loadMeetings();
     }
     
-    loadMeetings();
+    // Sincronizar Google por si acaso
     syncGoogleEvents();
   };
 
