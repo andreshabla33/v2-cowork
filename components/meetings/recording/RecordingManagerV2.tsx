@@ -191,11 +191,12 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         id: grabacionIdRef.current,
         espacio_id: espacioId,
         creado_por: userId,
-        estado: 'recording',
+        estado: 'grabando',
         inicio_grabacion: new Date().toISOString(),
-        tipo: 'reunion',
+        tipo: tipo, // Guardar tipo detallado (rrhh_entrevista, deals, equipo, etc.)
         tiene_video: true,
         tiene_audio: true,
+        formato: 'webm',
       });
 
       // Iniciar grabación
@@ -337,7 +338,7 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
 
       // Actualizar grabación en Supabase
       await supabase.from('grabaciones').update({
-        estado: 'completed',
+        estado: 'completado',
         duracion_segundos: duration,
         fin_grabacion: new Date().toISOString(),
       }).eq('id', grabacionIdRef.current);

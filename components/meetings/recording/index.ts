@@ -50,6 +50,7 @@ export { RecordingTypeSelector } from './RecordingTypeSelector';
 export { RecordingTypeSelectorV2 } from './RecordingTypeSelectorV2';
 export { AnalysisDashboard } from './AnalysisDashboard';
 export { RecordingManagerV2 } from './RecordingManagerV2';
+export { GrabacionesHistorial } from './GrabacionesHistorial';
 
 // Re-exportar tipos y funciones de permisos
 export type { CargoLaboral, TipoGrabacionDetallado } from './types/analysis';

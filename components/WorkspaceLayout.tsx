@@ -7,6 +7,7 @@ import { MiembrosView } from './MiembrosView';
 import AvatarCustomizer3D from './AvatarCustomizer3D';
 import { ChatPanel } from './ChatPanel';
 import { CalendarPanel } from './meetings/CalendarPanel';
+import { GrabacionesHistorial } from './meetings/recording/GrabacionesHistorial';
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
 import { StatusSelector } from './StatusSelector';
@@ -180,7 +181,8 @@ export const WorkspaceLayout: React.FC = () => {
           {[
             { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Espacio' },
             { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Mensajes' },
-            { id: 'tasks', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', label: 'Tareas' }
+            { id: 'tasks', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', label: 'Tareas' },
+            { id: 'grabaciones', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', label: 'Grabaciones' }
           ].map(item => (
             <button 
               key={item.id}
@@ -260,6 +262,7 @@ export const WorkspaceLayout: React.FC = () => {
             {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
             {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
             {activeSubTab === 'calendar' && <CalendarPanel />}
+            {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
             {activeSubTab === 'settings' && (
               <div className="p-16 max-w-4xl mx-auto">
                 <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">Configuración</h2>

@@ -1,0 +1,520 @@
+/**
+ * GrabacionesHistorial - Vista de historial de grabaciones con análisis
+ * Diseño UI 2026 con micro-interacciones y diseño adaptativo
+ */
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { useStore } from '../../../store/useStore';
+import { AnalysisDashboard } from './AnalysisDashboard';
+import { ResultadoAnalisis, TipoGrabacion } from './types/analysis';
+
+interface Grabacion {
+  id: string;
+  reunion_id: string | null;
+  espacio_id: string;
+  creado_por: string;
+  archivo_url: string | null;
+  archivo_nombre: string | null;
+  duracion_segundos: number | null;
+  formato: string;
+  estado: 'grabando' | 'procesando' | 'transcribiendo' | 'analizando' | 'completado' | 'error';
+  tipo: string;
+  tiene_video: boolean;
+  tiene_audio: boolean;
+  inicio_grabacion: string;
+  fin_grabacion: string | null;
+  creado_en: string;
+  // Relaciones
+  transcripciones?: Transcripcion[];
+  analisis_comportamiento?: AnalisisComportamiento[];
+  resumenes_ai?: ResumenAI[];
+  usuario?: { nombre: string; apellido: string };
+}
+
+interface Transcripcion {
+  id: string;
+  texto: string;
+  inicio_segundos: number;
+  fin_segundos: number;
+  speaker_nombre: string | null;
+}
+
+interface AnalisisComportamiento {
+  id: string;
+  timestamp_segundos: number;
+  emocion_dominante: string;
+  engagement_score: number;
+  emociones_detalle: Record<string, number>;
+}
+
+interface ResumenAI {
+  id: string;
+  resumen_corto: string;
+  resumen_detallado: string;
+  action_items: string[];
+  puntos_clave: string[];
+  sentimiento_general: string;
+}
+
+const ESTADO_CONFIG: Record<string, { color: string; icon: string; label: string }> = {
+  grabando: { color: 'bg-red-500', icon: '🔴', label: 'Grabando' },
+  procesando: { color: 'bg-yellow-500', icon: '⏳', label: 'Procesando' },
+  transcribiendo: { color: 'bg-blue-500', icon: '📝', label: 'Transcribiendo' },
+  analizando: { color: 'bg-purple-500', icon: '🧠', label: 'Analizando' },
+  completado: { color: 'bg-green-500', icon: '✅', label: 'Completado' },
+  error: { color: 'bg-red-600', icon: '❌', label: 'Error' },
+};
+
+const TIPO_CONFIG: Record<string, { color: string; icon: string; label: string }> = {
+  rrhh: { color: 'from-purple-500 to-pink-600', icon: '👥', label: 'RRHH' },
+  rrhh_entrevista: { color: 'from-purple-500 to-pink-600', icon: '🎯', label: 'Entrevista' },
+  rrhh_one_to_one: { color: 'from-purple-500 to-pink-600', icon: '🤝', label: 'One-to-One' },
+  deals: { color: 'from-emerald-500 to-teal-600', icon: '💼', label: 'Deal/Negociación' },
+  equipo: { color: 'from-blue-500 to-indigo-600', icon: '🚀', label: 'Equipo' },
+  reunion: { color: 'from-slate-500 to-gray-600', icon: '📹', label: 'Reunión' },
+};
+
+export const GrabacionesHistorial: React.FC = () => {
+  const { activeWorkspace, session, theme } = useStore();
+  const [grabaciones, setGrabaciones] = useState<Grabacion[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [filtroEstado, setFiltroEstado] = useState<string>('todos');
+  const [filtroTipo, setFiltroTipo] = useState<string>('todos');
+  const [busqueda, setBusqueda] = useState('');
+  const [grabacionSeleccionada, setGrabacionSeleccionada] = useState<Grabacion | null>(null);
+  const [showDashboard, setShowDashboard] = useState(false);
+  const [resultadoAnalisis, setResultadoAnalisis] = useState<ResultadoAnalisis | null>(null);
+
+  // Cargar grabaciones
+  useEffect(() => {
+    if (!activeWorkspace?.id) return;
+    cargarGrabaciones();
+  }, [activeWorkspace?.id]);
+
+  const cargarGrabaciones = async () => {
+    if (!activeWorkspace?.id) return;
+    
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('grabaciones')
+        .select(`
+          *,
+          usuario:creado_por (
+            id,
+            nombre,
+            apellido
+          ),
+          transcripciones (
+            id,
+            texto,
+            inicio_segundos,
+            fin_segundos,
+            speaker_nombre
+          ),
+          analisis_comportamiento (
+            id,
+            timestamp_segundos,
+            emocion_dominante,
+            engagement_score,
+            emociones_detalle
+          ),
+          resumenes_ai (
+            id,
+            resumen_corto,
+            resumen_detallado,
+            action_items,
+            puntos_clave,
+            sentimiento_general
+          )
+        `)
+        .eq('espacio_id', activeWorkspace.id)
+        .order('creado_en', { ascending: false });
+
+      if (fetchError) throw fetchError;
+      setGrabaciones(data || []);
+    } catch (err: any) {
+      console.error('Error cargando grabaciones:', err);
+      setError('Error al cargar las grabaciones');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Filtrar grabaciones
+  const grabacionesFiltradas = useMemo(() => {
+    return grabaciones.filter(g => {
+      if (filtroEstado !== 'todos' && g.estado !== filtroEstado) return false;
+      if (filtroTipo !== 'todos' && g.tipo !== filtroTipo) return false;
+      if (busqueda) {
+        const searchLower = busqueda.toLowerCase();
+        const nombreUsuario = `${g.usuario?.nombre || ''} ${g.usuario?.apellido || ''}`.toLowerCase();
+        const tieneTexto = g.transcripciones?.some(t => t.texto.toLowerCase().includes(searchLower));
+        if (!nombreUsuario.includes(searchLower) && !tieneTexto) return false;
+      }
+      return true;
+    });
+  }, [grabaciones, filtroEstado, filtroTipo, busqueda]);
+
+  // Formatear duración
+  const formatDuracion = (segundos: number | null): string => {
+    if (!segundos) return '--:--';
+    const mins = Math.floor(segundos / 60);
+    const secs = Math.floor(segundos % 60);
+    return `${mins}:${String(secs).padStart(2, '0')}`;
+  };
+
+  // Formatear fecha
+  const formatFecha = (fecha: string): string => {
+    const d = new Date(fecha);
+    return d.toLocaleDateString('es-ES', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  // Ver análisis de una grabación
+  const verAnalisis = (grabacion: Grabacion) => {
+    if (!grabacion.analisis_comportamiento?.length) {
+      alert('Esta grabación no tiene análisis disponible');
+      return;
+    }
+
+    // Construir resultado para el dashboard
+    const tipoGrab = (grabacion.tipo as TipoGrabacion) || 'equipo';
+    const resultado: ResultadoAnalisis = {
+      grabacion_id: grabacion.id,
+      tipo_grabacion: tipoGrab,
+      duracion_segundos: grabacion.duracion_segundos || 0,
+      participantes: grabacion.usuario ? [{ id: grabacion.creado_por, nombre: `${grabacion.usuario.nombre} ${grabacion.usuario.apellido}` }] : [],
+      frames_faciales: grabacion.analisis_comportamiento.map(a => ({
+        timestamp_segundos: a.timestamp_segundos,
+        emociones_scores: a.emociones_detalle as any || {},
+        emocion_dominante: a.emocion_dominante as any,
+        confianza_deteccion: 0.8,
+        action_units: {},
+        engagement_score: a.engagement_score,
+        mirando_camara: true,
+        cambio_abrupto: false,
+        delta_vs_baseline: 0,
+      })),
+      frames_corporales: [],
+      microexpresiones: [],
+      baseline: null,
+      analisis: {
+        tipo: tipoGrab,
+      } as any,
+      modelo_version: '1.0.0',
+      procesado_en: grabacion.creado_en,
+      confianza_general: 0.85,
+    };
+
+    setResultadoAnalisis(resultado);
+    setGrabacionSeleccionada(grabacion);
+    setShowDashboard(true);
+  };
+
+  const isArcade = theme === 'arcade';
+
+  return (
+    <div className="h-full w-full overflow-y-auto p-6">
+      {/* Header */}
+      <div className="max-w-6xl mx-auto">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <h1 className={`text-3xl font-black uppercase tracking-tight ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+              📹 Grabaciones
+            </h1>
+            <p className={`text-sm mt-1 ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
+              Historial de reuniones grabadas con transcripciones y análisis
+            </p>
+          </div>
+          <button
+            onClick={cargarGrabaciones}
+            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+              isArcade 
+                ? 'bg-[#00ff41] text-black hover:bg-white' 
+                : 'bg-indigo-600 text-white hover:bg-indigo-500'
+            }`}
+          >
+            🔄 Actualizar
+          </button>
+        </div>
+
+        {/* Filtros */}
+        <div className={`p-4 rounded-2xl mb-6 border ${isArcade ? 'bg-black border-[#00ff41]/30' : 'bg-zinc-800/50 border-white/10'}`}>
+          <div className="flex flex-wrap gap-4 items-center">
+            {/* Búsqueda */}
+            <div className="flex-1 min-w-[200px]">
+              <input
+                type="text"
+                placeholder="🔍 Buscar en transcripciones..."
+                value={busqueda}
+                onChange={(e) => setBusqueda(e.target.value)}
+                className={`w-full px-4 py-2.5 rounded-xl text-sm transition-all ${
+                  isArcade 
+                    ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41] placeholder-[#00ff41]/40 focus:border-[#00ff41]' 
+                    : 'bg-zinc-700/50 border border-white/10 text-white placeholder-zinc-500 focus:border-indigo-500'
+                }`}
+              />
+            </div>
+
+            {/* Filtro Estado */}
+            <select
+              value={filtroEstado}
+              onChange={(e) => setFiltroEstado(e.target.value)}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium ${
+                isArcade 
+                  ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41]' 
+                  : 'bg-zinc-700/50 border border-white/10 text-white'
+              }`}
+            >
+              <option value="todos">📊 Todos los estados</option>
+              <option value="completado">✅ Completados</option>
+              <option value="procesando">⏳ Procesando</option>
+              <option value="error">❌ Con error</option>
+            </select>
+
+            {/* Filtro Tipo */}
+            <select
+              value={filtroTipo}
+              onChange={(e) => setFiltroTipo(e.target.value)}
+              className={`px-4 py-2.5 rounded-xl text-sm font-medium ${
+                isArcade 
+                  ? 'bg-black border-2 border-[#00ff41]/50 text-[#00ff41]' 
+                  : 'bg-zinc-700/50 border border-white/10 text-white'
+              }`}
+            >
+              <option value="todos">🎬 Todos los tipos</option>
+              <option value="rrhh_entrevista">🎯 Entrevistas</option>
+              <option value="rrhh_one_to_one">🤝 One-to-One</option>
+              <option value="deals">💼 Deals</option>
+              <option value="equipo">🚀 Equipo</option>
+            </select>
+          </div>
+        </div>
+
+        {/* Loading */}
+        {isLoading && (
+          <div className="flex flex-col items-center justify-center py-20">
+            <div className={`w-12 h-12 border-4 rounded-full animate-spin ${
+              isArcade ? 'border-[#00ff41]/20 border-t-[#00ff41]' : 'border-indigo-500/20 border-t-indigo-500'
+            }`} />
+            <p className={`mt-4 text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
+              Cargando grabaciones...
+            </p>
+          </div>
+        )}
+
+        {/* Error */}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 text-center">
+            <p className="text-red-400">{error}</p>
+            <button
+              onClick={cargarGrabaciones}
+              className="mt-4 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+            >
+              Reintentar
+            </button>
+          </div>
+        )}
+
+        {/* Lista vacía */}
+        {!isLoading && !error && grabacionesFiltradas.length === 0 && (
+          <div className={`text-center py-20 rounded-2xl border-2 border-dashed ${
+            isArcade ? 'border-[#00ff41]/30' : 'border-white/10'
+          }`}>
+            <span className="text-6xl mb-4 block">📹</span>
+            <h3 className={`text-xl font-bold mb-2 ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+              No hay grabaciones
+            </h3>
+            <p className={`text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
+              {grabaciones.length === 0 
+                ? 'Inicia una reunión y grábala para ver el análisis aquí'
+                : 'No hay grabaciones que coincidan con los filtros'}
+            </p>
+          </div>
+        )}
+
+        {/* Lista de grabaciones */}
+        {!isLoading && !error && grabacionesFiltradas.length > 0 && (
+          <div className="grid gap-4">
+            {grabacionesFiltradas.map((grabacion) => {
+              const estadoConfig = ESTADO_CONFIG[grabacion.estado] || ESTADO_CONFIG.completado;
+              const tipoConfig = TIPO_CONFIG[grabacion.tipo] || TIPO_CONFIG.reunion;
+              const tieneAnalisis = grabacion.analisis_comportamiento && grabacion.analisis_comportamiento.length > 0;
+              const tieneTranscripcion = grabacion.transcripciones && grabacion.transcripciones.length > 0;
+
+              return (
+                <div
+                  key={grabacion.id}
+                  className={`group p-5 rounded-2xl border transition-all duration-300 hover:scale-[1.01] ${
+                    isArcade 
+                      ? 'bg-black border-[#00ff41]/30 hover:border-[#00ff41] hover:shadow-[0_0_30px_rgba(0,255,65,0.2)]' 
+                      : 'bg-zinc-800/50 border-white/10 hover:border-white/20 hover:bg-zinc-800'
+                  }`}
+                >
+                  <div className="flex items-start gap-4">
+                    {/* Icono tipo */}
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tipoConfig.color} flex items-center justify-center text-2xl shadow-lg`}>
+                      {tipoConfig.icon}
+                    </div>
+
+                    {/* Info principal */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-3 mb-1">
+                        <h3 className={`font-bold text-lg ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                          {tipoConfig.label}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConfig.color} text-white`}>
+                          {estadoConfig.icon} {estadoConfig.label}
+                        </span>
+                      </div>
+
+                      <div className={`flex items-center gap-4 text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
+                        <span>📅 {formatFecha(grabacion.creado_en)}</span>
+                        <span>⏱️ {formatDuracion(grabacion.duracion_segundos)}</span>
+                        {grabacion.usuario && (
+                          <span>👤 {grabacion.usuario.nombre} {grabacion.usuario.apellido}</span>
+                        )}
+                      </div>
+
+                      {/* Preview de transcripción */}
+                      {tieneTranscripcion && (
+                        <p className={`mt-2 text-sm line-clamp-2 ${isArcade ? 'text-[#00ff41]/40' : 'text-zinc-500'}`}>
+                          "{grabacion.transcripciones![0].texto.substring(0, 150)}..."
+                        </p>
+                      )}
+
+                      {/* Badges */}
+                      <div className="flex items-center gap-2 mt-3">
+                        {tieneTranscripcion && (
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-blue-500/20 text-blue-400'
+                          }`}>
+                            📝 {grabacion.transcripciones!.length} segmentos
+                          </span>
+                        )}
+                        {tieneAnalisis && (
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-purple-500/20 text-purple-400'
+                          }`}>
+                            🧠 Análisis disponible
+                          </span>
+                        )}
+                        {grabacion.resumenes_ai && grabacion.resumenes_ai.length > 0 && (
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-emerald-500/20 text-emerald-400'
+                          }`}>
+                            ✨ Resumen AI
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Acciones */}
+                    <div className="flex flex-col gap-2">
+                      {tieneAnalisis && (
+                        <button
+                          onClick={() => verAnalisis(grabacion)}
+                          className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                            isArcade 
+                              ? 'bg-[#00ff41] text-black hover:bg-white' 
+                              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                          }`}
+                        >
+                          📊 Ver Análisis
+                        </button>
+                      )}
+                      {tieneTranscripcion && (
+                        <button
+                          onClick={() => {
+                            setGrabacionSeleccionada(grabacion);
+                            // Aquí se podría abrir un modal de transcripción
+                          }}
+                          className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                            isArcade 
+                              ? 'border-2 border-[#00ff41] text-[#00ff41] hover:bg-[#00ff41] hover:text-black' 
+                              : 'border border-white/20 text-white hover:bg-white/10'
+                          }`}
+                        >
+                          📝 Transcripción
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Estadísticas */}
+        {!isLoading && grabaciones.length > 0 && (
+          <div className={`mt-8 p-6 rounded-2xl border ${isArcade ? 'bg-black border-[#00ff41]/30' : 'bg-zinc-800/30 border-white/10'}`}>
+            <h3 className={`text-sm font-bold uppercase tracking-wider mb-4 ${isArcade ? 'text-[#00ff41]' : 'text-zinc-400'}`}>
+              📊 Resumen
+            </h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className={`p-4 rounded-xl ${isArcade ? 'bg-[#00ff41]/10' : 'bg-white/5'}`}>
+                <div className={`text-3xl font-black ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                  {grabaciones.length}
+                </div>
+                <div className={`text-xs ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>Total grabaciones</div>
+              </div>
+              <div className={`p-4 rounded-xl ${isArcade ? 'bg-[#00ff41]/10' : 'bg-white/5'}`}>
+                <div className={`text-3xl font-black ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                  {grabaciones.filter(g => g.estado === 'completado').length}
+                </div>
+                <div className={`text-xs ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>Completadas</div>
+              </div>
+              <div className={`p-4 rounded-xl ${isArcade ? 'bg-[#00ff41]/10' : 'bg-white/5'}`}>
+                <div className={`text-3xl font-black ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                  {grabaciones.filter(g => g.analisis_comportamiento && g.analisis_comportamiento.length > 0).length}
+                </div>
+                <div className={`text-xs ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>Con análisis</div>
+              </div>
+              <div className={`p-4 rounded-xl ${isArcade ? 'bg-[#00ff41]/10' : 'bg-white/5'}`}>
+                <div className={`text-3xl font-black ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                  {formatDuracion(grabaciones.reduce((sum, g) => sum + (g.duracion_segundos || 0), 0))}
+                </div>
+                <div className={`text-xs ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>Tiempo total</div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Dashboard de análisis */}
+      {showDashboard && resultadoAnalisis && (
+        <AnalysisDashboard
+          resultado={resultadoAnalisis}
+          onClose={() => {
+            setShowDashboard(false);
+            setResultadoAnalisis(null);
+            setGrabacionSeleccionada(null);
+          }}
+          onExport={() => {
+            const json = JSON.stringify(resultadoAnalisis, null, 2);
+            const blob = new Blob([json], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `analisis_${grabacionSeleccionada?.tipo}_${new Date().toISOString().slice(0, 10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+          }}
+        />
+      )}
+    </div>
+  );
+};
+
+export default GrabacionesHistorial;
