@@ -8,7 +8,7 @@ import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
-import { RecordingManager } from './meetings/recording/RecordingManager';
+import { RecordingManagerV2 } from './meetings/recording/RecordingManagerV2';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -1649,9 +1649,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         </div>
       </div>
       
-      {/* Recording Manager con análisis de IA */}
+      {/* Recording Manager V2 con análisis conductual avanzado */}
       {hasActiveCall && (
-        <RecordingManager
+        <RecordingManagerV2
           espacioId={activeWorkspace?.id || ''}
           userId={session?.user?.id || ''}
           userName={currentUser.name}
@@ -1660,8 +1660,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
           }}
-          onProcessingComplete={(summary) => {
-            console.log('✅ Resumen AI generado:', summary);
+          onProcessingComplete={(resultado) => {
+            console.log('✅ Análisis conductual completado:', resultado?.tipo_grabacion, resultado?.analisis);
           }}
         />
       )}

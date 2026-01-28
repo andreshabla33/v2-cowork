@@ -5,6 +5,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
+import { useTranscription } from './useTranscription';
 
 interface RecordingManagerProps {
   espacioId: string;
@@ -90,6 +91,27 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   const [engagementScore, setEngagementScore] = useState(0.5);
 
   const isRecording = processingState.step === 'recording';
+
+  // ==================== TRANSCRIPCIÓN EN TIEMPO REAL (MoonshineJS) ====================
+  const {
+    startTranscription,
+    stopTranscription,
+    transcribeAudioBlob,
+    isTranscribing,
+    fullTranscript,
+    currentSegment,
+    segments,
+    error: transcriptionError,
+  } = useTranscription({
+    grabacionId: grabacionIdRef.current || 'pending',
+    idioma: 'es',
+    onSegmentUpdate: (segment) => {
+      console.log('📝 Nuevo segmento:', segment.texto);
+    },
+    onFullTranscriptUpdate: (text) => {
+      transcriptRef.current = text;
+    },
+  });
 
   const updateState = useCallback((updates: Partial<ProcessingState>) => {
     setProcessingState(prev => ({ ...prev, ...updates }));
@@ -329,15 +351,25 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       // Iniciar análisis de microexpresiones (en paralelo)
       startEmotionAnalysis();
       
-      console.log('🔴 Grabación con análisis de emociones iniciada');
+      // Iniciar transcripción en tiempo real (en paralelo)
+      // Extraer solo el audio del stream para transcripción
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length > 0) {
+        const audioStream = new MediaStream(audioTracks);
+        startTranscription(audioStream).catch(err => {
+          console.warn('⚠️ Transcripción en tiempo real no disponible:', err.message);
+        });
+      }
+      
+      console.log('🔴 Grabación con análisis de emociones y transcripción iniciada');
 
     } catch (err: any) {
       console.error('Error iniciando grabación:', err);
       updateState({ step: 'error', message: err.message || 'Error al iniciar grabación' });
     }
-  }, [stream, espacioId, userId, updateState, onRecordingStateChange, startEmotionAnalysis]);
+  }, [stream, espacioId, userId, updateState, onRecordingStateChange, startEmotionAnalysis, startTranscription]);
 
-  const stopRecording = useCallback(() => {
+  const stopRecording = useCallback(async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       updateState({ step: 'stopping', message: 'Deteniendo grabación...' });
       
@@ -348,13 +380,16 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       
       // Detener análisis de emociones
       stopEmotionAnalysis();
+      
+      // Detener transcripción en tiempo real
+      await stopTranscription();
 
       mediaRecorderRef.current.stop();
       onRecordingStateChange?.(false);
       
-      console.log(`⏹️ Grabación detenida - ${emotionHistoryRef.current.length} muestras de emociones capturadas`);
+      console.log(`⏹️ Grabación detenida - ${emotionHistoryRef.current.length} muestras de emociones, ${segments.length} segmentos de transcripción`);
     }
-  }, [updateState, onRecordingStateChange, stopEmotionAnalysis]);
+  }, [updateState, onRecordingStateChange, stopEmotionAnalysis, stopTranscription, segments.length]);
 
   const processRecording = useCallback(async () => {
     try {
@@ -424,30 +459,33 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       a.click();
       URL.revokeObjectURL(localUrl);
     }
-  }, [processingState.duration, updateState, onProcessingComplete]);
+  }, [processingState.duration, updateState, onProcessingComplete, userId, userName]);
 
   const transcribeAudio = async (blob: Blob): Promise<string> => {
     try {
+      // Si ya tenemos transcripción en tiempo real, usarla
+      if (transcriptRef.current && transcriptRef.current.trim().length > 20) {
+        console.log('✅ Usando transcripción en tiempo real capturada');
+        return transcriptRef.current;
+      }
+      
+      // Si no hay transcripción en tiempo real, intentar transcribir el blob completo
+      console.log('🎤 Transcribiendo audio del blob...');
+      const transcribedText = await transcribeAudioBlob(blob);
+      
+      if (transcribedText && transcribedText.trim().length > 0) {
+        console.log('✅ Transcripción del blob completada');
+        return transcribedText;
+      }
+      
+      // Fallback si no hay transcripción disponible
       const duration = processingState.duration;
+      console.warn('⚠️ No se pudo obtener transcripción, usando fallback');
+      return `[Reunión de ${Math.round(duration / 60)} minutos - Transcripción no disponible. El audio fue grabado correctamente.]`;
       
-      const mockTranscript = `[Transcripción de reunión - ${Math.round(duration / 60)} minutos]
-
-Esta es una transcripción simulada de la reunión grabada. 
-En producción, esto usaría MoonshineJS para transcripción local.
-
-Puntos discutidos:
-- Revisión del progreso del proyecto
-- Planificación de próximos pasos
-- Asignación de tareas
-
-La reunión duró aproximadamente ${Math.round(duration / 60)} minutos con ${duration > 60 ? 'discusión activa' : 'breve intercambio'}.`;
-
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      return mockTranscript;
     } catch (err) {
       console.error('Error en transcripción:', err);
-      return `[Reunión de ${Math.round(processingState.duration / 60)} minutos - Transcripción no disponible]`;
+      return `[Reunión de ${Math.round(processingState.duration / 60)} minutos - Error en transcripción: ${err}]`;
     }
   };
 
