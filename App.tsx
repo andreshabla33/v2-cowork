@@ -5,6 +5,8 @@ import { supabase } from './lib/supabase';
 import { LoginScreen } from './components/LoginScreen';
 import { Dashboard } from './components/Dashboard';
 import { WorkspaceLayout } from './components/WorkspaceLayout';
+import { CargoSelector } from './components/onboarding/CargoSelector';
+import type { CargoLaboral } from './components/onboarding/CargoSelector';
 
 const App: React.FC = () => {
   const { session, setSession, view, setView, initialize, initialized } = useStore();
@@ -48,6 +50,7 @@ const App: React.FC = () => {
       {initialized && view === 'dashboard' && <Dashboard />}
       {initialized && view === 'workspace' && <WorkspaceLayout />}
       {view === 'invitation' && <InvitationProcessor />}
+      {view === 'onboarding' && <OnboardingCargoView />}
     </div>
   );
 };
@@ -162,7 +165,8 @@ const InvitationProcessor: React.FC = () => {
       
       setTimeout(() => {
         setAuthFeedback({ type: 'success', message: `¡Bienvenido a ${invitacion.espacio.nombre}!` });
-        setView('dashboard');
+        // Redirigir a onboarding para selección de cargo
+        setView('onboarding');
       }, 2000);
     } catch (err: any) {
       setErrorLocal(err.message || 'Error al aceptar invitación');
@@ -250,11 +254,152 @@ const InvitationProcessor: React.FC = () => {
           <div className="space-y-6">
             <div className="text-6xl animate-ping">🎊</div>
             <h1 className="text-2xl font-black uppercase tracking-tight text-green-500">¡Bienvenido al equipo!</h1>
-            <p className="text-sm opacity-50 uppercase font-bold tracking-widest">Redirigiendo a tu nuevo espacio...</p>
+            <p className="text-sm opacity-50 uppercase font-bold tracking-widest">Redirigiendo a configurar tu perfil...</p>
           </div>
         )}
       </div>
     </div>
+  );
+};
+
+// Componente de Onboarding para selección de cargo
+interface OnboardingCargoState {
+  isLoading: boolean;
+  error: string | null;
+  espacioNombre: string;
+  cargoSugerido: CargoLaboral | null;
+  miembroId: string | null;
+}
+
+const OnboardingCargoView: React.FC = () => {
+  const { session, setView, setAuthFeedback } = useStore();
+  const [state, setState] = useState<OnboardingCargoState>({
+    isLoading: true,
+    error: null,
+    espacioNombre: 'tu espacio',
+    cargoSugerido: null,
+    miembroId: null,
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    verificarMiembro();
+  }, [session]);
+
+  const verificarMiembro = async () => {
+    if (!session?.user?.id) {
+      setState(prev => ({ ...prev, isLoading: false, error: 'No hay sesión activa' }));
+      return;
+    }
+
+    try {
+      // Buscar membresía del usuario
+      const { data: miembro, error } = await supabase
+        .from('miembros_espacio')
+        .select(`
+          id,
+          cargo,
+          onboarding_completado,
+          espacios_trabajo:espacio_id (nombre)
+        `)
+        .eq('usuario_id', session.user.id)
+        .eq('aceptado', true)
+        .order('aceptado_en', { ascending: false })
+        .limit(1)
+        .single();
+
+      if (error || !miembro) {
+        setState(prev => ({ ...prev, isLoading: false, error: 'No se encontró membresía' }));
+        return;
+      }
+
+      // Si ya completó onboarding, ir al dashboard
+      if (miembro.onboarding_completado) {
+        setView('dashboard');
+        return;
+      }
+
+      // Buscar cargo sugerido en invitación
+      const { data: invitacion } = await supabase
+        .from('invitaciones_pendientes')
+        .select('cargo_sugerido')
+        .eq('email', session.user.email)
+        .eq('usada', true)
+        .single();
+
+      const espacioData = miembro.espacios_trabajo as any;
+      setState({
+        isLoading: false,
+        error: null,
+        espacioNombre: espacioData?.nombre || 'tu espacio',
+        cargoSugerido: invitacion?.cargo_sugerido || null,
+        miembroId: miembro.id,
+      });
+    } catch (err) {
+      console.error('Error verificando miembro:', err);
+      setState(prev => ({ ...prev, isLoading: false, error: 'Error al cargar datos' }));
+    }
+  };
+
+  const handleSelectCargo = async (cargo: CargoLaboral) => {
+    if (!state.miembroId) return;
+    setSaving(true);
+
+    try {
+      const { error } = await supabase
+        .from('miembros_espacio')
+        .update({
+          cargo,
+          onboarding_completado: true,
+        })
+        .eq('id', state.miembroId);
+
+      if (error) throw error;
+
+      setAuthFeedback({ type: 'success', message: `¡Perfil configurado! Cargo: ${cargo}` });
+      setView('dashboard');
+    } catch (err) {
+      console.error('Error guardando cargo:', err);
+      setState(prev => ({ ...prev, error: 'Error al guardar el cargo' }));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (state.isLoading) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+          <p className="text-slate-400">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (state.error) {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 max-w-md text-center">
+          <p className="text-red-400 mb-4">{state.error}</p>
+          <button
+            onClick={() => setView('dashboard')}
+            className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Ir al inicio
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <CargoSelector
+      onSelect={handleSelectCargo}
+      cargoSugerido={state.cargoSugerido || undefined}
+      espacioNombre={state.espacioNombre}
+      isLoading={saving}
+    />
   );
 };
 
