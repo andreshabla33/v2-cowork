@@ -262,13 +262,25 @@ const InvitationProcessor: React.FC = () => {
   );
 };
 
-// Componente de Onboarding para selección de cargo
+// Tipo para departamento
+interface Departamento {
+  id: string;
+  nombre: string;
+  color: string;
+  icono: string;
+}
+
+// Componente de Onboarding para selección de cargo y departamento
 interface OnboardingCargoState {
   isLoading: boolean;
   error: string | null;
   espacioNombre: string;
+  espacioId: string | null;
   cargoSugerido: CargoLaboral | null;
   miembroId: string | null;
+  departamentos: Departamento[];
+  paso: 'cargo' | 'departamento';
+  cargoSeleccionado: CargoLaboral | null;
 }
 
 const OnboardingCargoView: React.FC = () => {
@@ -277,8 +289,12 @@ const OnboardingCargoView: React.FC = () => {
     isLoading: true,
     error: null,
     espacioNombre: 'tu espacio',
+    espacioId: null,
     cargoSugerido: null,
     miembroId: null,
+    departamentos: [],
+    paso: 'cargo',
+    cargoSeleccionado: null,
   });
   const [saving, setSaving] = useState(false);
 
@@ -299,6 +315,7 @@ const OnboardingCargoView: React.FC = () => {
         .select(`
           id,
           cargo,
+          espacio_id,
           onboarding_completado,
           espacios_trabajo:espacio_id (nombre)
         `)
@@ -319,6 +336,13 @@ const OnboardingCargoView: React.FC = () => {
         return;
       }
 
+      // Buscar departamentos del espacio
+      const { data: departamentosData } = await supabase
+        .from('departamentos')
+        .select('id, nombre, color, icono')
+        .eq('espacio_id', miembro.espacio_id)
+        .order('nombre');
+
       // Buscar cargo sugerido en invitación
       const { data: invitacion } = await supabase
         .from('invitaciones_pendientes')
@@ -332,8 +356,12 @@ const OnboardingCargoView: React.FC = () => {
         isLoading: false,
         error: null,
         espacioNombre: espacioData?.nombre || 'tu espacio',
+        espacioId: miembro.espacio_id,
         cargoSugerido: invitacion?.cargo_sugerido || null,
         miembroId: miembro.id,
+        departamentos: departamentosData || [],
+        paso: 'cargo',
+        cargoSeleccionado: null,
       });
     } catch (err) {
       console.error('Error verificando miembro:', err);
@@ -341,29 +369,40 @@ const OnboardingCargoView: React.FC = () => {
     }
   };
 
-  const handleSelectCargo = async (cargo: CargoLaboral) => {
-    if (!state.miembroId) return;
+  const handleSelectCargo = (cargo: CargoLaboral) => {
+    // Pasar al paso de departamento
+    setState(prev => ({ ...prev, cargoSeleccionado: cargo, paso: 'departamento' }));
+  };
+
+  const handleSelectDepartamento = async (departamentoId: string) => {
+    if (!state.miembroId || !state.cargoSeleccionado) return;
     setSaving(true);
 
     try {
       const { error } = await supabase
         .from('miembros_espacio')
         .update({
-          cargo,
+          cargo: state.cargoSeleccionado,
+          departamento_id: departamentoId,
           onboarding_completado: true,
         })
         .eq('id', state.miembroId);
 
       if (error) throw error;
 
-      setAuthFeedback({ type: 'success', message: `¡Perfil configurado! Cargo: ${cargo}` });
+      const deptNombre = state.departamentos.find(d => d.id === departamentoId)?.nombre || '';
+      setAuthFeedback({ type: 'success', message: `¡Perfil configurado! ${deptNombre}` });
       setView('dashboard');
     } catch (err) {
-      console.error('Error guardando cargo:', err);
-      setState(prev => ({ ...prev, error: 'Error al guardar el cargo' }));
+      console.error('Error guardando:', err);
+      setState(prev => ({ ...prev, error: 'Error al guardar' }));
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleBack = () => {
+    setState(prev => ({ ...prev, paso: 'cargo', cargoSeleccionado: null }));
   };
 
   if (state.isLoading) {
@@ -393,13 +432,78 @@ const OnboardingCargoView: React.FC = () => {
     );
   }
 
+  // Paso 1: Selección de cargo
+  if (state.paso === 'cargo') {
+    return (
+      <CargoSelector
+        onSelect={handleSelectCargo}
+        cargoSugerido={state.cargoSugerido || undefined}
+        espacioNombre={state.espacioNombre}
+        isLoading={saving}
+      />
+    );
+  }
+
+  // Paso 2: Selección de departamento
   return (
-    <CargoSelector
-      onSelect={handleSelectCargo}
-      cargoSugerido={state.cargoSugerido || undefined}
-      espacioNombre={state.espacioNombre}
-      isLoading={saving}
-    />
+    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+      <div className="w-full max-w-2xl">
+        {/* Header */}
+        <div className="text-center mb-8">
+          <button
+            onClick={handleBack}
+            className="mb-4 text-slate-400 hover:text-white flex items-center gap-2 mx-auto text-sm"
+          >
+            ← Volver a selección de cargo
+          </button>
+          <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 rounded-full text-indigo-400 text-xs font-medium mb-4">
+            Paso 2 de 2
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">¿A qué departamento perteneces?</h1>
+          <p className="text-slate-400">
+            Selecciona tu departamento en <span className="text-indigo-400 font-medium">{state.espacioNombre}</span>
+          </p>
+        </div>
+
+        {/* Grid de departamentos */}
+        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+          {state.departamentos.map((dept) => (
+            <button
+              key={dept.id}
+              onClick={() => handleSelectDepartamento(dept.id)}
+              disabled={saving}
+              className="group p-6 rounded-2xl border-2 border-slate-700 hover:border-indigo-500 bg-slate-800/50 hover:bg-slate-800 transition-all duration-200 text-left disabled:opacity-50"
+            >
+              <div 
+                className="w-12 h-12 rounded-xl flex items-center justify-center mb-4 text-2xl"
+                style={{ backgroundColor: dept.color + '20' }}
+              >
+                {dept.icono === 'users' && '👥'}
+                {dept.icono === 'code' && '💻'}
+                {dept.icono === 'palette' && '🎨'}
+                {dept.icono === 'megaphone' && '📣'}
+                {dept.icono === 'headphones' && '🎧'}
+                {dept.icono === 'trending-up' && '📈'}
+              </div>
+              <h3 className="text-lg font-semibold text-white group-hover:text-indigo-400 transition-colors">
+                {dept.nombre}
+              </h3>
+              <div 
+                className="w-8 h-1 rounded-full mt-2"
+                style={{ backgroundColor: dept.color }}
+              />
+            </button>
+          ))}
+        </div>
+
+        {saving && (
+          <div className="mt-6 text-center">
+            <div className="w-6 h-6 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <p className="text-slate-400 text-sm mt-2">Guardando...</p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 };
 
