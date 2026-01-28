@@ -153,7 +153,14 @@ export const useStore = create<AppState>((set, get) => ({
         const workspaces = await get().fetchWorkspaces();
         const savedId = localStorage.getItem(STORAGE_WS_KEY);
         
-        if (savedId) {
+        // Verificar si hay token de invitación en la URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const invitationToken = urlParams.get('token');
+        
+        if (invitationToken) {
+          // Si hay token de invitación, ir a procesarlo
+          set({ view: 'invitation' });
+        } else if (savedId) {
           const found = workspaces.find(w => w.id === savedId);
           if (found) {
             get().setActiveWorkspace(found, (found as any).userRole);
