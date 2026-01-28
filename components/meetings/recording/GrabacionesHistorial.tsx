@@ -235,53 +235,61 @@ export const GrabacionesHistorial: React.FC = () => {
   }, [activeWorkspace?.id]);
 
   const cargarGrabaciones = async () => {
-    if (!activeWorkspace?.id) return;
+    if (!activeWorkspace?.id) {
+      console.log('GrabacionesHistorial: No hay activeWorkspace.id');
+      setIsLoading(false);
+      return;
+    }
     
     setIsLoading(true);
     setError(null);
+    console.log('GrabacionesHistorial: Cargando grabaciones para espacio:', activeWorkspace.id);
 
     try {
+      // Primero intentar consulta simple
       const { data, error: fetchError } = await supabase
         .from('grabaciones')
-        .select(`
-          *,
-          usuario:creado_por (
-            id,
-            nombre,
-            apellido
-          ),
-          transcripciones (
-            id,
-            texto,
-            inicio_segundos,
-            fin_segundos,
-            speaker_nombre
-          ),
-          analisis_comportamiento (
-            id,
-            timestamp_segundos,
-            emocion_dominante,
-            engagement_score,
-            emociones_detalle
-          ),
-          resumenes_ai (
-            id,
-            resumen_corto,
-            resumen_detallado,
-            action_items,
-            puntos_clave,
-            sentimiento_general
-          )
-        `)
+        .select('*')
         .eq('espacio_id', activeWorkspace.id)
         .order('creado_en', { ascending: false });
 
-      if (fetchError) throw fetchError;
-      setGrabaciones(data || []);
+      console.log('GrabacionesHistorial: Respuesta:', { data, error: fetchError });
+
+      if (fetchError) {
+        console.error('GrabacionesHistorial: Error en query:', fetchError);
+        throw fetchError;
+      }
+      
+      // Si hay grabaciones, cargar datos relacionados
+      if (data && data.length > 0) {
+        // Cargar transcripciones y análisis por separado
+        const grabacionesConDatos = await Promise.all(
+          data.map(async (grabacion) => {
+            const [transcRes, analisisRes, resumenRes] = await Promise.all([
+              supabase.from('transcripciones').select('*').eq('grabacion_id', grabacion.id),
+              supabase.from('analisis_comportamiento').select('*').eq('grabacion_id', grabacion.id),
+              supabase.from('resumenes_ai').select('*').eq('grabacion_id', grabacion.id)
+            ]);
+            
+            return {
+              ...grabacion,
+              transcripciones: transcRes.data || [],
+              analisis_comportamiento: analisisRes.data || [],
+              resumenes_ai: resumenRes.data || []
+            };
+          })
+        );
+        setGrabaciones(grabacionesConDatos);
+      } else {
+        setGrabaciones([]);
+      }
+      
+      console.log('GrabacionesHistorial: Grabaciones cargadas:', data?.length || 0);
     } catch (err: any) {
-      console.error('Error cargando grabaciones:', err);
-      setError('Error al cargar las grabaciones');
+      console.error('GrabacionesHistorial: Error cargando:', err);
+      setError('Error al cargar las grabaciones: ' + (err.message || 'Error desconocido'));
     } finally {
+      console.log('GrabacionesHistorial: Finalizando carga, isLoading = false');
       setIsLoading(false);
     }
   };
