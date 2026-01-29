@@ -1,10 +1,16 @@
 /**
  * useAdvancedEmotionAnalysis - Hook avanzado para análisis de emociones
+ * =======================================================================
  * Mejoras sobre el original:
  * - Detección de microexpresiones (200ms)
  * - Baseline personalizado
  * - Detección de cambios abruptos
  * - Predicción de comportamiento
+ * 
+ * OPTIMIZACIÓN 2026-01-29:
+ * - Usa Web Worker para no bloquear el hilo principal
+ * - Mejora rendimiento de audio en WebRTC
+ * - requestAnimationFrame en lugar de setInterval
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -16,6 +22,7 @@ import {
   PrediccionComportamiento,
   TipoGrabacion,
 } from './types/analysis';
+import { useMediaPipeWorker, MediaPipeResult } from './useMediaPipeWorker';
 
 interface UseAdvancedEmotionAnalysisOptions {
   tipoGrabacion: TipoGrabacion;
@@ -37,11 +44,11 @@ interface AdvancedEmotionAnalysisState {
   microexpresionesDetectadas: number;
 }
 
-const MEDIAPIPE_VISION_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - reducido para mejor rendimiento de audio
+const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - optimizado para rendimiento
 const BASELINE_DURATION_MS = 5000; // 5 segundos de calibración
 const MICROEXPRESSION_MAX_DURATION_MS = 500;
 const ABRUPT_CHANGE_THRESHOLD = 0.3;
+const USE_WEB_WORKER = true; // Flag para habilitar/deshabilitar Worker
 
 // Mapeo de blendshapes a emociones con pesos refinados
 const EMOTION_BLENDSHAPE_WEIGHTS: Record<EmotionType, { shapes: string[]; weights: number[] }> = {
@@ -128,10 +135,34 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
   const lastEmotionScoresRef = useRef<Record<EmotionType, number> | null>(null);
   const emotionStartTimeRef = useRef<{ emotion: EmotionType; startTime: number } | null>(null);
 
-  // Cargar MediaPipe Face Landmarker
+  // Hook del Web Worker para MediaPipe
+  const { 
+    isReady: workerReady, 
+    initialize: initializeWorker, 
+    analyze: analyzeWithWorker, 
+    stop: stopWorker 
+  } = useMediaPipeWorker({ 
+    enableFace: true, 
+    enablePose: false // Solo análisis facial aquí
+  });
+
+  // Inicializar MediaPipe (vía Worker o directo como fallback)
   const loadFaceLandmarker = useCallback(async (): Promise<boolean> => {
+    if (USE_WEB_WORKER) {
+      console.log('🎭 [Advanced] Inicializando MediaPipe via Web Worker...');
+      const success = await initializeWorker();
+      if (success) {
+        console.log('✅ [Advanced] Worker MediaPipe listo - hilo principal libre');
+        return true;
+      }
+      console.warn('⚠️ [Advanced] Worker falló, continuando sin análisis');
+      return false;
+    }
+    
+    // Fallback: cargar directo (bloquea hilo principal)
     try {
-      console.log('🎭 [Advanced] Cargando MediaPipe Face Landmarker...');
+      console.log('🎭 [Advanced] Cargando MediaPipe directo (fallback)...');
+      const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
       
       const vision = await import(
         /* webpackIgnore: true */ 
@@ -139,7 +170,7 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       );
       
       const { FaceLandmarker, FilesetResolver } = vision;
-      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_VISION_CDN);
+      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
 
       const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
         baseOptions: {
@@ -153,14 +184,14 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       });
 
       faceLandmarkerRef.current = faceLandmarker;
-      console.log('✅ [Advanced] MediaPipe cargado - modo optimizado (500ms)');
+      console.log('✅ [Advanced] MediaPipe cargado (modo fallback)');
       return true;
 
     } catch (err) {
       console.error('⚠️ [Advanced] Error cargando MediaPipe:', err);
       return false;
     }
-  }, []);
+  }, [initializeWorker]);
 
   // Calcular score de emoción desde blendshapes
   const calculateEmotionScores = useCallback((blendshapes: Record<string, number>): Record<EmotionType, number> => {
@@ -429,8 +460,86 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     }
   }, [tipoGrabacion, onPrediccion]);
 
-  // Analizar frame de video
-  const analyzeFrame = useCallback(() => {
+  // Procesar resultados de blendshapes (usado tanto por worker como fallback)
+  const processBlendshapes = useCallback((blendshapes: Record<string, number>, hasTransformMatrix: boolean = true) => {
+    const currentTime = (Date.now() - startTimeRef.current) / 1000;
+    const emotionScores = calculateEmotionScores(blendshapes);
+    const { emotion, score } = getDominantEmotion(emotionScores);
+    const mirandoCamara = hasTransformMatrix ? isLookingAtCamera(null) : true;
+    const engagement = calculateEngagement(blendshapes, mirandoCamara);
+    const stress = calculateStressScore(blendshapes);
+    const confidence = calculateConfidenceScore(blendshapes);
+    const cambioAbrupto = detectAbruptChange(emotionScores);
+
+    let deltaVsBaseline = 0;
+    if (baselineRef.current) {
+      deltaVsBaseline = engagement - baselineRef.current.engagement_promedio;
+    }
+
+    const frame: EmotionFrame = {
+      timestamp_segundos: currentTime,
+      emocion_dominante: emotion,
+      emociones_scores: emotionScores,
+      engagement_score: engagement,
+      confianza_deteccion: score,
+      action_units: blendshapes,
+      mirando_camara: mirandoCamara,
+      cambio_abrupto: cambioAbrupto,
+      delta_vs_baseline: deltaVsBaseline,
+    };
+
+    framesHistoryRef.current.push(frame);
+    checkMicroexpression(emotion, score, blendshapes);
+
+    setState(prev => ({
+      ...prev,
+      currentEmotion: emotion,
+      engagementScore: engagement,
+      stressScore: stress,
+      confidenceScore: confidence,
+      framesAnalyzed: prev.framesAnalyzed + 1,
+    }));
+
+    onFrameUpdate?.(frame);
+
+    if (state.isCalibrating && currentTime * 1000 >= BASELINE_DURATION_MS) {
+      calculateBaseline();
+    }
+
+    if (Math.floor(currentTime) % 10 === 0 && state.framesAnalyzed % 50 === 0) {
+      generatePredictions();
+    }
+
+    if (Math.floor(currentTime) % 5 === 0 && framesHistoryRef.current.length % 25 === 0) {
+      console.log(`🎭 [${currentTime.toFixed(1)}s] ${emotion} | Eng: ${Math.round(engagement * 100)}% | Stress: ${Math.round(stress * 100)}% | Micro: ${microexpresionesRef.current.length}`);
+    }
+  }, [
+    calculateEmotionScores, getDominantEmotion, isLookingAtCamera,
+    calculateEngagement, calculateStressScore, calculateConfidenceScore,
+    detectAbruptChange, checkMicroexpression, calculateBaseline,
+    generatePredictions, onFrameUpdate, state.isCalibrating, state.framesAnalyzed,
+  ]);
+
+  // Analizar frame usando Worker (no bloquea hilo principal)
+  const analyzeFrameWithWorker = useCallback(async () => {
+    if (!videoElementRef.current || !workerReady) return;
+    
+    const video = videoElementRef.current;
+    if (video.readyState < 2) return;
+
+    try {
+      const result = await analyzeWithWorker(video, { analyzeFace: true, analyzePose: false });
+      
+      if (result?.face?.hasDetection && result.face.blendshapes) {
+        processBlendshapes(result.face.blendshapes, false);
+      }
+    } catch (err) {
+      // Silenciar errores
+    }
+  }, [workerReady, analyzeWithWorker, processBlendshapes]);
+
+  // Analizar frame directo (fallback - bloquea hilo principal)
+  const analyzeFrameDirect = useCallback(() => {
     if (!faceLandmarkerRef.current || !videoElementRef.current) return;
 
     const video = videoElementRef.current;
@@ -447,74 +556,21 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
           blendshapes[shape.categoryName] = shape.score;
         });
 
-        const currentTime = (Date.now() - startTimeRef.current) / 1000;
-        const emotionScores = calculateEmotionScores(blendshapes);
-        const { emotion, score } = getDominantEmotion(emotionScores);
-        const mirandoCamara = isLookingAtCamera(results.facialTransformationMatrixes);
-        const engagement = calculateEngagement(blendshapes, mirandoCamara);
-        const stress = calculateStressScore(blendshapes);
-        const confidence = calculateConfidenceScore(blendshapes);
-        const cambioAbrupto = detectAbruptChange(emotionScores);
-
-        // Calcular delta vs baseline
-        let deltaVsBaseline = 0;
-        if (baselineRef.current) {
-          deltaVsBaseline = engagement - baselineRef.current.engagement_promedio;
-        }
-
-        const frame: EmotionFrame = {
-          timestamp_segundos: currentTime,
-          emocion_dominante: emotion,
-          emociones_scores: emotionScores,
-          engagement_score: engagement,
-          confianza_deteccion: score,
-          action_units: blendshapes,
-          mirando_camara: mirandoCamara,
-          cambio_abrupto: cambioAbrupto,
-          delta_vs_baseline: deltaVsBaseline,
-        };
-
-        framesHistoryRef.current.push(frame);
-        
-        // Detectar microexpresiones
-        checkMicroexpression(emotion, score, blendshapes);
-
-        // Actualizar estado
-        setState(prev => ({
-          ...prev,
-          currentEmotion: emotion,
-          engagementScore: engagement,
-          stressScore: stress,
-          confidenceScore: confidence,
-          framesAnalyzed: prev.framesAnalyzed + 1,
-        }));
-
-        onFrameUpdate?.(frame);
-
-        // Calibración de baseline
-        if (state.isCalibrating && currentTime * 1000 >= BASELINE_DURATION_MS) {
-          calculateBaseline();
-        }
-
-        // Generar predicciones cada 10 segundos
-        if (Math.floor(currentTime) % 10 === 0 && state.framesAnalyzed % 50 === 0) {
-          generatePredictions();
-        }
-
-        // Log periódico
-        if (Math.floor(currentTime) % 5 === 0 && framesHistoryRef.current.length % 25 === 0) {
-          console.log(`🎭 [${currentTime.toFixed(1)}s] ${emotion} | Eng: ${Math.round(engagement * 100)}% | Stress: ${Math.round(stress * 100)}% | Micro: ${microexpresionesRef.current.length}`);
-        }
+        processBlendshapes(blendshapes, !!results.facialTransformationMatrixes);
       }
     } catch (err) {
-      // Silenciar errores para no interrumpir
+      // Silenciar errores
     }
-  }, [
-    calculateEmotionScores, getDominantEmotion, isLookingAtCamera,
-    calculateEngagement, calculateStressScore, calculateConfidenceScore,
-    detectAbruptChange, checkMicroexpression, calculateBaseline,
-    generatePredictions, onFrameUpdate, state.isCalibrating, state.framesAnalyzed,
-  ]);
+  }, [processBlendshapes]);
+
+  // Función principal de análisis (elige método según configuración)
+  const analyzeFrame = useCallback(() => {
+    if (USE_WEB_WORKER && workerReady) {
+      analyzeFrameWithWorker();
+    } else if (faceLandmarkerRef.current) {
+      analyzeFrameDirect();
+    }
+  }, [workerReady, analyzeFrameWithWorker, analyzeFrameDirect]);
 
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {
@@ -554,6 +610,12 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       analysisIntervalRef.current = null;
     }
 
+    // Detener Worker si está activo
+    if (USE_WEB_WORKER) {
+      stopWorker();
+    }
+
+    // Limpiar MediaPipe directo (fallback)
     faceLandmarkerRef.current?.close?.();
     faceLandmarkerRef.current = null;
     videoElementRef.current = null;
@@ -565,7 +627,7 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     }));
 
     console.log(`🛑 [Advanced] Análisis detenido. Frames: ${framesHistoryRef.current.length}, Microexpresiones: ${microexpresionesRef.current.length}`);
-  }, []);
+  }, [stopWorker]);
 
   // Obtener resultados
   const getResults = useCallback(() => {
@@ -590,9 +652,12 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       if (analysisIntervalRef.current) {
         clearInterval(analysisIntervalRef.current);
       }
+      if (USE_WEB_WORKER) {
+        stopWorker();
+      }
       faceLandmarkerRef.current?.close?.();
     };
-  }, []);
+  }, [stopWorker]);
 
   return {
     ...state,

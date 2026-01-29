@@ -1,6 +1,11 @@
 /**
  * useBodyLanguageAnalysis - Hook para análisis de lenguaje corporal
+ * ===================================================================
  * Usa MediaPipe Pose para detectar postura, gestos y tensión corporal
+ * 
+ * OPTIMIZACIÓN 2026-01-29:
+ * - Usa Web Worker para no bloquear el hilo principal
+ * - Mejora rendimiento de audio en WebRTC
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
@@ -10,6 +15,7 @@ import {
   BodyLanguageFrame,
   PosturaAnalysis,
 } from './types/analysis';
+import { useMediaPipeWorker } from './useMediaPipeWorker';
 
 interface UseBodyLanguageAnalysisOptions {
   onFrameUpdate?: (frame: BodyLanguageFrame) => void;
@@ -25,8 +31,8 @@ interface BodyLanguageState {
   framesAnalyzed: number;
 }
 
-const MEDIAPIPE_POSE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-const ANALYSIS_INTERVAL_MS = 500; // 2 FPS para postura (menos intensivo)
+const ANALYSIS_INTERVAL_MS = 500; // 2 FPS para postura
+const USE_WEB_WORKER = true; // Flag para habilitar/deshabilitar Worker
 
 // Índices de landmarks de MediaPipe Pose
 const POSE_LANDMARKS = {
@@ -67,10 +73,34 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
   const framesHistoryRef = useRef<BodyLanguageFrame[]>([]);
   const lastPosturaRef = useRef<PosturaType>('neutral');
 
-  // Cargar MediaPipe Pose
+  // Hook del Web Worker para MediaPipe Pose
+  const { 
+    isReady: workerReady, 
+    initialize: initializeWorker, 
+    analyze: analyzeWithWorker, 
+    stop: stopWorker 
+  } = useMediaPipeWorker({ 
+    enableFace: false, 
+    enablePose: true // Solo análisis de pose aquí
+  });
+
+  // Cargar MediaPipe Pose (vía Worker o directo como fallback)
   const loadPoseLandmarker = useCallback(async (): Promise<boolean> => {
+    if (USE_WEB_WORKER) {
+      console.log('🏃 [Body] Inicializando MediaPipe Pose via Web Worker...');
+      const success = await initializeWorker();
+      if (success) {
+        console.log('✅ [Body] Worker MediaPipe Pose listo - hilo principal libre');
+        return true;
+      }
+      console.warn('⚠️ [Body] Worker falló, continuando sin análisis corporal');
+      return false;
+    }
+
+    // Fallback: cargar directo (bloquea hilo principal)
     try {
-      console.log('🏃 [Body] Cargando MediaPipe Pose Landmarker...');
+      console.log('🏃 [Body] Cargando MediaPipe Pose directo (fallback)...');
+      const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
       
       const vision = await import(
         /* webpackIgnore: true */ 
@@ -78,7 +108,7 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       );
       
       const { PoseLandmarker, FilesetResolver } = vision;
-      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_POSE_CDN);
+      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
 
       const poseLandmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
         baseOptions: {
@@ -90,14 +120,14 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       });
 
       poseLandmarkerRef.current = poseLandmarker;
-      console.log('✅ [Body] MediaPipe Pose cargado');
+      console.log('✅ [Body] MediaPipe Pose cargado (modo fallback)');
       return true;
 
     } catch (err) {
       console.error('⚠️ [Body] Error cargando MediaPipe Pose:', err);
       return false;
     }
-  }, []);
+  }, [initializeWorker]);
 
   // Calcular ángulo entre tres puntos
   const calculateAngle = useCallback((
@@ -250,8 +280,78 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     return Math.max(0, tension);
   }, []);
 
-  // Analizar frame
-  const analyzeFrame = useCallback(() => {
+  // Procesar landmarks (usado tanto por worker como fallback)
+  const processLandmarks = useCallback((landmarks: any[]) => {
+    const currentTime = (Date.now() - startTimeRef.current) / 1000;
+
+    const { postura, score: posturaScore } = detectPostura(landmarks);
+    const { gesto, actividad } = detectGestos(landmarks);
+    const tension = detectTension(landmarks);
+
+    const nose = landmarks[POSE_LANDMARKS.NOSE];
+    const shoulderCenter = {
+      x: (landmarks[POSE_LANDMARKS.LEFT_SHOULDER].x + landmarks[POSE_LANDMARKS.RIGHT_SHOULDER].x) / 2,
+      y: (landmarks[POSE_LANDMARKS.LEFT_SHOULDER].y + landmarks[POSE_LANDMARKS.RIGHT_SHOULDER].y) / 2,
+    };
+    const inclinacionX = (nose.x - shoulderCenter.x) * 90;
+    const inclinacionY = (nose.y - shoulderCenter.y) * 90;
+
+    const frame: BodyLanguageFrame = {
+      timestamp_segundos: currentTime,
+      postura,
+      postura_score: posturaScore,
+      inclinacion_x: inclinacionX,
+      inclinacion_y: inclinacionY,
+      gestos_manos: gesto,
+      actividad_manos: actividad,
+      auto_toque_detectado: gesto === 'auto_toque',
+      brazos_cruzados: gesto === 'brazos_cruzados',
+      hombros_tension: tension,
+    };
+
+    framesHistoryRef.current.push(frame);
+
+    if (postura !== lastPosturaRef.current) {
+      onPosturaChange?.(postura);
+      lastPosturaRef.current = postura;
+    }
+
+    setState(prev => ({
+      ...prev,
+      currentPostura: postura,
+      posturaScore: posturaScore,
+      gestosActivos: gesto,
+      tensionLevel: tension,
+      framesAnalyzed: prev.framesAnalyzed + 1,
+    }));
+
+    onFrameUpdate?.(frame);
+
+    if (Math.floor(currentTime) % 10 === 0 && framesHistoryRef.current.length % 20 === 0) {
+      console.log(`🏃 [${currentTime.toFixed(1)}s] Postura: ${postura} | Gesto: ${gesto} | Tensión: ${Math.round(tension * 100)}%`);
+    }
+  }, [detectPostura, detectGestos, detectTension, onFrameUpdate, onPosturaChange]);
+
+  // Analizar frame usando Worker (no bloquea hilo principal)
+  const analyzeFrameWithWorker = useCallback(async () => {
+    if (!videoElementRef.current || !workerReady) return;
+    
+    const video = videoElementRef.current;
+    if (video.readyState < 2) return;
+
+    try {
+      const result = await analyzeWithWorker(video, { analyzeFace: false, analyzePose: true });
+      
+      if (result?.pose?.hasDetection && result.pose.landmarks) {
+        processLandmarks(result.pose.landmarks);
+      }
+    } catch (err) {
+      // Silenciar errores
+    }
+  }, [workerReady, analyzeWithWorker, processLandmarks]);
+
+  // Analizar frame directo (fallback)
+  const analyzeFrameDirect = useCallback(() => {
     if (!poseLandmarkerRef.current || !videoElementRef.current) return;
 
     const video = videoElementRef.current;
@@ -261,63 +361,21 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       const results = poseLandmarkerRef.current.detectForVideo(video, performance.now());
 
       if (results.landmarks?.length > 0) {
-        const landmarks = results.landmarks[0];
-        const currentTime = (Date.now() - startTimeRef.current) / 1000;
-
-        const { postura, score: posturaScore } = detectPostura(landmarks);
-        const { gesto, actividad } = detectGestos(landmarks);
-        const tension = detectTension(landmarks);
-
-        // Calcular inclinación
-        const nose = landmarks[POSE_LANDMARKS.NOSE];
-        const shoulderCenter = {
-          x: (landmarks[POSE_LANDMARKS.LEFT_SHOULDER].x + landmarks[POSE_LANDMARKS.RIGHT_SHOULDER].x) / 2,
-          y: (landmarks[POSE_LANDMARKS.LEFT_SHOULDER].y + landmarks[POSE_LANDMARKS.RIGHT_SHOULDER].y) / 2,
-        };
-        const inclinacionX = (nose.x - shoulderCenter.x) * 90; // Grados aproximados
-        const inclinacionY = (nose.y - shoulderCenter.y) * 90;
-
-        const frame: BodyLanguageFrame = {
-          timestamp_segundos: currentTime,
-          postura,
-          postura_score: posturaScore,
-          inclinacion_x: inclinacionX,
-          inclinacion_y: inclinacionY,
-          gestos_manos: gesto,
-          actividad_manos: actividad,
-          auto_toque_detectado: gesto === 'auto_toque',
-          brazos_cruzados: gesto === 'brazos_cruzados',
-          hombros_tension: tension,
-        };
-
-        framesHistoryRef.current.push(frame);
-
-        // Detectar cambio de postura
-        if (postura !== lastPosturaRef.current) {
-          onPosturaChange?.(postura);
-          lastPosturaRef.current = postura;
-        }
-
-        setState(prev => ({
-          ...prev,
-          currentPostura: postura,
-          posturaScore: posturaScore,
-          gestosActivos: gesto,
-          tensionLevel: tension,
-          framesAnalyzed: prev.framesAnalyzed + 1,
-        }));
-
-        onFrameUpdate?.(frame);
-
-        // Log periódico
-        if (Math.floor(currentTime) % 10 === 0 && framesHistoryRef.current.length % 20 === 0) {
-          console.log(`🏃 [${currentTime.toFixed(1)}s] Postura: ${postura} | Gesto: ${gesto} | Tensión: ${Math.round(tension * 100)}%`);
-        }
+        processLandmarks(results.landmarks[0]);
       }
     } catch (err) {
       // Silenciar errores
     }
-  }, [detectPostura, detectGestos, detectTension, onFrameUpdate, onPosturaChange]);
+  }, [processLandmarks]);
+
+  // Función principal de análisis
+  const analyzeFrame = useCallback(() => {
+    if (USE_WEB_WORKER && workerReady) {
+      analyzeFrameWithWorker();
+    } else if (poseLandmarkerRef.current) {
+      analyzeFrameDirect();
+    }
+  }, [workerReady, analyzeFrameWithWorker, analyzeFrameDirect]);
 
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {
@@ -349,6 +407,12 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       analysisIntervalRef.current = null;
     }
 
+    // Detener Worker si está activo
+    if (USE_WEB_WORKER) {
+      stopWorker();
+    }
+
+    // Limpiar MediaPipe directo (fallback)
     poseLandmarkerRef.current?.close?.();
     poseLandmarkerRef.current = null;
     videoElementRef.current = null;
@@ -359,7 +423,7 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     }));
 
     console.log(`🛑 [Body] Análisis detenido. Frames: ${framesHistoryRef.current.length}`);
-  }, []);
+  }, [stopWorker]);
 
   // Obtener análisis de postura
   const getPosturaAnalysis = useCallback((): PosturaAnalysis => {
@@ -429,9 +493,12 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       if (analysisIntervalRef.current) {
         clearInterval(analysisIntervalRef.current);
       }
+      if (USE_WEB_WORKER) {
+        stopWorker();
+      }
       poseLandmarkerRef.current?.close?.();
     };
-  }, []);
+  }, [stopWorker]);
 
   return {
     ...state,
