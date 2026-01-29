@@ -285,7 +285,33 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
       // Obtener resultado de análisis combinado
       const resultadoAnalisis = combinedAnalysis.getResultadoCompleto();
 
-      updateState({ progress: 60, message: 'Guardando datos...' });
+      updateState({ progress: 50, message: 'Guardando transcripción...' });
+
+      // Guardar transcripción en Supabase
+      if (transcript && transcript.trim().length > 0) {
+        const transcripcionRecord = {
+          grabacion_id: grabacionIdRef.current,
+          texto: transcript,
+          inicio_segundos: 0,
+          fin_segundos: duration,
+          speaker_id: userId,
+          speaker_nombre: userName,
+          confianza: 0.9,
+          idioma: 'es',
+        };
+        
+        const { error: transcError } = await supabase
+          .from('transcripciones')
+          .insert(transcripcionRecord);
+        
+        if (transcError) {
+          console.error('Error guardando transcripción:', transcError);
+        } else {
+          console.log('✅ Transcripción guardada en Supabase');
+        }
+      }
+
+      updateState({ progress: 70, message: 'Guardando análisis conductual...' });
 
       // Guardar análisis en Supabase
       const emotionFrames = resultadoAnalisis.frames_faciales;
@@ -305,9 +331,14 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         // Insertar en lotes
         for (let i = 0; i < emotionRecords.length; i += 50) {
           const batch = emotionRecords.slice(i, i + 50);
-          await supabase.from('analisis_comportamiento').insert(batch);
+          const { error: analisisError } = await supabase.from('analisis_comportamiento').insert(batch);
+          if (analisisError) {
+            console.error('Error guardando análisis:', analisisError);
+          }
         }
         console.log(`✅ ${emotionRecords.length} registros de análisis guardados`);
+      } else {
+        console.warn('⚠️ No hay frames de análisis para guardar');
       }
 
       updateState({ progress: 80, message: 'Generando resumen AI...' });
@@ -336,20 +367,16 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         },
       });
 
-      // Actualizar grabación en Supabase
+      // Actualizar grabación en Supabase (metadatos sin archivo de video)
       await supabase.from('grabaciones').update({
         estado: 'completado',
         duracion_segundos: duration,
         fin_grabacion: new Date().toISOString(),
+        archivo_nombre: reunionTitulo || `Reunión ${new Date().toLocaleDateString('es-ES')}`,
       }).eq('id', grabacionIdRef.current);
 
-      // Descargar video local
-      const localUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = localUrl;
-      a.download = `${tipoGrabacion}_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
-      a.click();
-      URL.revokeObjectURL(localUrl);
+      // Video procesado localmente - no se sube a storage por privacidad
+      console.log('📹 Video procesado localmente (no subido a storage)');
 
       // Guardar resultado
       setResultado(resultadoAnalisis);
@@ -376,14 +403,11 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
       console.error('Error procesando grabación:', err);
       updateState({ step: 'error', message: err.message || 'Error en el procesamiento' });
 
-      // Descargar video aunque haya error
-      const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const localUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = localUrl;
-      a.download = `grabacion_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.webm`;
-      a.click();
-      URL.revokeObjectURL(localUrl);
+      // Marcar grabación como error
+      await supabase.from('grabaciones').update({
+        estado: 'error',
+        error_mensaje: err.message || 'Error en procesamiento',
+      }).eq('id', grabacionIdRef.current);
     }
   }, [
     processingState.duration, 
