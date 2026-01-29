@@ -93,18 +93,37 @@ export const LoginScreen: React.FC = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[#09090b] p-4 overflow-y-auto">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-[#050508] p-4 overflow-y-auto">
+      {/* Fondo con gradientes neon animados */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] rounded-full bg-indigo-600/20 blur-[150px] animate-pulse" />
-        <div className="absolute bottom-[-20%] right-[-10%] w-[60%] h-[60%] rounded-full bg-purple-600/20 blur-[150px] animate-pulse" style={{ animationDelay: '2s' }} />
+        <div className="absolute top-[-30%] left-[-20%] w-[70%] h-[70%] rounded-full bg-violet-600/15 blur-[180px] animate-pulse" />
+        <div className="absolute bottom-[-30%] right-[-20%] w-[70%] h-[70%] rounded-full bg-cyan-500/10 blur-[180px] animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute top-[40%] left-[50%] w-[40%] h-[40%] rounded-full bg-fuchsia-600/10 blur-[120px] animate-pulse" style={{ animationDelay: '3s' }} />
+        {/* Grid pattern sutil */}
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
       </div>
 
-      <div className="w-full max-w-md my-auto glass-card rounded-[48px] p-8 md:p-10 shadow-2xl relative z-10 animate-in fade-in zoom-in duration-700">
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-indigo-700 rounded-3xl flex items-center justify-center font-black text-5xl text-white italic shadow-2xl shadow-indigo-500/40 mb-6 transform rotate-3 hover:rotate-0 transition-transform duration-500">C</div>
-          <h1 className="text-4xl font-black tracking-tighter italic uppercase text-white mb-2">Cowork</h1>
-          <p className="text-zinc-500 text-[10px] font-black uppercase tracking-[0.4em]">Virtual Collaboration Hub</p>
-        </div>
+      {/* Card principal con glassmorphism 2026 */}
+      <div className="w-full max-w-md my-auto relative z-10">
+        {/* Glow exterior */}
+        <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 via-fuchsia-600/20 to-cyan-500/20 rounded-[52px] blur-xl opacity-60" />
+        
+        <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[48px] p-8 md:p-10 shadow-2xl">
+          {/* Header con logo gaming style */}
+          <div className="flex flex-col items-center mb-10">
+            {/* Logo con glow neon */}
+            <div className="relative group mb-6">
+              <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-3xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
+              <div className="relative w-20 h-20 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-3xl flex items-center justify-center font-black text-5xl text-white shadow-2xl transform rotate-3 group-hover:rotate-0 group-hover:scale-105 transition-all duration-500">
+                C
+              </div>
+            </div>
+            {/* Título con efecto gradient */}
+            <h1 className="text-5xl font-black tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
+              COWORK
+            </h1>
+            <p className="text-zinc-500 text-[10px] font-bold uppercase tracking-[0.5em]">Virtual Collaboration Hub</p>
+          </div>
 
         {authFeedback && (
           <div className="mb-6 p-4 bg-green-500/10 border border-green-500/30 rounded-2xl animate-in slide-in-from-top-2 flex items-start gap-3 text-green-400">
@@ -157,7 +176,7 @@ export const LoginScreen: React.FC = () => {
                 value={fullName} 
                 onChange={e => setFullName(e.target.value)} 
                 autoComplete="name"
-                className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all placeholder:text-zinc-700 text-white" 
+                className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all placeholder:text-zinc-700 text-white" 
               />
             </div>
           )}
@@ -174,7 +193,7 @@ export const LoginScreen: React.FC = () => {
               value={email} 
               onChange={e => setEmail(e.target.value)} 
               autoComplete="email"
-              className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all placeholder:text-zinc-700 text-white" 
+              className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all placeholder:text-zinc-700 text-white" 
             />
           </div>
 
@@ -191,16 +210,19 @@ export const LoginScreen: React.FC = () => {
               value={password} 
               onChange={e => setPassword(e.target.value)} 
               autoComplete={isRegister ? "new-password" : "current-password"}
-              className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-600 transition-all placeholder:text-zinc-700 text-white" 
+              className="w-full bg-black/40 border border-white/5 rounded-[20px] pl-14 pr-5 py-5 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500/50 focus:border-violet-500/50 transition-all placeholder:text-zinc-700 text-white" 
             />
           </div>
 
           <button 
             type="submit" 
             disabled={loading} 
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white px-6 py-5 rounded-[20px] font-black text-xs uppercase tracking-[0.2em] transition-all shadow-2xl shadow-indigo-600/30 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
+            className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white px-6 py-5 rounded-[20px] font-black text-xs uppercase tracking-[0.2em] transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-3"
           >
-            {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : isRegister ? 'Crear Cuenta' : 'Entrar'}
+            <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+            <span className="relative flex items-center gap-3">
+              {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : isRegister ? 'Crear Cuenta' : 'Entrar'}
+            </span>
           </button>
         </form>
 
@@ -223,10 +245,11 @@ export const LoginScreen: React.FC = () => {
 
         <p className="mt-10 text-center text-[10px] text-zinc-500 font-bold uppercase tracking-widest">
           {isRegister ? '¿Ya tienes cuenta?' : '¿Nuevo por aquí?'} 
-          <button onClick={() => setIsRegister(!isRegister)} className="ml-2 text-indigo-500 font-black hover:text-indigo-400 transition-colors underline decoration-2 underline-offset-4">
+          <button onClick={() => setIsRegister(!isRegister)} className="ml-2 text-violet-400 font-black hover:text-violet-300 transition-colors underline decoration-2 underline-offset-4">
             {isRegister ? 'Inicia Sesión' : 'Crea una aquí'}
           </button>
         </p>
+        </div>
       </div>
     </div>
   );
