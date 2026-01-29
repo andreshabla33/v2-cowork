@@ -293,6 +293,7 @@ interface OnboardingCargoState {
   departamentos: Departamento[];
   paso: 'cargo' | 'departamento';
   cargoSeleccionado: CargoLaboral | null;
+  rolSistema: string; // Rol del sistema (super_admin, admin, member)
 }
 
 const OnboardingCargoView: React.FC = () => {
@@ -307,6 +308,7 @@ const OnboardingCargoView: React.FC = () => {
     departamentos: [],
     paso: 'cargo',
     cargoSeleccionado: null,
+    rolSistema: 'member', // Por defecto member (más restrictivo)
   });
   const [saving, setSaving] = useState(false);
 
@@ -321,12 +323,13 @@ const OnboardingCargoView: React.FC = () => {
     }
 
     try {
-      // Buscar membresía del usuario
+      // Buscar membresía del usuario (incluye ROL del sistema)
       const { data: miembro, error } = await supabase
         .from('miembros_espacio')
         .select(`
           id,
           cargo,
+          rol,
           espacio_id,
           onboarding_completado,
           espacios_trabajo:espacio_id (nombre)
@@ -374,6 +377,7 @@ const OnboardingCargoView: React.FC = () => {
         departamentos: departamentosData || [],
         paso: 'cargo',
         cargoSeleccionado: null,
+        rolSistema: (miembro as any).rol || 'member', // Rol del sistema para filtrar cargos
       });
     } catch (err) {
       console.error('Error verificando miembro:', err);
@@ -444,7 +448,7 @@ const OnboardingCargoView: React.FC = () => {
     );
   }
 
-  // Paso 1: Selección de cargo
+  // Paso 1: Selección de cargo (filtrado por rol del sistema)
   if (state.paso === 'cargo') {
     return (
       <CargoSelector
@@ -452,6 +456,7 @@ const OnboardingCargoView: React.FC = () => {
         cargoSugerido={state.cargoSugerido || undefined}
         espacioNombre={state.espacioNombre}
         isLoading={saving}
+        rolUsuario={state.rolSistema}
       />
     );
   }

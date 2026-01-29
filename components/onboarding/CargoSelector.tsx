@@ -232,11 +232,20 @@ const CARGOS_INFO: CargoInfo[] = [
   },
 ];
 
+// Mapeo de roles de sistema a categorías permitidas
+// Solo admins y super_admins pueden ver liderazgo
+export const CATEGORIAS_POR_ROL: Record<string, string[]> = {
+  super_admin: ['liderazgo', 'rrhh', 'comercial', 'producto', 'general'],
+  admin: ['liderazgo', 'rrhh', 'comercial', 'producto', 'general'],
+  member: ['rrhh', 'comercial', 'producto', 'general'], // Sin liderazgo
+};
+
 interface CargoSelectorProps {
   onSelect: (cargo: CargoLaboral) => void;
   cargoSugerido?: CargoLaboral;
   espacioNombre?: string;
   isLoading?: boolean;
+  rolUsuario?: string; // Rol del sistema (super_admin, admin, member)
 }
 
 export const CargoSelector: React.FC<CargoSelectorProps> = ({
@@ -244,6 +253,7 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
   cargoSugerido,
   espacioNombre = 'tu nuevo espacio',
   isLoading = false,
+  rolUsuario = 'member', // Por defecto member (más restrictivo)
 }) => {
   const [cargoSeleccionado, setCargoSeleccionado] = useState<CargoLaboral | null>(
     cargoSugerido || null
@@ -252,6 +262,12 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
     cargoSugerido ? CARGOS_INFO.find(c => c.id === cargoSugerido)?.categoria || null : null
   );
   const [hoveredCargo, setHoveredCargo] = useState<CargoLaboral | null>(null);
+
+  // Filtrar categorías según el rol del usuario
+  const categoriasPermitidas = CATEGORIAS_POR_ROL[rolUsuario] || CATEGORIAS_POR_ROL.member;
+  const categoriasVisibles = Object.entries(CATEGORIAS).filter(
+    ([catId]) => categoriasPermitidas.includes(catId)
+  );
 
   const handleSelectCargo = useCallback((cargo: CargoLaboral) => {
     setCargoSeleccionado(cargo);
@@ -304,7 +320,7 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
         {/* Categorías y Cargos */}
         <div className="bg-slate-800/50 backdrop-blur-xl rounded-2xl border border-slate-700/50 p-6 mb-6">
           <div className="space-y-4">
-            {Object.entries(CATEGORIAS).map(([catId, categoria], index) => {
+            {categoriasVisibles.map(([catId, categoria], index) => {
               const cargos = cargosPorCategoria[catId] || [];
               const isExpanded = categoriaExpandida === catId;
               const hasSelectedCargo = cargos.some(c => c.id === cargoSeleccionado);
