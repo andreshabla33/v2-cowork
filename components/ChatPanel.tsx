@@ -26,7 +26,7 @@ interface ChatPanelProps {
 }
 
 export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatOnly = false, onChannelSelect }) => {
-  const { activeWorkspace, currentUser, setActiveSubTab, theme, onlineUsers, incrementUnreadChat, activeSubTab, activeChatGroupId, setActiveChatGroupId } = useStore();
+  const { activeWorkspace, currentUser, setActiveSubTab, theme, onlineUsers, incrementUnreadChat, activeSubTab, activeChatGroupId, setActiveChatGroupId, userRoleInActiveWorkspace } = useStore();
   const [grupos, setGrupos] = useState<ChatGroup[]>([]);
   const grupoActivo = activeChatGroupId;
   const setGrupoActivo = setActiveChatGroupId;
@@ -732,14 +732,16 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               );}) : (
                  <p className="px-4 py-2 text-[9px] opacity-30 italic font-bold">No hay otros miembros</p>
               )}
-              {/* Botón para invitar */}
-              <button 
-                onClick={() => setActiveSubTab('miembros')}
-                className="w-full text-left px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center gap-3 mt-2"
-              >
-                <span className="w-5 h-5 flex items-center justify-center bg-indigo-500/20 rounded-lg text-lg">+</span>
-                Invitar personas
-              </button>
+              {/* Botón para invitar - Solo visible para admin y super_admin */}
+              {userRoleInActiveWorkspace && !['member', 'miembro'].includes(userRoleInActiveWorkspace) && (
+                <button 
+                  onClick={() => setActiveSubTab('miembros')}
+                  className="w-full text-left px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center gap-3 mt-2"
+                >
+                  <span className="w-5 h-5 flex items-center justify-center bg-indigo-500/20 rounded-lg text-lg">+</span>
+                  Invitar personas
+                </button>
+              )}
             </div>
           </div>
         </div>
