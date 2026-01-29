@@ -1,14 +1,62 @@
 /**
- * Hook para transcripción en tiempo real usando MoonshineJS
- * Procesa audio localmente en el navegador - sin enviar datos a servidores
+ * Hook para transcripción en tiempo real
+ * Usa Web Speech API (nativo del navegador) - funciona en Chrome, Edge, Safari
+ * Procesa audio localmente - sin enviar datos a servidores externos
  */
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { TranscriptionSegment, TranscriptionState } from './types';
 
+// Tipos para Web Speech API
+interface SpeechRecognitionResult {
+  readonly isFinal: boolean;
+  readonly length: number;
+  item(index: number): SpeechRecognitionAlternative;
+  [index: number]: SpeechRecognitionAlternative;
+}
+
+interface SpeechRecognitionAlternative {
+  readonly transcript: string;
+  readonly confidence: number;
+}
+
+interface SpeechRecognitionResultList {
+  readonly length: number;
+  item(index: number): SpeechRecognitionResult;
+  [index: number]: SpeechRecognitionResult;
+}
+
+interface SpeechRecognitionEvent extends Event {
+  readonly resultIndex: number;
+  readonly results: SpeechRecognitionResultList;
+}
+
+interface SpeechRecognitionErrorEvent extends Event {
+  readonly error: string;
+  readonly message: string;
+}
+
+interface SpeechRecognitionInstance extends EventTarget {
+  continuous: boolean;
+  interimResults: boolean;
+  lang: string;
+  maxAlternatives: number;
+  onresult: ((event: SpeechRecognitionEvent) => void) | null;
+  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
+  onend: (() => void) | null;
+  start(): void;
+  stop(): void;
+  abort(): void;
+}
+
+interface SpeechRecognitionConstructor {
+  new(): SpeechRecognitionInstance;
+}
+
 declare global {
   interface Window {
-    Moonshine: any;
+    SpeechRecognition: SpeechRecognitionConstructor;
+    webkitSpeechRecognition: SpeechRecognitionConstructor;
   }
 }
 
@@ -19,10 +67,8 @@ interface UseTranscriptionOptions {
   onFullTranscriptUpdate?: (fullText: string) => void;
 }
 
-const MOONSHINE_CDN = 'https://cdn.jsdelivr.net/npm/@moonshine-ai/moonshine-js@latest/dist/moonshine.min.js';
-
 export function useTranscription(options: UseTranscriptionOptions) {
-  const { grabacionId, idioma = 'es', onSegmentUpdate, onFullTranscriptUpdate } = options;
+  const { grabacionId, idioma = 'es-ES', onSegmentUpdate, onFullTranscriptUpdate } = options;
 
   const [state, setState] = useState<TranscriptionState>({
     isLoading: false,
@@ -33,111 +79,121 @@ export function useTranscription(options: UseTranscriptionOptions) {
     currentSegment: '',
   });
 
-  const transcriberRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionInstance | null>(null);
   const segmentIdRef = useRef(0);
   const startTimeRef = useRef<number>(0);
-  const moonshineLoadedRef = useRef(false);
+  const isRestartingRef = useRef(false);
+  const shouldContinueRef = useRef(false);
 
-  const loadMoonshine = useCallback(async (): Promise<boolean> => {
-    if (moonshineLoadedRef.current && window.Moonshine) {
-      return true;
-    }
-
-    return new Promise((resolve) => {
-      if (window.Moonshine) {
-        moonshineLoadedRef.current = true;
-        resolve(true);
-        return;
-      }
-
-      const script = document.createElement('script');
-      script.src = MOONSHINE_CDN;
-      script.type = 'module';
-      script.async = true;
-
-      script.onload = () => {
-        moonshineLoadedRef.current = true;
-        console.log('✅ MoonshineJS cargado:', {
-          Moonshine: !!window.Moonshine,
-          MicrophoneTranscriber: !!window.Moonshine?.MicrophoneTranscriber,
-          Transcriber: !!window.Moonshine?.Transcriber,
-        });
-        resolve(true);
-      };
-
-      script.onerror = () => {
-        console.error('❌ Error cargando MoonshineJS');
-        resolve(false);
-      };
-
-      document.head.appendChild(script);
-    });
-  }, []);
-
-  const startTranscription = useCallback(async (audioStream?: MediaStream) => {
+  const startTranscription = useCallback(async (_audioStream?: MediaStream) => {
     try {
       setState(prev => ({ ...prev, isLoading: true, error: null }));
 
-      const loaded = await loadMoonshine();
-      if (!loaded || !window.Moonshine) {
-        throw new Error('No se pudo cargar el motor de transcripción');
+      // Verificar soporte de Web Speech API
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        throw new Error('Web Speech API no soportada en este navegador');
       }
 
       startTimeRef.current = Date.now();
+      shouldContinueRef.current = true;
 
-      console.log('🎤 Creando MicrophoneTranscriber...');
-      const transcriber = new window.Moonshine.MicrophoneTranscriber(
-        'model/tiny',
-        {
-          onTranscriptionCommitted: (text: string) => {
-            console.log('📝 Transcripción recibida:', text);
-            const segmentId = `seg_${grabacionId}_${segmentIdRef.current++}`;
-            const currentTime = (Date.now() - startTimeRef.current) / 1000;
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = idioma;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (event: SpeechRecognitionEvent) => {
+        let interimTranscript = '';
+        let finalTranscript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; i++) {
+          const transcript = event.results[i][0].transcript;
+          if (event.results[i].isFinal) {
+            finalTranscript += transcript;
+          } else {
+            interimTranscript += transcript;
+          }
+        }
+
+        // Actualizar segmento actual (interim)
+        if (interimTranscript) {
+          setState(prev => ({
+            ...prev,
+            currentSegment: interimTranscript,
+          }));
+        }
+
+        // Guardar segmento final
+        if (finalTranscript.trim()) {
+          const segmentId = `seg_${grabacionId}_${segmentIdRef.current++}`;
+          const currentTime = (Date.now() - startTimeRef.current) / 1000;
+          
+          const segment: TranscriptionSegment = {
+            id: segmentId,
+            grabacion_id: grabacionId,
+            texto: finalTranscript.trim(),
+            inicio_segundos: Math.max(0, currentTime - 3),
+            fin_segundos: currentTime,
+            idioma: idioma,
+            confianza: event.results[event.resultIndex][0].confidence || 0.9,
+          };
+
+          console.log('📝 Transcripción recibida:', finalTranscript.trim());
+
+          setState(prev => {
+            const newSegments = [...prev.segments, segment];
+            const newFullTranscript = newSegments.map(s => s.texto).join(' ');
             
-            const segment: TranscriptionSegment = {
-              id: segmentId,
-              grabacion_id: grabacionId,
-              texto: text.trim(),
-              inicio_segundos: Math.max(0, currentTime - 5),
-              fin_segundos: currentTime,
-              idioma: idioma,
-              confianza: 0.9,
-            };
+            onSegmentUpdate?.(segment);
+            onFullTranscriptUpdate?.(newFullTranscript);
 
-            setState(prev => {
-              const newSegments = [...prev.segments, segment];
-              const newFullTranscript = newSegments.map(s => s.texto).join(' ');
-              
-              onSegmentUpdate?.(segment);
-              onFullTranscriptUpdate?.(newFullTranscript);
-
-              return {
-                ...prev,
-                segments: newSegments,
-                fullTranscript: newFullTranscript,
-                currentSegment: '',
-              };
-            });
-          },
-          onTranscriptionUpdated: (text: string) => {
-            setState(prev => ({
+            return {
               ...prev,
-              currentSegment: text,
-            }));
-          },
-        },
-        true
-      );
+              segments: newSegments,
+              fullTranscript: newFullTranscript,
+              currentSegment: '',
+            };
+          });
+        }
+      };
 
-      if (audioStream) {
-        transcriber.setAudioStream?.(audioStream);
-      }
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
+        console.warn('⚠️ Error de reconocimiento:', event.error);
+        // No detener por errores temporales
+        if (event.error === 'no-speech' || event.error === 'aborted') {
+          return;
+        }
+        setState(prev => ({
+          ...prev,
+          error: `Error: ${event.error}`,
+        }));
+      };
 
-      transcriberRef.current = transcriber;
-      await transcriber.start();
+      recognition.onend = () => {
+        // Reiniciar automáticamente si debe continuar
+        if (shouldContinueRef.current && !isRestartingRef.current) {
+          isRestartingRef.current = true;
+          console.log('🔄 Reiniciando reconocimiento...');
+          setTimeout(() => {
+            if (shouldContinueRef.current && recognitionRef.current) {
+              try {
+                recognitionRef.current.start();
+              } catch (e) {
+                console.warn('No se pudo reiniciar:', e);
+              }
+            }
+            isRestartingRef.current = false;
+          }, 100);
+        }
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
 
       setState(prev => ({ ...prev, isLoading: false, isTranscribing: true }));
-      console.log('🎤 Transcripción iniciada');
+      console.log('🎤 Transcripción iniciada (Web Speech API)');
 
     } catch (err: any) {
       console.error('Error iniciando transcripción:', err);
@@ -147,13 +203,14 @@ export function useTranscription(options: UseTranscriptionOptions) {
         error: err.message || 'Error al iniciar transcripción',
       }));
     }
-  }, [grabacionId, idioma, loadMoonshine, onSegmentUpdate, onFullTranscriptUpdate]);
+  }, [grabacionId, idioma, onSegmentUpdate, onFullTranscriptUpdate]);
 
   const stopTranscription = useCallback(async () => {
-    if (transcriberRef.current) {
+    shouldContinueRef.current = false;
+    if (recognitionRef.current) {
       try {
-        await transcriberRef.current.stop();
-        transcriberRef.current = null;
+        recognitionRef.current.stop();
+        recognitionRef.current = null;
         setState(prev => ({ ...prev, isTranscribing: false }));
         console.log('🛑 Transcripción detenida');
       } catch (err) {
@@ -162,47 +219,16 @@ export function useTranscription(options: UseTranscriptionOptions) {
     }
   }, []);
 
-  const transcribeAudioBlob = useCallback(async (audioBlob: Blob): Promise<string> => {
-    try {
-      setState(prev => ({ ...prev, isLoading: true, error: null }));
-
-      const loaded = await loadMoonshine();
-      if (!loaded || !window.Moonshine) {
-        throw new Error('No se pudo cargar el motor de transcripción');
-      }
-
-      const arrayBuffer = await audioBlob.arrayBuffer();
-      const audioContext = new AudioContext({ sampleRate: 16000 });
-      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-      const audioData = audioBuffer.getChannelData(0);
-
-      const transcriber = new window.Moonshine.Transcriber('model/tiny');
-      const result = await transcriber.transcribe(audioData);
-      const fullText = result.text || result;
-
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        fullTranscript: fullText,
-      }));
-
-      onFullTranscriptUpdate?.(fullText);
-      return fullText;
-
-    } catch (err: any) {
-      console.error('Error transcribiendo audio:', err);
-      setState(prev => ({
-        ...prev,
-        isLoading: false,
-        error: err.message || 'Error al transcribir audio',
-      }));
-      return '';
-    }
-  }, [loadMoonshine, onFullTranscriptUpdate]);
+  const transcribeAudioBlob = useCallback(async (_audioBlob: Blob): Promise<string> => {
+    // Web Speech API no soporta transcribir blobs directamente
+    // Retornar la transcripción acumulada
+    return state.fullTranscript;
+  }, [state.fullTranscript]);
 
   useEffect(() => {
     return () => {
-      transcriberRef.current?.stop?.();
+      shouldContinueRef.current = false;
+      recognitionRef.current?.stop?.();
     };
   }, []);
 

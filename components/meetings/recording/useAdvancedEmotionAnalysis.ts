@@ -38,7 +38,7 @@ interface AdvancedEmotionAnalysisState {
 }
 
 const MEDIAPIPE_VISION_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-const ANALYSIS_INTERVAL_MS = 200; // 5 FPS para microexpresiones
+const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - reducido para mejor rendimiento de audio
 const BASELINE_DURATION_MS = 5000; // 5 segundos de calibración
 const MICROEXPRESSION_MAX_DURATION_MS = 500;
 const ABRUPT_CHANGE_THRESHOLD = 0.3;
