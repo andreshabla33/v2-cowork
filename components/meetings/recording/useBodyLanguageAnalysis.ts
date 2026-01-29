@@ -84,49 +84,16 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     enablePose: true // Solo análisis de pose aquí
   });
 
-  // Cargar MediaPipe Pose (vía Worker o directo como fallback automático)
+  // Cargar MediaPipe Pose exclusivamente vía Worker (sin fallback)
   const loadPoseLandmarker = useCallback(async (): Promise<boolean> => {
-    if (USE_WEB_WORKER) {
-      console.log('🏃 [Body] Inicializando MediaPipe Pose via Web Worker...');
-      const success = await initializeWorker();
-      if (success) {
-        console.log('✅ [Body] Worker MediaPipe Pose listo - hilo principal libre');
-        return true;
-      }
-      console.warn('⚠️ [Body] Worker falló, usando fallback directo...');
-      // Continúa con fallback en lugar de retornar false
-    }
-
-    // Fallback: cargar directo (bloquea hilo principal)
-    try {
-      console.log('🏃 [Body] Cargando MediaPipe Pose directo (fallback)...');
-      const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-      
-      const vision = await import(
-        /* webpackIgnore: true */ 
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest'
-      );
-      
-      const { PoseLandmarker, FilesetResolver } = vision;
-      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
-
-      const poseLandmarker = await PoseLandmarker.createFromOptions(filesetResolver, {
-        baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
-          delegate: 'GPU',
-        },
-        runningMode: 'VIDEO',
-        numPoses: 1,
-      });
-
-      poseLandmarkerRef.current = poseLandmarker;
-      console.log('✅ [Body] MediaPipe Pose cargado (modo fallback)');
+    console.log('🏃 [Body] Inicializando MediaPipe Pose via Web Worker...');
+    const success = await initializeWorker();
+    if (success) {
+      console.log('✅ [Body] Worker MediaPipe Pose listo - hilo principal libre');
       return true;
-
-    } catch (err) {
-      console.error('⚠️ [Body] Error cargando MediaPipe Pose:', err);
-      return false;
     }
+    console.warn('⚠️ [Body] Worker no disponible - análisis corporal deshabilitado');
+    return false;
   }, [initializeWorker]);
 
   // Calcular ángulo entre tres puntos
@@ -368,14 +335,12 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     }
   }, [processLandmarks]);
 
-  // Función principal de análisis
+  // Función principal de análisis (solo Worker, sin fallback)
   const analyzeFrame = useCallback(() => {
-    if (USE_WEB_WORKER && workerReady) {
+    if (workerReady) {
       analyzeFrameWithWorker();
-    } else if (poseLandmarkerRef.current) {
-      analyzeFrameDirect();
     }
-  }, [workerReady, analyzeFrameWithWorker, analyzeFrameDirect]);
+  }, [workerReady, analyzeFrameWithWorker]);
 
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {

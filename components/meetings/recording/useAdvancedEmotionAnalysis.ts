@@ -146,51 +146,16 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     enablePose: false // Solo análisis facial aquí
   });
 
-  // Inicializar MediaPipe (vía Worker o directo como fallback automático)
+  // Inicializar MediaPipe exclusivamente vía Worker (sin fallback)
   const loadFaceLandmarker = useCallback(async (): Promise<boolean> => {
-    if (USE_WEB_WORKER) {
-      console.log('🎭 [Advanced] Inicializando MediaPipe via Web Worker...');
-      const success = await initializeWorker();
-      if (success) {
-        console.log('✅ [Advanced] Worker MediaPipe listo - hilo principal libre');
-        return true;
-      }
-      console.warn('⚠️ [Advanced] Worker falló, usando fallback directo...');
-      // Continúa con fallback en lugar de retornar false
-    }
-    
-    // Fallback: cargar directo (bloquea hilo principal)
-    try {
-      console.log('🎭 [Advanced] Cargando MediaPipe directo (fallback)...');
-      const MEDIAPIPE_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm';
-      
-      const vision = await import(
-        /* webpackIgnore: true */ 
-        'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest'
-      );
-      
-      const { FaceLandmarker, FilesetResolver } = vision;
-      const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_CDN);
-
-      const faceLandmarker = await FaceLandmarker.createFromOptions(filesetResolver, {
-        baseOptions: {
-          modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task',
-          delegate: 'GPU',
-        },
-        outputFaceBlendshapes: true,
-        outputFacialTransformationMatrixes: true,
-        runningMode: 'VIDEO',
-        numFaces: 1,
-      });
-
-      faceLandmarkerRef.current = faceLandmarker;
-      console.log('✅ [Advanced] MediaPipe cargado (modo fallback)');
+    console.log('🎭 [Advanced] Inicializando MediaPipe via Web Worker...');
+    const success = await initializeWorker();
+    if (success) {
+      console.log('✅ [Advanced] Worker MediaPipe listo - hilo principal libre');
       return true;
-
-    } catch (err) {
-      console.error('⚠️ [Advanced] Error cargando MediaPipe:', err);
-      return false;
     }
+    console.warn('⚠️ [Advanced] Worker no disponible - análisis facial deshabilitado');
+    return false;
   }, [initializeWorker]);
 
   // Calcular score de emoción desde blendshapes
@@ -563,14 +528,12 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     }
   }, [processBlendshapes]);
 
-  // Función principal de análisis (elige método según configuración)
+  // Función principal de análisis (solo Worker, sin fallback)
   const analyzeFrame = useCallback(() => {
-    if (USE_WEB_WORKER && workerReady) {
+    if (workerReady) {
       analyzeFrameWithWorker();
-    } else if (faceLandmarkerRef.current) {
-      analyzeFrameDirect();
     }
-  }, [workerReady, analyzeFrameWithWorker, analyzeFrameDirect]);
+  }, [workerReady, analyzeFrameWithWorker]);
 
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {
