@@ -897,6 +897,28 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
+
+  // Cargar cargo del usuario desde miembros_espacio
+  useEffect(() => {
+    const cargarCargo = async () => {
+      if (!session?.user?.id || !activeWorkspace?.id) return;
+      
+      const { data } = await supabase
+        .from('miembros_espacio')
+        .select('cargo')
+        .eq('usuario_id', session.user.id)
+        .eq('espacio_id', activeWorkspace.id)
+        .single();
+      
+      if (data?.cargo) {
+        console.log('📋 Cargo del usuario cargado:', data.cargo);
+        setCargoUsuario(data.cargo);
+      }
+    };
+    
+    cargarCargo();
+  }, [session?.user?.id, activeWorkspace?.id]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Map<string, MediaStream>>(new Map());
   const activeStreamRef = useRef<MediaStream | null>(null);
@@ -1650,7 +1672,6 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       </div>
       
       {/* Recording Manager V2 con análisis conductual avanzado */}
-      {/* TODO: Obtener cargoUsuario desde miembros_espacio.cargo o perfil de usuario */}
       {hasActiveCall && (
         <RecordingManagerV2
           espacioId={activeWorkspace?.id || ''}
@@ -1658,7 +1679,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           userName={currentUser.name}
           reunionTitulo={`Reunión ${new Date().toLocaleDateString()}`}
           stream={stream}
-          cargoUsuario={currentUser.cargo as any || 'colaborador'}
+          cargoUsuario={cargoUsuario as any}
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
           }}
