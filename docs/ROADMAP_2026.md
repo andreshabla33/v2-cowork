@@ -261,7 +261,20 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 | `3b6be9d` | Ocultar botón Invitar Personas para rol member |
 | `9b1320a` | Filtrar tipos grabación por rol sistema + cargo |
 | `0c2c244` | Asignar departamento "General" automáticamente al creador |
+| `d81373a` | Guardar transcripción en Supabase, eliminar descarga local video |
+| `c96e795` | Dashboard muestra Transcripciones con nombre de reunión |
 
 ---
 
-*Última actualización: 28 Enero 2026 - 22:50 UTC-4*
+### 📹 Sistema de Grabación - Arquitectura Privacidad
+
+| Componente | Almacenamiento | Descripción |
+|:-----------|:---------------|:------------|
+| **Video** | ❌ Local (navegador) | No se sube a storage por privacidad |
+| **Transcripción** | ✅ Supabase | Tabla `transcripciones` |
+| **Análisis Conductual** | ✅ Supabase | Tabla `analisis_comportamiento` |
+| **Metadatos** | ✅ Supabase | Tabla `grabaciones` (sin archivo) |
+
+---
+
+*Última actualización: 28 Enero 2026 - 23:05 UTC-4*
