@@ -69,7 +69,7 @@ export const LoginScreen: React.FC = () => {
         } else {
           setAuthFeedback({ 
             type: 'success', 
-            message: '🚀 ¡Usuario creado con éxito! Ya puedes iniciar sesión.' 
+            message: '� ¡Revisa tu correo! Te enviamos un enlace de confirmación para activar tu cuenta.' 
           });
           setIsRegister(false);
         }
