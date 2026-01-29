@@ -130,23 +130,6 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
     }
   }, [stream, processingState.step, processingState.message, updateState]);
 
-  // Manejar clic en botón de grabar
-  const handleRecordClick = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      setShowTypeSelector(true);
-    }
-  }, [isRecording]);
-
-  // Manejar selección de tipo
-  const handleTypeSelect = useCallback((tipo: TipoGrabacionDetallado, analisis: boolean) => {
-    setTipoGrabacion(tipo);
-    setConAnalisis(analisis);
-    setShowTypeSelector(false);
-    startRecording(tipo, analisis);
-  }, []);
-
   // Buscar elemento de video
   const findVideoElement = useCallback((): HTMLVideoElement | null => {
     if (!stream) return null;
@@ -279,6 +262,24 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
       console.log('⏹️ Grabación detenida');
     }
   }, [updateState, onRecordingStateChange, stopTranscription, combinedAnalysis]);
+
+  // Manejar clic en botón de grabar
+  const handleRecordClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else {
+      setShowTypeSelector(true);
+    }
+  }, [isRecording, stopRecording]);
+
+  // Manejar selección de tipo
+  const handleTypeSelect = useCallback((tipo: TipoGrabacionDetallado, analisis: boolean) => {
+    console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis);
+    setTipoGrabacion(tipo);
+    setConAnalisis(analisis);
+    setShowTypeSelector(false);
+    startRecording(tipo, analisis);
+  }, [startRecording]);
 
   // Procesar grabación
   const processRecording = useCallback(async () => {
