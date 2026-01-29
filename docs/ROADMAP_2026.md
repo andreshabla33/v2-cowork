@@ -92,12 +92,22 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 #### Permisos de UI por Rol
 - **Botón "Invitar Personas"**: Solo visible para `admin` y `super_admin`
 - **Selector de Cargo**: Filtrado según rol del sistema
+- **Tipos de Grabación**: Filtrados según rol + cargo laboral
+
+| Rol + Cargo | Tipos de Grabación Visibles |
+|:------------|:----------------------------|
+| super_admin/admin (cualquier cargo) | Todos |
+| member + cargo RRHH | Entrevista, One-to-One |
+| member + cargo Comercial | Deal/Negociación |
+| member + cargo Equipo | Equipo |
+| member + colaborador/otro | Solo "Todos los tipos" (básico) |
 
 #### Archivos Modificados
 - `CargoSelector.tsx`: Props `rolUsuario`, filtrado de categorías y cargos
 - `App.tsx`: Obtiene rol del sistema y lo pasa al selector
 - `Dashboard.tsx`: UI completa estilo gaming 2026
 - `ChatPanel.tsx`: Botón invitar oculto para members
+- `GrabacionesHistorial.tsx`: Filtro de tipos por rol + cargo
 
 ---
 
@@ -249,7 +259,8 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 | `e3848b1` | Seguridad de roles - invitados no ven cargos de liderazgo |
 | `520e4be` | Filtrar cargos de dirección para members |
 | `3b6be9d` | Ocultar botón Invitar Personas para rol member |
+| `9b1320a` | Filtrar tipos grabación por rol sistema + cargo |
 
 ---
 
-*Última actualización: 28 Enero 2026 - 22:35 UTC-4*
+*Última actualización: 28 Enero 2026 - 22:45 UTC-4*
