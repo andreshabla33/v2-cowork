@@ -398,24 +398,41 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         ? emotionFrames.reduce((sum, f) => sum + f.engagement_score, 0) / emotionFrames.length
         : 0.5;
 
-      const { data: aiData } = await supabase.functions.invoke('generar-resumen-ai', {
-        body: {
-          grabacion_id: grabacionIdRef.current,
-          espacio_id: espacioId,
-          creador_id: userId,
-          transcripcion: transcript,
-          emociones: emotionFrames.slice(-50),
-          duracion_segundos: duration,
-          participantes: [userName],
-          reunion_titulo: reunionTitulo,
-          tipo_grabacion: tipoGrabacion,
-          metricas_adicionales: {
-            engagement_promedio: avgEngagement,
-            microexpresiones_detectadas: resultadoAnalisis.microexpresiones.length,
-            tipo_analisis: tipoGrabacion,
+      // Obtener token de sesión para autenticar la llamada
+      const { data: sessionData } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      
+      if (accessToken) {
+        const { data: aiData, error: aiError } = await supabase.functions.invoke('generar-resumen-ai', {
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
           },
-        },
-      });
+          body: {
+            grabacion_id: grabacionIdRef.current,
+            espacio_id: espacioId,
+            creador_id: userId,
+            transcripcion: transcript,
+            emociones: emotionFrames.slice(-50),
+            duracion_segundos: duration,
+            participantes: [userName],
+            reunion_titulo: reunionTitulo,
+            tipo_grabacion: tipoGrabacion,
+            metricas_adicionales: {
+              engagement_promedio: avgEngagement,
+              microexpresiones_detectadas: resultadoAnalisis.microexpresiones.length,
+              tipo_analisis: tipoGrabacion,
+            },
+          },
+        });
+        
+        if (aiError) {
+          console.warn('⚠️ Error generando resumen AI:', aiError.message);
+        } else {
+          console.log('✅ Resumen AI generado');
+        }
+      } else {
+        console.warn('⚠️ No hay sesión activa para generar resumen AI');
+      }
 
       // Actualizar grabación en Supabase (metadatos sin archivo de video)
       await supabase.from('grabaciones').update({
