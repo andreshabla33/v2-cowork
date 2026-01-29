@@ -12,7 +12,7 @@ interface Notification {
 
 interface AppState {
   theme: ThemeType;
-  view: 'dashboard' | 'workspace' | 'invitation' | 'loading' | 'onboarding';
+  view: 'dashboard' | 'workspace' | 'invitation' | 'loading' | 'onboarding' | 'onboarding_creador';
   activeSubTab: 'space' | 'tasks' | 'miembros' | 'settings' | 'builder' | 'chat' | 'avatar' | 'calendar' | 'grabaciones';
   currentUser: User;
   users: User[];
@@ -160,6 +160,9 @@ export const useStore = create<AppState>((set, get) => ({
         if (invitationToken) {
           // Si hay token de invitación, ir a procesarlo
           set({ view: 'invitation' });
+        } else if (workspaces.length === 0) {
+          // Usuario nuevo sin espacios -> Onboarding de creador
+          set({ view: 'onboarding_creador' });
         } else if (savedId) {
           const found = workspaces.find(w => w.id === savedId);
           if (found) {

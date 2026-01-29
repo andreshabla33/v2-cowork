@@ -6,6 +6,7 @@ import { LoginScreen } from './components/LoginScreen';
 import { Dashboard } from './components/Dashboard';
 import { WorkspaceLayout } from './components/WorkspaceLayout';
 import { CargoSelector } from './components/onboarding/CargoSelector';
+import { OnboardingCreador } from './components/onboarding/OnboardingCreador';
 import type { CargoLaboral } from './components/onboarding/CargoSelector';
 
 const App: React.FC = () => {
@@ -51,6 +52,17 @@ const App: React.FC = () => {
       {initialized && view === 'workspace' && <WorkspaceLayout />}
       {view === 'invitation' && <InvitationProcessor />}
       {view === 'onboarding' && <OnboardingCargoView />}
+      {view === 'onboarding_creador' && session && (
+        <OnboardingCreador
+          userId={session.user.id}
+          userEmail={session.user.email || ''}
+          userName={session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuario'}
+          onComplete={() => {
+            initialize();
+            setView('dashboard');
+          }}
+        />
+      )}
     </div>
   );
 };
