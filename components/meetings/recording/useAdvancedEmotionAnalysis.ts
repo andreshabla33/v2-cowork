@@ -153,7 +153,7 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       });
 
       faceLandmarkerRef.current = faceLandmarker;
-      console.log('✅ [Advanced] MediaPipe cargado - modo microexpresiones (200ms)');
+      console.log('✅ [Advanced] MediaPipe cargado - modo optimizado (500ms)');
       return true;
 
     } catch (err) {
@@ -541,7 +541,7 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       baselineComplete: false,
     }));
 
-    // Análisis cada 200ms para microexpresiones
+    // Análisis cada 500ms - optimizado para rendimiento de audio
     analysisIntervalRef.current = setInterval(analyzeFrame, ANALYSIS_INTERVAL_MS);
 
     console.log(`🎭 [Advanced] Análisis iniciado para: ${tipoGrabacion.toUpperCase()}`);
