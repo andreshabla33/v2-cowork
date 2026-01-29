@@ -596,7 +596,28 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         </div>
       )}
 
-      {/* Indicador de grabación (esquina) */}
+      {/* Botón flotante para iniciar grabación con análisis */}
+      {processingState.step === 'idle' && !isRecording && (
+        <div className="fixed bottom-6 right-6 z-[200]">
+          <button
+            onClick={() => setShowTypeSelector(true)}
+            className="group relative flex items-center gap-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white px-5 py-3 rounded-2xl shadow-2xl transition-all hover:scale-105"
+          >
+            <span className="w-4 h-4 bg-red-500 rounded-full animate-pulse"></span>
+            <span className="font-bold text-sm">Grabar con Análisis</span>
+            <span className="text-xl">🧠</span>
+            
+            {/* Tooltip */}
+            <div className="absolute bottom-full mb-2 right-0 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+              <div className="bg-black text-white text-xs px-3 py-2 rounded-lg whitespace-nowrap">
+                Grabación con análisis conductual
+              </div>
+            </div>
+          </button>
+        </div>
+      )}
+
+      {/* Indicador de grabación activa (esquina) */}
       {isRecording && (
         <div className="fixed top-4 left-4 z-[200]">
           <div className="flex items-center gap-3 bg-red-600 px-4 py-2 rounded-full shadow-lg">
@@ -604,6 +625,12 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
             <span className="text-white font-mono font-bold">
               {formatDuration(processingState.duration)}
             </span>
+            <button
+              onClick={stopRecording}
+              className="ml-2 bg-white/20 hover:bg-white/30 px-2 py-1 rounded text-xs font-medium transition-colors"
+            >
+              Detener
+            </button>
           </div>
         </div>
       )}
