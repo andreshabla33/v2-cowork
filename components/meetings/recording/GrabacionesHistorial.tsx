@@ -7,7 +7,17 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { useStore } from '../../../store/useStore';
 import { AnalysisDashboard } from './AnalysisDashboard';
-import { ResultadoAnalisis, TipoGrabacion, CargoLaboral, getTiposGrabacionDisponibles } from './types/analysis';
+import { 
+  ResultadoAnalisis, 
+  TipoGrabacion, 
+  CargoLaboral, 
+  getTiposGrabacionDisponibles,
+  EmotionFrame,
+  AnalisisRRHH,
+  AnalisisDeals,
+  AnalisisEquipo,
+  EmotionType,
+} from './types/analysis';
 
 interface Grabacion {
   id: string;
@@ -354,30 +364,33 @@ export const GrabacionesHistorial: React.FC = () => {
       return;
     }
 
-    // Construir resultado para el dashboard
+    // Construir frames desde los datos guardados
     const tipoGrab = (grabacion.tipo as TipoGrabacion) || 'equipo';
+    const frames: EmotionFrame[] = grabacion.analisis_comportamiento.map(a => ({
+      timestamp_segundos: a.timestamp_segundos,
+      emociones_scores: (a.emociones_detalle || {}) as Record<EmotionType, number>,
+      emocion_dominante: (a.emocion_dominante || 'neutral') as EmotionType,
+      confianza_deteccion: 0.8,
+      action_units: {},
+      engagement_score: a.engagement_score || 0.5,
+      mirando_camara: true,
+      cambio_abrupto: false,
+      delta_vs_baseline: 0,
+    }));
+
+    // Generar análisis específico por tipo
+    const analisisEspecifico = generateAnalisisFromFrames(tipoGrab, frames, grabacion.duracion_segundos || 0);
+
     const resultado: ResultadoAnalisis = {
       grabacion_id: grabacion.id,
       tipo_grabacion: tipoGrab,
       duracion_segundos: grabacion.duracion_segundos || 0,
       participantes: grabacion.usuario ? [{ id: grabacion.creado_por, nombre: `${grabacion.usuario.nombre} ${grabacion.usuario.apellido}` }] : [],
-      frames_faciales: grabacion.analisis_comportamiento.map(a => ({
-        timestamp_segundos: a.timestamp_segundos,
-        emociones_scores: a.emociones_detalle as any || {},
-        emocion_dominante: a.emocion_dominante as any,
-        confianza_deteccion: 0.8,
-        action_units: {},
-        engagement_score: a.engagement_score,
-        mirando_camara: true,
-        cambio_abrupto: false,
-        delta_vs_baseline: 0,
-      })),
+      frames_faciales: frames,
       frames_corporales: [],
       microexpresiones: [],
       baseline: null,
-      analisis: {
-        tipo: tipoGrab,
-      } as any,
+      analisis: analisisEspecifico,
       modelo_version: '1.0.0',
       procesado_en: grabacion.creado_en,
       confianza_general: 0.85,
@@ -386,6 +399,140 @@ export const GrabacionesHistorial: React.FC = () => {
     setResultadoAnalisis(resultado);
     setGrabacionSeleccionada(grabacion);
     setShowDashboard(true);
+  };
+
+  // Generar análisis específico desde frames guardados
+  const generateAnalisisFromFrames = (tipo: TipoGrabacion, frames: EmotionFrame[], duracion: number) => {
+    const avgEngagement = frames.length > 0
+      ? frames.reduce((sum, f) => sum + f.engagement_score, 0) / frames.length
+      : 0.5;
+
+    const emotionCounts: Record<string, number> = {};
+    frames.forEach(f => {
+      emotionCounts[f.emocion_dominante] = (emotionCounts[f.emocion_dominante] || 0) + 1;
+    });
+
+    const momentosPositivos = frames.filter(f => f.engagement_score > 0.7);
+    const momentosNegativos = frames.filter(f => 
+      f.emocion_dominante === 'angry' || f.emocion_dominante === 'sad' || f.emocion_dominante === 'disgusted'
+    );
+
+    if (tipo === 'deals') {
+      const probabilidadCierre = Math.min(1, avgEngagement * 0.5 + (momentosPositivos.length / Math.max(frames.length, 1)) * 0.3);
+      return {
+        tipo: 'deals',
+        momentos_interes: momentosPositivos.slice(0, 10).map(f => ({
+          timestamp: f.timestamp_segundos,
+          score: f.engagement_score,
+          indicadores: [f.emocion_dominante],
+        })),
+        señales_objecion: momentosNegativos.slice(0, 5).map(f => ({
+          timestamp: f.timestamp_segundos,
+          tipo: 'desconocido' as const,
+          intensidad: 0.6,
+          indicadores: [f.emocion_dominante],
+        })),
+        engagement_por_tema: [],
+        señales_cierre: [],
+        puntos_dolor: [],
+        predicciones: {
+          probabilidad_cierre: {
+            tipo: 'probabilidad_cierre',
+            probabilidad: probabilidadCierre,
+            confianza: 0.7,
+            factores: probabilidadCierre > 0.6 ? ['Alto engagement detectado'] : ['Engagement moderado'],
+            timestamp: Date.now(),
+          },
+          siguiente_paso_recomendado: {
+            tipo: 'siguiente_paso',
+            probabilidad: probabilidadCierre > 0.5 ? 0.8 : 0.4,
+            confianza: 0.6,
+            factores: probabilidadCierre > 0.5 ? ['Proponer siguiente reunión'] : ['Abordar objeciones'],
+            timestamp: Date.now(),
+          },
+          objecion_principal: {
+            tipo: 'objecion_principal',
+            probabilidad: momentosNegativos.length > 0 ? 0.6 : 0.2,
+            confianza: 0.5,
+            factores: momentosNegativos.length > 0 ? ['Objeciones detectadas'] : ['Sin objeciones claras'],
+            timestamp: Date.now(),
+          },
+        },
+        resumen: {
+          momentos_clave: momentosPositivos.slice(0, 3).map(m => `${Math.round(m.timestamp_segundos)}s: Alto interés`),
+          objeciones_detectadas: momentosNegativos.slice(0, 3).map(s => `${Math.round(s.timestamp_segundos)}s: Señal negativa`),
+          recomendaciones_seguimiento: probabilidadCierre > 0.6 
+            ? ['Cliente muestra interés - considerar propuesta de cierre']
+            : ['Reforzar propuesta de valor', 'Abordar posibles objeciones'],
+          probabilidad_cierre_estimada: probabilidadCierre,
+        },
+      } as AnalisisDeals;
+    }
+
+    if (tipo === 'rrhh') {
+      const congruenciaScore = avgEngagement * 0.8;
+      return {
+        tipo: 'rrhh',
+        congruencia_verbal_no_verbal: congruenciaScore,
+        nerviosismo_timeline: frames.map(f => ({ timestamp: f.timestamp_segundos, score: 1 - f.engagement_score })),
+        nerviosismo_promedio: 1 - avgEngagement,
+        confianza_percibida: avgEngagement,
+        momentos_alta_confianza: momentosPositivos.map(f => ({ timestamp: f.timestamp_segundos, duracion: 1 })),
+        momentos_baja_confianza: momentosNegativos.map(f => ({ timestamp: f.timestamp_segundos, duracion: 1 })),
+        momentos_incomodidad: momentosNegativos.map(f => ({
+          timestamp: f.timestamp_segundos,
+          duracion: 1,
+          indicadores: [f.emocion_dominante],
+        })),
+        engagement_timeline: frames.map(f => ({ timestamp: f.timestamp_segundos, score: f.engagement_score })),
+        predicciones: {
+          fit_cultural: { tipo: 'fit_cultural', probabilidad: avgEngagement, confianza: 0.6, factores: ['Basado en engagement'], timestamp: Date.now() },
+          nivel_interes_puesto: { tipo: 'nivel_interes', probabilidad: avgEngagement, confianza: 0.7, factores: ['Engagement promedio'], timestamp: Date.now() },
+          autenticidad_respuestas: { tipo: 'autenticidad', probabilidad: congruenciaScore, confianza: 0.65, factores: ['Expresiones consistentes'], timestamp: Date.now() },
+        },
+        resumen: {
+          fortalezas_observadas: avgEngagement > 0.6 ? ['Alto nivel de engagement', 'Muestra interés genuino'] : ['Participación activa'],
+          areas_atencion: momentosNegativos.length > 3 ? ['Momentos de incomodidad detectados'] : [],
+          recomendacion_seguimiento: avgEngagement > 0.6 ? 'Candidato muestra señales positivas' : 'Realizar preguntas de seguimiento',
+        },
+      } as AnalisisRRHH;
+    }
+
+    // Equipo (default)
+    return {
+      tipo: 'equipo',
+      participacion: [],
+      engagement_grupal: frames.map(f => ({
+        timestamp: f.timestamp_segundos,
+        score_promedio: f.engagement_score,
+        participantes_engaged: f.engagement_score > 0.5 ? 1 : 0,
+        participantes_total: 1,
+      })),
+      reacciones_ideas: [],
+      momentos_desconexion: frames.filter(f => f.engagement_score < 0.3).map(f => ({
+        timestamp: f.timestamp_segundos,
+        duracion: 1,
+        participantes_desconectados: [],
+        posible_causa: 'Bajo engagement',
+      })),
+      dinamica_grupal: {
+        cohesion_score: avgEngagement,
+        participacion_equilibrada: true,
+        lideres_naturales: [],
+        participantes_pasivos: [],
+      },
+      predicciones: {
+        adopcion_ideas: { tipo: 'adopcion', probabilidad: avgEngagement, confianza: 0.7, factores: ['Engagement grupal'], timestamp: Date.now() },
+        necesidad_seguimiento: { tipo: 'seguimiento', probabilidad: avgEngagement < 0.5 ? 0.8 : 0.3, confianza: 0.6, factores: [], timestamp: Date.now() },
+        riesgo_conflicto: { tipo: 'conflicto', probabilidad: momentosNegativos.length > 5 ? 0.5 : 0.2, confianza: 0.5, factores: [], timestamp: Date.now() },
+      },
+      resumen: {
+        ideas_mejor_recibidas: [],
+        participantes_destacados: [],
+        areas_mejora_equipo: avgEngagement < 0.5 ? ['Mejorar dinamismo de reuniones'] : [],
+        recomendaciones: avgEngagement > 0.6 ? ['Excelente dinámica de equipo'] : ['Considerar dinámicas para aumentar participación'],
+      },
+    } as AnalisisEquipo;
   };
 
   const isArcade = theme === 'arcade';
