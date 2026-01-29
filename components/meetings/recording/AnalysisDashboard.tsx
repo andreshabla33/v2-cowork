@@ -153,14 +153,40 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
 
         {/* Contenido específico por tipo */}
         <div className="p-5 max-h-[50vh] overflow-y-auto">
-          {resultado.tipo_grabacion === 'rrhh' && (
-            <RRHHAnalysisContent analisis={resultado.analisis as AnalisisRRHH} />
-          )}
-          {resultado.tipo_grabacion === 'deals' && (
-            <DealsAnalysisContent analisis={resultado.analisis as AnalisisDeals} />
-          )}
-          {resultado.tipo_grabacion === 'equipo' && (
-            <EquipoAnalysisContent analisis={resultado.analisis as AnalisisEquipo} />
+          {/* Solo mostrar contenido específico si hay datos completos de análisis */}
+          {resultado.analisis && resultado.analisis.resumen ? (
+            <>
+              {resultado.tipo_grabacion === 'rrhh' && (
+                <RRHHAnalysisContent analisis={resultado.analisis as AnalisisRRHH} />
+              )}
+              {resultado.tipo_grabacion === 'deals' && (
+                <DealsAnalysisContent analisis={resultado.analisis as AnalisisDeals} />
+              )}
+              {resultado.tipo_grabacion === 'equipo' && (
+                <EquipoAnalysisContent analisis={resultado.analisis as AnalisisEquipo} />
+              )}
+            </>
+          ) : (
+            <div className="bg-white/5 rounded-xl p-6 text-center">
+              <span className="text-4xl mb-4 block">📊</span>
+              <h4 className="text-white font-semibold mb-2">Análisis Básico</h4>
+              <p className="text-white/60 text-sm mb-4">
+                Los datos detallados de análisis conductual no están disponibles para esta grabación.
+                Se muestran las métricas generales basadas en el análisis facial.
+              </p>
+              {stats && (
+                <div className="grid grid-cols-2 gap-4 mt-4">
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-white/50 text-xs">Engagement Promedio</p>
+                    <p className="text-2xl font-bold text-white">{Math.round(stats.avgEngagement * 100)}%</p>
+                  </div>
+                  <div className="bg-white/5 rounded-lg p-3">
+                    <p className="text-white/50 text-xs">Emoción Predominante</p>
+                    <p className="text-2xl font-bold text-white">{EMOTION_ICONS[stats.dominantEmotion]} {stats.dominantEmotion}</p>
+                  </div>
+                </div>
+              )}
+            </div>
           )}
         </div>
 
