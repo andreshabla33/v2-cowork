@@ -285,7 +285,9 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
   const processRecording = useCallback(async () => {
     try {
       const blob = new Blob(chunksRef.current, { type: 'video/webm' });
-      const duration = processingState.duration;
+      // Calcular duración desde startTimeRef (más confiable que el estado)
+      const duration = Math.floor((Date.now() - startTimeRef.current) / 1000);
+      console.log('📊 Duración calculada:', duration, 'segundos');
 
       updateState({ step: 'processing', progress: 20, message: 'Procesando transcripción...' });
 

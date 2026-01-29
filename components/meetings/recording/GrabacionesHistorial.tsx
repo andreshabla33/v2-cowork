@@ -174,6 +174,7 @@ export const GrabacionesHistorial: React.FC = () => {
   const [busqueda, setBusqueda] = useState('');
   const [grabacionSeleccionada, setGrabacionSeleccionada] = useState<Grabacion | null>(null);
   const [showDashboard, setShowDashboard] = useState(false);
+  const [showTranscripcion, setShowTranscripcion] = useState(false);
   const [resultadoAnalisis, setResultadoAnalisis] = useState<ResultadoAnalisis | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral | null>(null);
   const [rolSistema, setRolSistema] = useState<string | null>(null);
@@ -601,7 +602,7 @@ export const GrabacionesHistorial: React.FC = () => {
                         <button
                           onClick={() => {
                             setGrabacionSeleccionada(grabacion);
-                            // Aquí se podría abrir un modal de transcripción
+                            setShowTranscripcion(true);
                           }}
                           className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
                             isArcade 
@@ -676,6 +677,122 @@ export const GrabacionesHistorial: React.FC = () => {
             URL.revokeObjectURL(url);
           }}
         />
+      )}
+
+      {/* Modal de Transcripción */}
+      {showTranscripcion && grabacionSeleccionada && (
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[500] flex items-center justify-center p-4 overflow-y-auto">
+          <div className={`max-w-3xl w-full rounded-2xl border shadow-2xl my-8 ${
+            isArcade ? 'bg-black border-[#00ff41]/50' : 'bg-zinc-900 border-white/10'
+          }`}>
+            {/* Header */}
+            <div className={`p-5 rounded-t-2xl border-b ${
+              isArcade ? 'bg-[#00ff41]/10 border-[#00ff41]/30' : 'bg-zinc-800 border-white/10'
+            }`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className="text-3xl">📝</span>
+                  <div>
+                    <h2 className={`font-bold text-xl ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                      Transcripción
+                    </h2>
+                    <p className={`text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
+                      {grabacionSeleccionada.archivo_nombre || 'Reunión'} • {formatFecha(grabacionSeleccionada.creado_en)}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => {
+                    setShowTranscripcion(false);
+                    setGrabacionSeleccionada(null);
+                  }}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all ${
+                    isArcade 
+                      ? 'bg-[#00ff41]/20 text-[#00ff41] hover:bg-[#00ff41]/30' 
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+
+            {/* Contenido */}
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              {grabacionSeleccionada.transcripciones && grabacionSeleccionada.transcripciones.length > 0 ? (
+                <div className="space-y-4">
+                  {grabacionSeleccionada.transcripciones.map((t, idx) => (
+                    <div 
+                      key={t.id || idx}
+                      className={`p-4 rounded-xl ${
+                        isArcade ? 'bg-[#00ff41]/5 border border-[#00ff41]/20' : 'bg-zinc-800/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className={`text-xs font-mono ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>
+                          ⏱️ {formatDuracion(t.inicio_segundos)} - {formatDuracion(t.fin_segundos)}
+                        </span>
+                        {t.speaker_nombre && (
+                          <span className={`text-xs px-2 py-0.5 rounded-full ${
+                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-400'
+                          }`}>
+                            👤 {t.speaker_nombre}
+                          </span>
+                        )}
+                      </div>
+                      <p className={`text-sm leading-relaxed ${isArcade ? 'text-[#00ff41]/90' : 'text-zinc-300'}`}>
+                        {t.texto}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-10">
+                  <span className="text-4xl mb-4 block">📭</span>
+                  <p className={isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}>
+                    No hay transcripción disponible
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className={`p-4 rounded-b-2xl border-t ${
+              isArcade ? 'border-[#00ff41]/30' : 'border-white/10'
+            }`}>
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    const texto = grabacionSeleccionada.transcripciones?.map(t => 
+                      `[${formatDuracion(t.inicio_segundos)}] ${t.speaker_nombre || 'Speaker'}: ${t.texto}`
+                    ).join('\n\n') || '';
+                    navigator.clipboard.writeText(texto);
+                  }}
+                  className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                    isArcade 
+                      ? 'border-2 border-[#00ff41] text-[#00ff41] hover:bg-[#00ff41] hover:text-black' 
+                      : 'border border-white/20 text-white hover:bg-white/10'
+                  }`}
+                >
+                  📋 Copiar
+                </button>
+                <button
+                  onClick={() => {
+                    setShowTranscripcion(false);
+                    setGrabacionSeleccionada(null);
+                  }}
+                  className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                    isArcade 
+                      ? 'bg-[#00ff41] text-black hover:bg-white' 
+                      : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                  }`}
+                >
+                  Cerrar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
