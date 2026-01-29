@@ -113,6 +113,23 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
     setProcessingState(prev => ({ ...prev, ...updates }));
   }, []);
 
+  // Limpiar error automáticamente después de 5 segundos o cuando el stream esté disponible
+  useEffect(() => {
+    if (processingState.step === 'error') {
+      const timer = setTimeout(() => {
+        updateState({ step: 'idle', message: '' });
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [processingState.step, updateState]);
+
+  // Limpiar error cuando el stream esté disponible
+  useEffect(() => {
+    if (stream && processingState.step === 'error' && processingState.message.includes('stream')) {
+      updateState({ step: 'idle', message: '' });
+    }
+  }, [stream, processingState.step, processingState.message, updateState]);
+
   // Manejar clic en botón de grabar
   const handleRecordClick = useCallback(() => {
     if (isRecording) {
