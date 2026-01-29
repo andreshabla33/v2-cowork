@@ -240,6 +240,16 @@ export const CATEGORIAS_POR_ROL: Record<string, string[]> = {
   member: ['rrhh', 'comercial', 'producto', 'general'], // Sin liderazgo
 };
 
+// Cargos restringidos para members (roles de dirección/liderazgo)
+// Un member no puede auto-asignarse estos cargos
+export const CARGOS_RESTRINGIDOS_MEMBER: CargoLaboral[] = [
+  'ceo',
+  'coo', 
+  'director_rrhh',
+  'director_comercial',
+  'manager_equipo',
+];
+
 interface CargoSelectorProps {
   onSelect: (cargo: CargoLaboral) => void;
   cargoSugerido?: CargoLaboral;
@@ -269,6 +279,12 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
     ([catId]) => categoriasPermitidas.includes(catId)
   );
 
+  // Filtrar cargos restringidos para members
+  const esMember = rolUsuario === 'member' || rolUsuario === 'miembro';
+  const cargosPermitidos = esMember 
+    ? CARGOS_INFO.filter(c => !CARGOS_RESTRINGIDOS_MEMBER.includes(c.id))
+    : CARGOS_INFO;
+
   const handleSelectCargo = useCallback((cargo: CargoLaboral) => {
     setCargoSeleccionado(cargo);
   }, []);
@@ -279,7 +295,8 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
     }
   }, [cargoSeleccionado, onSelect]);
 
-  const cargosPorCategoria = CARGOS_INFO.reduce((acc, cargo) => {
+  // Usar cargosPermitidos (filtrados según rol) en lugar de CARGOS_INFO
+  const cargosPorCategoria = cargosPermitidos.reduce((acc, cargo) => {
     if (!acc[cargo.categoria]) {
       acc[cargo.categoria] = [];
     }
