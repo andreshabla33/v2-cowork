@@ -249,8 +249,12 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
         durationIntervalRef.current = null;
       }
 
-      // Detener transcripción
-      await stopTranscription();
+      // Detener transcripción y capturar resultado
+      const finalTranscript = await stopTranscription();
+      if (finalTranscript && finalTranscript.length > 0) {
+        transcriptRef.current = finalTranscript;
+        console.log('📝 Transcripción final capturada:', finalTranscript.length, 'caracteres');
+      }
 
       // Detener análisis combinado
       combinedAnalysis.stopAnalysis();

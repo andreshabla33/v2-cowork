@@ -205,18 +205,33 @@ export function useTranscription(options: UseTranscriptionOptions) {
     }
   }, [grabacionId, idioma, onSegmentUpdate, onFullTranscriptUpdate]);
 
-  const stopTranscription = useCallback(async () => {
+  const stopTranscription = useCallback(async (): Promise<string> => {
     shouldContinueRef.current = false;
+    
+    // Esperar un momento para que lleguen los últimos resultados
+    await new Promise(resolve => setTimeout(resolve, 500));
+    
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
         recognitionRef.current = null;
-        setState(prev => ({ ...prev, isTranscribing: false }));
-        console.log('🛑 Transcripción detenida');
       } catch (err) {
         console.error('Error deteniendo transcripción:', err);
       }
     }
+    
+    // Esperar otro momento para procesar resultados finales
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // Obtener transcripción actual del estado
+    let currentTranscript = '';
+    setState(prev => {
+      currentTranscript = prev.fullTranscript;
+      console.log('🛑 Transcripción detenida. Texto acumulado:', currentTranscript.length, 'caracteres');
+      return { ...prev, isTranscribing: false };
+    });
+    
+    return currentTranscript;
   }, []);
 
   const transcribeAudioBlob = useCallback(async (_audioBlob: Blob): Promise<string> => {
