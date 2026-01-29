@@ -75,21 +75,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
       if (espacioError) throw espacioError;
 
-      // Crear membresía como super_admin
-      const { error: miembroError } = await supabase
-        .from('miembros_espacio')
-        .insert({
-          espacio_id: espacio.id,
-          usuario_id: userId,
-          rol: 'super_admin',
-          cargo: cargoSeleccionado,
-          aceptado: true,
-          onboarding_completado: true
-        });
-
-      if (miembroError) throw miembroError;
-
-      // Crear departamentos por defecto
+      // Crear departamentos por defecto PRIMERO
       const departamentosDefault = [
         { nombre: 'General', color: '#6366f1', icono: 'users' },
         { nombre: 'Desarrollo', color: '#10b981', icono: 'code' },
@@ -99,12 +85,30 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
         { nombre: 'Soporte', color: '#06b6d4', icono: 'headphones' }
       ];
 
-      await supabase.from('departamentos').insert(
+      const { data: deptData } = await supabase.from('departamentos').insert(
         departamentosDefault.map(d => ({
           ...d,
           espacio_id: espacio.id
         }))
-      );
+      ).select();
+
+      // Obtener ID del departamento "General" para asignar al creador
+      const deptGeneral = deptData?.find(d => d.nombre === 'General');
+
+      // Crear membresía como super_admin con departamento General
+      const { error: miembroError } = await supabase
+        .from('miembros_espacio')
+        .insert({
+          espacio_id: espacio.id,
+          usuario_id: userId,
+          rol: 'super_admin',
+          cargo: cargoSeleccionado,
+          departamento_id: deptGeneral?.id || null,
+          aceptado: true,
+          onboarding_completado: true
+        });
+
+      if (miembroError) throw miembroError;
 
       setEspacioCreado({ id: espacio.id, nombre: espacio.nombre });
       setPaso('invitar');
