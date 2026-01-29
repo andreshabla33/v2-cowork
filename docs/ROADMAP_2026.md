@@ -260,7 +260,8 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 | `520e4be` | Filtrar cargos de dirección para members |
 | `3b6be9d` | Ocultar botón Invitar Personas para rol member |
 | `9b1320a` | Filtrar tipos grabación por rol sistema + cargo |
+| `0c2c244` | Asignar departamento "General" automáticamente al creador |
 
 ---
 
-*Última actualización: 28 Enero 2026 - 22:45 UTC-4*
+*Última actualización: 28 Enero 2026 - 22:50 UTC-4*
