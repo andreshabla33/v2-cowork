@@ -48,7 +48,7 @@ const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - optimizado para rendimiento
 const BASELINE_DURATION_MS = 5000; // 5 segundos de calibración
 const MICROEXPRESSION_MAX_DURATION_MS = 500;
 const ABRUPT_CHANGE_THRESHOLD = 0.3;
-const USE_WEB_WORKER = true; // Flag para habilitar/deshabilitar Worker
+const USE_WEB_WORKER = false; // TEMPORALMENTE DESACTIVADO - diagnosticando problema de grabación
 
 // Mapeo de blendshapes a emociones con pesos refinados
 const EMOTION_BLENDSHAPE_WEIGHTS: Record<EmotionType, { shapes: string[]; weights: number[] }> = {

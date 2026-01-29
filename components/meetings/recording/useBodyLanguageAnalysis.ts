@@ -32,7 +32,7 @@ interface BodyLanguageState {
 }
 
 const ANALYSIS_INTERVAL_MS = 500; // 2 FPS para postura
-const USE_WEB_WORKER = true; // Flag para habilitar/deshabilitar Worker
+const USE_WEB_WORKER = false; // TEMPORALMENTE DESACTIVADO - diagnosticando problema de grabación
 
 // Índices de landmarks de MediaPipe Pose
 const POSE_LANDMARKS = {
