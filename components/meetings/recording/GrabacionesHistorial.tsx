@@ -165,7 +165,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, value, onChang
 };
 
 export const GrabacionesHistorial: React.FC = () => {
-  const { activeWorkspace, session, theme } = useStore();
+  const { activeWorkspace, session, theme, userRoleInActiveWorkspace } = useStore();
   const [grabaciones, setGrabaciones] = useState<Grabacion[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -176,15 +176,16 @@ export const GrabacionesHistorial: React.FC = () => {
   const [showDashboard, setShowDashboard] = useState(false);
   const [resultadoAnalisis, setResultadoAnalisis] = useState<ResultadoAnalisis | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral | null>(null);
+  const [rolSistema, setRolSistema] = useState<string | null>(null);
 
-  // Cargar cargo del usuario
+  // Cargar cargo y rol del usuario
   useEffect(() => {
-    const cargarCargo = async () => {
+    const cargarCargoYRol = async () => {
       if (!session?.user?.id || !activeWorkspace?.id) return;
       
       const { data } = await supabase
         .from('miembros_espacio')
-        .select('cargo')
+        .select('cargo, rol')
         .eq('usuario_id', session.user.id)
         .eq('espacio_id', activeWorkspace.id)
         .single();
@@ -192,8 +193,11 @@ export const GrabacionesHistorial: React.FC = () => {
       if (data?.cargo) {
         setCargoUsuario(data.cargo as CargoLaboral);
       }
+      if (data?.rol) {
+        setRolSistema(data.rol);
+      }
     };
-    cargarCargo();
+    cargarCargoYRol();
   }, [session?.user?.id, activeWorkspace?.id]);
 
   // Opciones de filtro de estado
@@ -204,9 +208,18 @@ export const GrabacionesHistorial: React.FC = () => {
     { value: 'error', label: 'Con error', icon: '❌' },
   ];
 
-  // Opciones de tipo según cargo del usuario
+  // Opciones de tipo según cargo del usuario y rol del sistema
   const tipoOptions: DropdownOption[] = useMemo(() => {
     const baseOptions: DropdownOption[] = [{ value: 'todos', label: 'Todos los tipos', icon: '🎬' }];
+    
+    // Si es member sin cargo de liderazgo, no mostrar tipos de análisis
+    const esMember = rolSistema === 'member' || rolSistema === 'miembro';
+    const esColaboradorBasico = !cargoUsuario || cargoUsuario === 'colaborador' || cargoUsuario === 'otro';
+    
+    if (esMember && esColaboradorBasico) {
+      // Members sin cargo especial solo ven grabaciones básicas (sin filtro de tipo)
+      return baseOptions;
+    }
     
     if (cargoUsuario) {
       const tiposDisponibles = getTiposGrabacionDisponibles(cargoUsuario);
@@ -216,8 +229,8 @@ export const GrabacionesHistorial: React.FC = () => {
           baseOptions.push({ value: tipo, label: config.label, icon: config.icon });
         }
       });
-    } else {
-      // Si no hay cargo, mostrar todos los tipos
+    } else if (!esMember) {
+      // Solo admins/super_admins sin cargo ven todos los tipos
       Object.entries(TIPO_CONFIG).forEach(([key, config]) => {
         if (key !== 'reunion' && key !== 'rrhh') {
           baseOptions.push({ value: key, label: config.label, icon: config.icon });
@@ -226,7 +239,7 @@ export const GrabacionesHistorial: React.FC = () => {
     }
     
     return baseOptions;
-  }, [cargoUsuario]);
+  }, [cargoUsuario, rolSistema]);
 
   // Cargar grabaciones al montar o cambiar espacio
   useEffect(() => {
@@ -436,11 +449,14 @@ export const GrabacionesHistorial: React.FC = () => {
             />
           </div>
           
-          {/* Indicador de cargo */}
-          {cargoUsuario && (
+          {/* Indicador de cargo y rol */}
+          {(cargoUsuario || rolSistema) && (
             <div className={`mt-3 pt-3 border-t ${isArcade ? 'border-[#00ff41]/20' : 'border-white/5'}`}>
               <p className={`text-xs ${isArcade ? 'text-[#00ff41]/40' : 'text-zinc-500'}`}>
-                👤 Filtrando por permisos de: <span className="font-semibold">{cargoUsuario.replace(/_/g, ' ')}</span>
+                👤 Rol: <span className="font-semibold">{rolSistema || 'No definido'}</span>
+                {cargoUsuario && (
+                  <> | Cargo: <span className="font-semibold">{cargoUsuario.replace(/_/g, ' ')}</span></>
+                )}
               </p>
             </div>
           )}
