@@ -13,6 +13,8 @@
 
 import { useRef, useCallback, useEffect, useState } from 'react';
 
+import mediapipeWorkerRaw from './mediapipe.worker.js?raw';
+
 interface UseMediaPipeWorkerOptions {
   enableFace?: boolean;
   enablePose?: boolean;
@@ -82,10 +84,12 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
       }, 10000);
 
       try {
-        // Crear worker usando Vite's worker import syntax
-        // @ts-ignore - Vite maneja esto en build time
-        const worker = new Worker(new URL('./mediapipe.worker.ts', import.meta.url), { type: 'module' });
-        
+        // Cargar worker como Blob desde el string crudo importado con ?raw
+        // Esto garantiza que Vite no lo transpile como módulo y permite importScripts
+        const blob = new Blob([mediapipeWorkerRaw], { type: 'application/javascript' });
+        const workerUrl = URL.createObjectURL(blob);
+        const worker = new Worker(workerUrl); // Sin { type: 'module' } = Classic Worker
+
         worker.onmessage = (event: MessageEvent<WorkerMessage>) => {
           const { type, payload } = event.data;
 
@@ -93,13 +97,11 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
             case 'ready':
               if (payload?.workerReady) {
                 console.log('🔧 [Hook] Worker listo, inicializando MediaPipe...');
-                // Worker cargado, ahora inicializar MediaPipe
                 worker.postMessage({
                   type: 'init',
                   payload: { enableFace, enablePose }
                 });
               } else if (payload?.success) {
-                // MediaPipe inicializado
                 if (!resolved) {
                   resolved = true;
                   clearTimeout(timeout);
@@ -123,7 +125,6 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
               break;
 
             case 'result':
-              // Resultado de análisis
               if (payload.timestamp) {
                 const callback = pendingCallbacksRef.current.get(payload.timestamp);
                 if (callback) {
