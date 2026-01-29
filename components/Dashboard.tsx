@@ -38,33 +38,62 @@ export const Dashboard: React.FC = () => {
   };
 
   return (
-    <div className="p-12 max-w-7xl mx-auto min-h-screen relative overflow-hidden">
-      {/* Background decoration */}
-      <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-600/5 blur-[120px] rounded-full -z-10 pointer-events-none" />
+    <div className="min-h-screen relative overflow-hidden bg-[#050508]">
+      {/* Fondo con grid pattern estilo gaming */}
+      <div className="absolute inset-0 bg-[linear-gradient(rgba(139,92,246,0.03)_1px,transparent_1px),linear-gradient(90deg,rgba(139,92,246,0.03)_1px,transparent_1px)] bg-[size:64px_64px] pointer-events-none" />
       
-      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-20 animate-in slide-in-from-top-4 duration-500 gap-6">
-        <div>
-           <div className="flex items-center gap-3 mb-2">
-              <div className="w-10 h-10 bg-indigo-600 rounded-2xl flex items-center justify-center font-black italic shadow-lg shadow-indigo-500/20 text-white">C</div>
-              <h1 className="text-6xl font-black tracking-tighter italic uppercase text-white">Cowork</h1>
-           </div>
-           <p className="text-zinc-500 font-bold uppercase tracking-[0.3em] text-[10px] ml-1">Bienvenido, {currentUser.name}</p>
-        </div>
-        <div className="flex items-center gap-4">
-           <button 
-             onClick={() => setShowCreate(true)} 
-             className="bg-indigo-600 hover:bg-indigo-500 px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all shadow-2xl shadow-indigo-600/30 text-white"
-           >
-             Nuevo Espacio
-           </button>
-           <button 
-             onClick={signOut} 
-             className="bg-zinc-900 border border-white/5 hover:bg-zinc-800 px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] text-zinc-400"
-           >
-             Salir
-           </button>
-        </div>
-      </header>
+      {/* Gradientes de fondo neon */}
+      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-gradient-to-br from-violet-600/10 via-fuchsia-600/5 to-transparent blur-[120px] rounded-full -z-10 pointer-events-none" />
+      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-gradient-to-tr from-cyan-600/10 via-violet-600/5 to-transparent blur-[100px] rounded-full -z-10 pointer-events-none" />
+      
+      <div className="p-8 md:p-12 max-w-7xl mx-auto relative z-10">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-16 gap-6">
+          <div>
+            <div className="flex items-center gap-4 mb-3">
+              {/* Logo con glow neon */}
+              <div className="relative">
+                <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-lg opacity-60" />
+                <div className="relative w-12 h-12 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-2xl flex items-center justify-center font-black text-xl text-white shadow-lg">
+                  C
+                </div>
+              </div>
+              {/* Título con gradiente */}
+              <h1 className="text-5xl md:text-6xl font-black tracking-tight">
+                <span className="bg-gradient-to-r from-white via-violet-200 to-white bg-clip-text text-transparent">
+                  COWORK
+                </span>
+              </h1>
+            </div>
+            <p className="text-zinc-500 font-semibold uppercase tracking-[0.25em] text-[11px] ml-16">
+              Bienvenido, <span className="text-violet-400">{currentUser.name}</span>
+            </p>
+          </div>
+          
+          <div className="flex items-center gap-3">
+            {/* Botón Nuevo Espacio con gradiente neon */}
+            <button 
+              onClick={() => setShowCreate(true)} 
+              className="group relative px-6 py-3 rounded-xl font-bold uppercase tracking-wider text-xs overflow-hidden transition-all duration-300 hover:scale-105"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 opacity-100" />
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="relative text-white flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+                </svg>
+                Nuevo Espacio
+              </span>
+            </button>
+            
+            {/* Botón Salir */}
+            <button 
+              onClick={signOut} 
+              className="px-5 py-3 rounded-xl font-bold uppercase tracking-wider text-[10px] text-zinc-400 bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] hover:border-violet-500/30 transition-all"
+            >
+              Salir
+            </button>
+          </div>
+        </header>
 
       {/* Feedback de la operación */}
       {authFeedback && (
@@ -83,97 +112,151 @@ export const Dashboard: React.FC = () => {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {workspaces.map((ws: any) => (
           <div 
             key={ws.id} 
             onClick={() => setActiveWorkspace(ws, ws.userRole)}
-            className="group glass-card p-10 rounded-[48px] border border-white/5 hover:border-indigo-500/30 transition-all cursor-pointer relative overflow-hidden animate-in fade-in duration-500"
+            className="group relative p-8 rounded-3xl border border-white/[0.08] bg-white/[0.02] backdrop-blur-xl hover:border-violet-500/40 transition-all duration-300 cursor-pointer overflow-hidden"
           >
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-600/10 blur-[60px] group-hover:bg-indigo-600/20 transition-all" />
+            {/* Glow de fondo en hover */}
+            <div className="absolute top-0 right-0 w-40 h-40 bg-gradient-to-br from-violet-600/10 via-fuchsia-600/5 to-transparent blur-[60px] opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
             
-            <div className="flex justify-between items-start mb-8">
-              <div className="w-16 h-16 bg-zinc-900 border border-white/5 rounded-2xl flex items-center justify-center text-3xl font-black text-indigo-500 group-hover:scale-110 transition-transform shadow-xl">
-                {ws.name ? ws.name.charAt(0).toUpperCase() : 'W'}
+            <div className="relative z-10">
+              <div className="flex justify-between items-start mb-6">
+                {/* Icono del espacio con gradiente */}
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-md opacity-40 group-hover:opacity-60 transition-opacity" />
+                  <div className="relative w-14 h-14 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-2xl flex items-center justify-center text-2xl font-black text-violet-400 group-hover:scale-105 transition-transform">
+                    {ws.name ? ws.name.charAt(0).toUpperCase() : 'W'}
+                  </div>
+                </div>
+                {/* Indicador de estado */}
+                <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                  <span className="text-emerald-400 text-[9px] font-bold uppercase tracking-wider">Activo</span>
+                </div>
               </div>
-              <div className="flex items-center gap-1.5">
-                 <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                 <span className="text-zinc-600 text-[9px] font-black uppercase tracking-widest">Activo</span>
-              </div>
-            </div>
 
-            <h3 className="text-3xl font-black italic tracking-tighter uppercase mb-2 group-hover:text-indigo-400 transition-colors truncate">{ws.name}</h3>
-            
-            <div className="flex items-center gap-3 mt-6">
-               <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest text-white ${
-                 ws.userRole === Role.SUPER_ADMIN ? 'bg-purple-600 shadow-[0_0_20px_rgba(168,85,247,0.4)]' : 
-                 ws.userRole === Role.ADMIN ? 'bg-red-600 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'bg-blue-600 shadow-[0_0_20px_rgba(59,130,246,0.4)]'
-               }`}>
-                 {ws.userRole ? ws.userRole.replace('_', ' ') : 'Miembro'}
-               </span>
-            </div>
-            
-            <div className="mt-8 pt-8 border-t border-white/5 flex items-center justify-between">
-               <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600">Entrar al espacio</p>
-               <svg className="w-5 h-5 text-indigo-500 group-hover:translate-x-2 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 8l4 4m0 0l-4 4m4-4H3" />
-               </svg>
+              {/* Nombre del espacio */}
+              <h3 className="text-2xl font-bold tracking-tight mb-3 text-white group-hover:bg-gradient-to-r group-hover:from-violet-400 group-hover:to-fuchsia-400 group-hover:bg-clip-text group-hover:text-transparent transition-all truncate">
+                {ws.name}
+              </h3>
+              
+              {/* Badge de rol con gradiente */}
+              <div className="flex items-center gap-3 mt-4">
+                <span className={`px-3 py-1.5 rounded-lg text-[9px] font-bold uppercase tracking-wider ${
+                  ws.userRole === Role.SUPER_ADMIN 
+                    ? 'bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 text-violet-300 border border-violet-500/30' 
+                    : ws.userRole === Role.ADMIN 
+                    ? 'bg-gradient-to-r from-cyan-600/20 to-blue-600/20 text-cyan-300 border border-cyan-500/30' 
+                    : 'bg-gradient-to-r from-emerald-600/20 to-teal-600/20 text-emerald-300 border border-emerald-500/30'
+                }`}>
+                  {ws.userRole ? ws.userRole.replace('_', ' ') : 'Miembro'}
+                </span>
+              </div>
+              
+              {/* Footer con acción */}
+              <div className="mt-6 pt-6 border-t border-white/[0.06] flex items-center justify-between">
+                <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Entrar al espacio</p>
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 flex items-center justify-center group-hover:from-violet-600 group-hover:to-fuchsia-600 transition-all">
+                  <svg className="w-4 h-4 text-violet-400 group-hover:text-white group-hover:translate-x-0.5 transition-all" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </div>
+              </div>
             </div>
           </div>
         ))}
 
         {workspaces.length === 0 && !authFeedback && !loading && (
-          <div className="col-span-full py-40 border-2 border-dashed border-zinc-800 rounded-[60px] flex flex-col items-center justify-center gap-6 text-center animate-in fade-in duration-1000">
-             <div className="w-24 h-24 bg-zinc-900 rounded-full flex items-center justify-center text-5xl mb-2 opacity-30">🏢</div>
-             <div className="space-y-2">
-                <p className="text-white font-black uppercase tracking-[0.3em] text-sm">No tienes espacios de trabajo</p>
-                <p className="text-zinc-600 text-[10px] font-bold uppercase">Comienza creando tu propia sede virtual</p>
-             </div>
-             <button 
-               onClick={() => setShowCreate(true)} 
-               className="mt-4 px-10 py-4 bg-indigo-600 hover:bg-indigo-500 rounded-2xl font-black uppercase tracking-widest text-xs text-white shadow-2xl shadow-indigo-600/40 transition-all hover:scale-105"
-             >
-               Crea tu primer espacio
-             </button>
+          <div className="col-span-full py-32 border border-dashed border-violet-500/20 rounded-3xl flex flex-col items-center justify-center gap-6 text-center bg-gradient-to-b from-violet-600/5 to-transparent">
+            {/* Icono con glow */}
+            <div className="relative">
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-full blur-xl opacity-30" />
+              <div className="relative w-20 h-20 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full flex items-center justify-center text-4xl">
+                🏢
+              </div>
+            </div>
+            <div className="space-y-2">
+              <p className="text-white font-bold text-lg">No tienes espacios de trabajo</p>
+              <p className="text-zinc-500 text-sm">Comienza creando tu propia sede virtual</p>
+            </div>
+            <button 
+              onClick={() => setShowCreate(true)} 
+              className="mt-2 group relative px-8 py-4 rounded-xl font-bold uppercase tracking-wider text-sm overflow-hidden transition-all duration-300 hover:scale-105"
+            >
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500" />
+              <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <span className="relative text-white">Crea tu primer espacio</span>
+            </button>
           </div>
         )}
       </div>
 
       {showCreate && (
-        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/80 backdrop-blur-sm p-6">
-          <div className="max-w-md w-full bg-[#0d0d0f] border border-white/10 rounded-[48px] p-12 shadow-[0_50px_100px_rgba(0,0,0,0.8)] animate-in zoom-in duration-300">
-            <h2 className="text-4xl font-black uppercase italic tracking-tighter mb-10 text-white">Lanzar Sede</h2>
-            <div className="space-y-8">
-              <div>
-                <label className="text-[10px] uppercase font-black tracking-widest text-indigo-500 mb-3 block">Nombre de la Compañía</label>
-                <input 
-                  type="text" 
-                  autoFocus
-                  placeholder="Ej. Cyberdyne Systems"
-                  value={newSpaceName}
-                  onChange={e => setNewSpaceName(e.target.value)}
-                  className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-5 text-lg focus:ring-2 focus:ring-indigo-600 outline-none text-white placeholder:text-zinc-800 font-bold"
-                />
+        <div className="fixed inset-0 z-[600] flex items-center justify-center bg-black/90 backdrop-blur-xl p-6">
+          <div className="max-w-md w-full relative">
+            {/* Glow de fondo del modal */}
+            <div className="absolute -inset-4 bg-gradient-to-r from-violet-600/20 via-fuchsia-600/20 to-cyan-600/20 rounded-[40px] blur-2xl" />
+            
+            <div className="relative bg-[#0a0a0c] border border-white/[0.08] rounded-3xl p-10 shadow-2xl">
+              {/* Header con icono */}
+              <div className="flex items-center gap-4 mb-8">
+                <div className="relative">
+                  <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl blur-md opacity-60" />
+                  <div className="relative w-12 h-12 bg-gradient-to-br from-violet-600 to-fuchsia-600 rounded-xl flex items-center justify-center">
+                    <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-white">Lanzar Sede</h2>
+                  <p className="text-zinc-500 text-sm">Crea tu espacio de trabajo virtual</p>
+                </div>
               </div>
-              <div className="flex gap-4 pt-4">
-                <button 
-                  onClick={() => setShowCreate(false)} 
-                  className="flex-1 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-500 hover:text-white transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button 
-                  onClick={handleCreate}
-                  disabled={loading || !newSpaceName.trim()}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl disabled:opacity-50 text-white"
-                >
-                  {loading ? 'Preparando...' : 'Crear Sede'}
-                </button>
+
+              <div className="space-y-6">
+                <div>
+                  <label className="text-xs uppercase font-semibold tracking-wider text-violet-400 mb-2 block">
+                    Nombre de la Compañía
+                  </label>
+                  <input 
+                    type="text" 
+                    autoFocus
+                    placeholder="Ej. Cyberdyne Systems"
+                    value={newSpaceName}
+                    onChange={e => setNewSpaceName(e.target.value)}
+                    className="w-full bg-white/[0.03] border border-white/[0.08] rounded-xl px-5 py-4 text-base focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30 outline-none text-white placeholder:text-zinc-600 transition-all"
+                  />
+                </div>
+                
+                <div className="flex gap-3 pt-4">
+                  <button 
+                    onClick={() => setShowCreate(false)} 
+                    className="flex-1 py-4 rounded-xl font-semibold text-sm text-zinc-400 bg-white/[0.03] border border-white/[0.08] hover:bg-white/[0.06] transition-all"
+                  >
+                    Cancelar
+                  </button>
+                  <button 
+                    onClick={handleCreate}
+                    disabled={loading || !newSpaceName.trim()}
+                    className="flex-1 group relative py-4 rounded-xl font-bold text-sm overflow-hidden disabled:opacity-50 transition-all"
+                  >
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500" />
+                    <div className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <span className="relative text-white">
+                      {loading ? 'Preparando...' : 'Crear Sede'}
+                    </span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       )}
+      </div>
     </div>
   );
 };
