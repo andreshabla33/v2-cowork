@@ -37,6 +37,11 @@ const MEDIAPIPE_WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision
 const FACE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
 const POSE_MODEL_URL = 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task';
 
+// Declarar variables globales de MediaPipe (se cargan vía importScripts)
+declare const FilesetResolver: any;
+declare const FaceLandmarker: any;
+declare const PoseLandmarker: any;
+
 /**
  * Inicializar MediaPipe en el worker
  */
@@ -44,13 +49,11 @@ async function initializeMediaPipe(options: { enableFace: boolean; enablePose: b
   try {
     console.log('🔧 [Worker] Inicializando MediaPipe...');
     
-    // Importar MediaPipe dinámicamente
-    const vision = await import(
-      /* webpackIgnore: true */
-      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest'
-    );
+    // Cargar MediaPipe via importScripts (forma estándar para Workers)
+    // @ts-ignore
+    importScripts('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/vision_bundle.mjs');
     
-    const { FaceLandmarker, PoseLandmarker, FilesetResolver } = vision;
+    console.log('🔧 [Worker] MediaPipe script cargado, inicializando FilesetResolver...');
     
     // Resolver fileset
     const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_CDN);
