@@ -48,7 +48,7 @@ const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - optimizado para rendimiento
 const BASELINE_DURATION_MS = 5000; // 5 segundos de calibración
 const MICROEXPRESSION_MAX_DURATION_MS = 500;
 const ABRUPT_CHANGE_THRESHOLD = 0.3;
-const USE_WEB_WORKER = false; // TEMPORALMENTE DESACTIVADO - diagnosticando problema de grabación
+const USE_WEB_WORKER = true; // Activado con fallback automático si falla
 
 // Mapeo de blendshapes a emociones con pesos refinados
 const EMOTION_BLENDSHAPE_WEIGHTS: Record<EmotionType, { shapes: string[]; weights: number[] }> = {
@@ -146,7 +146,7 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     enablePose: false // Solo análisis facial aquí
   });
 
-  // Inicializar MediaPipe (vía Worker o directo como fallback)
+  // Inicializar MediaPipe (vía Worker o directo como fallback automático)
   const loadFaceLandmarker = useCallback(async (): Promise<boolean> => {
     if (USE_WEB_WORKER) {
       console.log('🎭 [Advanced] Inicializando MediaPipe via Web Worker...');
@@ -155,8 +155,8 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
         console.log('✅ [Advanced] Worker MediaPipe listo - hilo principal libre');
         return true;
       }
-      console.warn('⚠️ [Advanced] Worker falló, continuando sin análisis');
-      return false;
+      console.warn('⚠️ [Advanced] Worker falló, usando fallback directo...');
+      // Continúa con fallback en lugar de retornar false
     }
     
     // Fallback: cargar directo (bloquea hilo principal)

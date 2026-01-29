@@ -32,7 +32,7 @@ interface BodyLanguageState {
 }
 
 const ANALYSIS_INTERVAL_MS = 500; // 2 FPS para postura
-const USE_WEB_WORKER = false; // TEMPORALMENTE DESACTIVADO - diagnosticando problema de grabación
+const USE_WEB_WORKER = true; // Activado con fallback automático si falla
 
 // Índices de landmarks de MediaPipe Pose
 const POSE_LANDMARKS = {
@@ -84,7 +84,7 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     enablePose: true // Solo análisis de pose aquí
   });
 
-  // Cargar MediaPipe Pose (vía Worker o directo como fallback)
+  // Cargar MediaPipe Pose (vía Worker o directo como fallback automático)
   const loadPoseLandmarker = useCallback(async (): Promise<boolean> => {
     if (USE_WEB_WORKER) {
       console.log('🏃 [Body] Inicializando MediaPipe Pose via Web Worker...');
@@ -93,8 +93,8 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
         console.log('✅ [Body] Worker MediaPipe Pose listo - hilo principal libre');
         return true;
       }
-      console.warn('⚠️ [Body] Worker falló, continuando sin análisis corporal');
-      return false;
+      console.warn('⚠️ [Body] Worker falló, usando fallback directo...');
+      // Continúa con fallback en lugar de retornar false
     }
 
     // Fallback: cargar directo (bloquea hilo principal)

@@ -58,7 +58,7 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
   const requestIdRef = useRef(0);
 
   /**
-   * Inicializar el worker
+   * Inicializar el worker con timeout de seguridad
    */
   const initialize = useCallback(async (): Promise<boolean> => {
     if (workerRef.current || isInitializing) {
@@ -66,8 +66,21 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
     }
 
     setIsInitializing(true);
+    console.log('🔧 [Hook] Iniciando Worker MediaPipe...');
 
     return new Promise((resolve) => {
+      let resolved = false;
+      
+      // Timeout de 10 segundos para inicialización
+      const timeout = setTimeout(() => {
+        if (!resolved) {
+          resolved = true;
+          console.warn('⚠️ [Hook] Timeout inicializando Worker - usando fallback');
+          setIsInitializing(false);
+          resolve(false);
+        }
+      }, 10000);
+
       try {
         // Crear worker usando Vite's worker import syntax
         // @ts-ignore - Vite maneja esto en build time
@@ -79,6 +92,7 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
           switch (type) {
             case 'ready':
               if (payload?.workerReady) {
+                console.log('🔧 [Hook] Worker listo, inicializando MediaPipe...');
                 // Worker cargado, ahora inicializar MediaPipe
                 worker.postMessage({
                   type: 'init',
@@ -86,17 +100,25 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
                 });
               } else if (payload?.success) {
                 // MediaPipe inicializado
-                console.log('✅ [Hook] Worker MediaPipe listo');
-                setIsReady(true);
-                setIsInitializing(false);
-                resolve(true);
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeout);
+                  console.log('✅ [Hook] Worker MediaPipe listo');
+                  setIsReady(true);
+                  setIsInitializing(false);
+                  resolve(true);
+                }
               } else if (payload?.stopped) {
                 setIsReady(false);
               } else if (payload?.error) {
-                console.error('❌ [Hook] Error en worker:', payload.error);
-                onError?.(payload.error);
-                setIsInitializing(false);
-                resolve(false);
+                if (!resolved) {
+                  resolved = true;
+                  clearTimeout(timeout);
+                  console.error('❌ [Hook] Error en worker:', payload.error);
+                  onError?.(payload.error);
+                  setIsInitializing(false);
+                  resolve(false);
+                }
               }
               break;
 
@@ -120,18 +142,26 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
         };
 
         worker.onerror = (error) => {
-          console.error('❌ [Hook] Error fatal del worker:', error);
-          onError?.(error.message);
-          setIsInitializing(false);
-          resolve(false);
+          if (!resolved) {
+            resolved = true;
+            clearTimeout(timeout);
+            console.error('❌ [Hook] Error fatal del worker:', error);
+            onError?.(error.message);
+            setIsInitializing(false);
+            resolve(false);
+          }
         };
 
         workerRef.current = worker;
 
       } catch (error) {
-        console.error('❌ [Hook] No se pudo crear el worker:', error);
-        setIsInitializing(false);
-        resolve(false);
+        if (!resolved) {
+          resolved = true;
+          clearTimeout(timeout);
+          console.error('❌ [Hook] No se pudo crear el worker:', error);
+          setIsInitializing(false);
+          resolve(false);
+        }
       }
     });
   }, [enableFace, enablePose, isInitializing, isReady, onError, onResult]);
