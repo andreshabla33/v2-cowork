@@ -396,10 +396,10 @@ export const GrabacionesHistorial: React.FC = () => {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className={`text-3xl font-black uppercase tracking-tight ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
-              📹 Grabaciones
+              � Transcripciones
             </h1>
             <p className={`text-sm mt-1 ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
-              Historial de reuniones grabadas con transcripciones y análisis
+              Historial de reuniones con transcripciones y análisis conductual
             </p>
           </div>
           <button
@@ -492,14 +492,14 @@ export const GrabacionesHistorial: React.FC = () => {
           <div className={`text-center py-20 rounded-2xl border-2 border-dashed ${
             isArcade ? 'border-[#00ff41]/30' : 'border-white/10'
           }`}>
-            <span className="text-6xl mb-4 block">📹</span>
+            <span className="text-6xl mb-4 block">�</span>
             <h3 className={`text-xl font-bold mb-2 ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
-              No hay grabaciones
+              No hay transcripciones
             </h3>
             <p className={`text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
               {grabaciones.length === 0 
-                ? 'Inicia una reunión y grábala para ver el análisis aquí'
-                : 'No hay grabaciones que coincidan con los filtros'}
+                ? 'Inicia una reunión para generar transcripciones y análisis'
+                : 'No hay transcripciones que coincidan con los filtros'}
             </p>
           </div>
         )}
@@ -532,8 +532,11 @@ export const GrabacionesHistorial: React.FC = () => {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-3 mb-1">
                         <h3 className={`font-bold text-lg ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
-                          {tipoConfig.label}
+                          {grabacion.archivo_nombre || tipoConfig.label}
                         </h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gradient-to-r ${tipoConfig.color} text-white`}>
+                          {tipoConfig.icon} {tipoConfig.label}
+                        </span>
                         <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConfig.color} text-white`}>
                           {estadoConfig.icon} {estadoConfig.label}
                         </span>
