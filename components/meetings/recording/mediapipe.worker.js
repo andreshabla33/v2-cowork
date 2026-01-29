@@ -20,23 +20,15 @@ let isInitialized = false;
 // Inicializar MediaPipe
 async function initializeMediaPipe(options) {
   try {
-    console.log('🔧 [Worker] Inicializando MediaPipe (Classic Worker)...');
+    console.log('🔧 [Worker] Inicializando MediaPipe (Dynamic Import)...');
     
-    // Cargar script principal de MediaPipe (bundle compatible con navegador)
-    // Usamos una versión específica (0.10.9) que sabemos tiene vision_bundle.js
-    // @ts-ignore
-    importScripts('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.js');
+    // Usar import() dinámico para cargar el módulo ES desde CDN
+    // Esto funciona en workers modernos y carga la versión correcta .mjs
+    const vision = await import('https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.9/vision_bundle.mjs');
     
-    console.log('🔧 [Worker] Script cargado, creando FilesetResolver...');
+    console.log('🔧 [Worker] Módulo cargado:', vision);
     
-    // En esta versión, las clases se exponen directamente en global o self
-    // O a veces en self.vision dependiendo del bundle. Probamos ambos.
-    const vision = self.vision || self;
     const { FilesetResolver, FaceLandmarker, PoseLandmarker } = vision;
-    
-    if (!FilesetResolver) {
-      throw new Error('No se pudo encontrar FilesetResolver en el script cargado');
-    }
     
     const filesetResolver = await FilesetResolver.forVisionTasks(MEDIAPIPE_WASM_CDN);
     
