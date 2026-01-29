@@ -291,13 +291,39 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
 
       updateState({ step: 'processing', progress: 20, message: 'Procesando transcripción...' });
 
-      // Obtener transcripción
+      // Obtener transcripción - intentar múltiples fuentes
       let transcript = transcriptRef.current;
+      console.log('📝 Transcripción desde ref:', transcript?.length || 0, 'caracteres');
+      
+      // Si el ref está vacío, intentar desde fullTranscript del hook
       if (!transcript || transcript.trim().length < 20) {
-        transcript = await transcribeAudioBlob(blob) || '';
+        transcript = fullTranscript;
+        console.log('📝 Transcripción desde fullTranscript:', transcript?.length || 0, 'caracteres');
       }
+      
+      // Si aún está vacío, intentar concatenar segments
+      if (!transcript || transcript.trim().length < 20) {
+        if (segments && segments.length > 0) {
+          transcript = segments.map(s => s.texto).join(' ');
+          console.log('📝 Transcripción desde segments:', transcript?.length || 0, 'caracteres');
+        }
+      }
+      
+      // Último recurso: transcribir el blob de audio
+      if (!transcript || transcript.trim().length < 20) {
+        console.log('📝 Intentando transcribir blob de audio...');
+        try {
+          transcript = await transcribeAudioBlob(blob) || '';
+          console.log('📝 Transcripción desde blob:', transcript?.length || 0, 'caracteres');
+        } catch (err) {
+          console.warn('⚠️ Error transcribiendo blob:', err);
+        }
+      }
+      
+      // Si todo falla, usar placeholder informativo
       if (!transcript || transcript.trim().length < 10) {
-        transcript = `[Reunión de ${Math.round(duration / 60)} minutos]`;
+        transcript = `[Grabación de ${Math.round(duration / 60)} minutos - transcripción no disponible]`;
+        console.warn('⚠️ Usando placeholder para transcripción');
       }
 
       updateState({ progress: 40, message: 'Generando análisis conductual...' });
@@ -435,6 +461,8 @@ export const RecordingManagerV2: React.FC<RecordingManagerV2Props> = ({
     onProcessingComplete, 
     combinedAnalysis, 
     transcribeAudioBlob,
+    fullTranscript,
+    segments,
     userId, 
     userName, 
     espacioId, 

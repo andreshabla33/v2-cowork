@@ -57,7 +57,11 @@ export function useTranscription(options: UseTranscriptionOptions) {
 
       script.onload = () => {
         moonshineLoadedRef.current = true;
-        console.log('✅ MoonshineJS cargado');
+        console.log('✅ MoonshineJS cargado:', {
+          Moonshine: !!window.Moonshine,
+          MicrophoneTranscriber: !!window.Moonshine?.MicrophoneTranscriber,
+          Transcriber: !!window.Moonshine?.Transcriber,
+        });
         resolve(true);
       };
 
@@ -81,10 +85,12 @@ export function useTranscription(options: UseTranscriptionOptions) {
 
       startTimeRef.current = Date.now();
 
+      console.log('🎤 Creando MicrophoneTranscriber...');
       const transcriber = new window.Moonshine.MicrophoneTranscriber(
         'model/tiny',
         {
           onTranscriptionCommitted: (text: string) => {
+            console.log('📝 Transcripción recibida:', text);
             const segmentId = `seg_${grabacionId}_${segmentIdRef.current++}`;
             const currentTime = (Date.now() - startTimeRef.current) / 1000;
             
