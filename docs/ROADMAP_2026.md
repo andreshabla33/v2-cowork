@@ -89,10 +89,15 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 ];
 ```
 
+#### Permisos de UI por Rol
+- **Botón "Invitar Personas"**: Solo visible para `admin` y `super_admin`
+- **Selector de Cargo**: Filtrado según rol del sistema
+
 #### Archivos Modificados
 - `CargoSelector.tsx`: Props `rolUsuario`, filtrado de categorías y cargos
 - `App.tsx`: Obtiene rol del sistema y lo pasa al selector
 - `Dashboard.tsx`: UI completa estilo gaming 2026
+- `ChatPanel.tsx`: Botón invitar oculto para members
 
 ---
 
@@ -243,7 +248,8 @@ CARGOS_RESTRINGIDOS_MEMBER = [
 | `43d989b` | Dashboard UI 2026 gaming style - cards, modal, header |
 | `e3848b1` | Seguridad de roles - invitados no ven cargos de liderazgo |
 | `520e4be` | Filtrar cargos de dirección para members |
+| `3b6be9d` | Ocultar botón Invitar Personas para rol member |
 
 ---
 
-*Última actualización: 28 Enero 2026 - 22:30 UTC-4*
+*Última actualización: 28 Enero 2026 - 22:35 UTC-4*
