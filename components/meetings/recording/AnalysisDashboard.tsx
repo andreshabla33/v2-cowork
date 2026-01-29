@@ -42,12 +42,26 @@ const EMOTION_COLORS: Record<EmotionType, string> = {
   neutral: 'bg-gray-500',
 };
 
+// Config por defecto si no se encuentra el tipo
+const CONFIG_DEFAULT: typeof CONFIGURACIONES_GRABACION['equipo'] = {
+  tipo: 'equipo',
+  tipoBase: 'equipo',
+  titulo: 'Reunión',
+  descripcion: 'Análisis de reunión',
+  icono: '📊',
+  color: 'from-indigo-600 to-purple-600',
+  colorAccent: '#6366f1',
+  requiereDisclaimer: false,
+  metricas: [],
+  cargosPermitidos: [],
+};
+
 export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
   resultado,
   onClose,
   onExport,
 }) => {
-  const config = CONFIGURACIONES_GRABACION[resultado.tipo_grabacion];
+  const config = CONFIGURACIONES_GRABACION[resultado.tipo_grabacion] || CONFIG_DEFAULT;
   
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
