@@ -510,4 +510,76 @@ function MeetingRoom() {
 
 ---
 
-*Documentación generada automáticamente - Cowork Virtual v2.0*
+## 📋 Changelog - Actualizaciones Recientes
+
+### v2.1.0 - 28 Enero 2026
+
+#### 🔧 Correcciones
+
+| Issue | Descripción | Solución |
+|-------|-------------|----------|
+| **Duración 0 minutos** | La duración de grabación se guardaba como 0 | Usar `startTimeRef` para calcular duración en vez del estado |
+| **Página en blanco en análisis** | Error `probabilidad_cierre_estimada undefined` | Añadir config por defecto y verificación de datos |
+| **Botón Transcripción no funcionaba** | Solo hacía `setGrabacionSeleccionada` sin acción | Implementar modal de transcripción completo |
+| **Error de stream** | Error persistente "No hay stream disponible" | Auto-limpiar error después de 5 segundos o cuando stream disponible |
+| **useCallback order** | Funciones usadas antes de declararse | Reorganizar orden de declaración de funciones |
+
+#### ✨ Nuevas Funcionalidades
+
+1. **Modal de Transcripción** (`GrabacionesHistorial.tsx`)
+   - Vista completa del texto transcrito
+   - Timestamps por segmento
+   - Nombre del speaker
+   - Botón para copiar al portapapeles
+
+2. **Generación de Análisis Completo desde Historial** (`generateAnalisisFromFrames`)
+   - Reconstruye análisis detallado desde frames guardados en DB
+   - Soporta tipos: `deals`, `rrhh`, `equipo`
+   - Calcula dinámicamente:
+     - Probabilidad de cierre (deals)
+     - Momentos de interés/objeciones
+     - Predicciones con factores
+     - Recomendaciones de seguimiento
+
+3. **Sistema de Permisos por Cargo** (`types/analysis.ts`)
+   - COO/CEO: Acceso total a todos los análisis
+   - Director RRHH: Solo análisis RRHH
+   - Director Comercial: Solo análisis Deals
+   - Team Lead/Scrum Master: Solo análisis Equipo
+
+#### 🏗️ Arquitectura de Privacidad
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    NAVEGADOR (Local)                         │
+├─────────────────────────────────────────────────────────────┤
+│  📹 Video → MediaRecorder → Blob → NO SE SUBE              │
+│  🎤 Audio → MoonshineJS → Transcripción                     │
+│  👤 Frames → MediaPipe → Análisis Facial                    │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼ Solo metadata
+┌─────────────────────────────────────────────────────────────┐
+│                       SUPABASE                               │
+├─────────────────────────────────────────────────────────────┤
+│  📝 transcripciones → texto, timestamps, speaker            │
+│  📊 analisis_comportamiento → emociones, engagement         │
+│  📋 grabaciones → metadatos (sin video)                     │
+│  🤖 resumenes_ai → resumen generado por GPT                 │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Principio:** El video permanece en el navegador del usuario y nunca se sube a la nube, garantizando privacidad total de las reuniones.
+
+#### 📁 Archivos Modificados
+
+| Archivo | Cambios |
+|---------|---------|
+| `RecordingManagerV2.tsx` | Auto-limpieza de errores, reorganización de funciones |
+| `GrabacionesHistorial.tsx` | Modal transcripción, generación de análisis completo |
+| `AnalysisDashboard.tsx` | Config por defecto, vista de análisis básico |
+| `VirtualSpace3D.tsx` | Carga de cargo desde `miembros_espacio` |
+
+---
+
+*Documentación generada automáticamente - Cowork Virtual v2.1*
