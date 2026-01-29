@@ -172,7 +172,15 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-[#050508] flex items-center justify-center p-4 overflow-y-auto">
+      {/* Fondo con gradientes neon animados - mismo estilo que login */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-30%] left-[-20%] w-[70%] h-[70%] rounded-full bg-violet-600/15 blur-[180px] animate-pulse" />
+        <div className="absolute bottom-[-30%] right-[-20%] w-[70%] h-[70%] rounded-full bg-cyan-500/10 blur-[180px] animate-pulse" style={{ animationDelay: '1.5s' }} />
+        <div className="absolute top-[40%] left-[50%] w-[40%] h-[40%] rounded-full bg-fuchsia-600/10 blur-[120px] animate-pulse" style={{ animationDelay: '3s' }} />
+        <div className="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.02)_1px,transparent_1px)] bg-[size:64px_64px]" />
+      </div>
+
       <AnimatePresence mode="wait">
         {/* PASO: Bienvenida */}
         {paso === 'bienvenida' && (
@@ -181,47 +189,54 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-lg text-center"
+            className="w-full max-w-lg text-center relative z-10"
           >
             <div className="mb-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-xl shadow-indigo-500/30">
-                <Sparkles className="w-10 h-10 text-white" />
+              {/* Logo con glow neon */}
+              <div className="relative group mx-auto w-20 h-20 mb-6">
+                <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
+                <div className="relative w-20 h-20 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-2xl flex items-center justify-center shadow-2xl">
+                  <Sparkles className="w-10 h-10 text-white" />
+                </div>
               </div>
-              <h1 className="text-4xl font-bold text-white mb-4">
+              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-4">
                 ¡Bienvenido, {userName.split(' ')[0]}!
               </h1>
-              <p className="text-xl text-slate-300">
+              <p className="text-lg text-zinc-400">
                 Vamos a configurar tu espacio de trabajo en menos de 2 minutos
               </p>
             </div>
 
-            <div className="space-y-4 mb-8">
-              <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-indigo-400 font-bold">1</span>
+            <div className="space-y-3 mb-8">
+              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black">1</span>
                 </div>
-                <span className="text-slate-300">Selecciona tu cargo</span>
+                <span className="text-zinc-300 font-medium">Selecciona tu cargo</span>
               </div>
-              <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-indigo-400 font-bold">2</span>
+              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black">2</span>
                 </div>
-                <span className="text-slate-300">Crea tu espacio de trabajo</span>
+                <span className="text-zinc-300 font-medium">Crea tu espacio de trabajo</span>
               </div>
-              <div className="flex items-center gap-4 p-4 bg-slate-800/50 rounded-xl border border-slate-700">
-                <div className="w-10 h-10 bg-indigo-500/20 rounded-lg flex items-center justify-center">
-                  <span className="text-indigo-400 font-bold">3</span>
+              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
+                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black">3</span>
                 </div>
-                <span className="text-slate-300">Invita a tu equipo</span>
+                <span className="text-zinc-300 font-medium">Invita a tu equipo</span>
               </div>
             </div>
 
             <button
               onClick={() => setPaso('cargo')}
-              className="w-full py-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-xl hover:from-indigo-500 hover:to-purple-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-500/30"
+              className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98]"
             >
-              Comenzar
-              <ArrowRight className="w-5 h-5" />
+              <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative flex items-center justify-center gap-2">
+                Comenzar
+                <ArrowRight className="w-5 h-5" />
+              </span>
             </button>
           </motion.div>
         )}
@@ -250,30 +265,33 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-lg"
+            className="w-full max-w-lg relative z-10"
           >
             <button
               onClick={() => setPaso('cargo')}
-              className="mb-6 text-slate-400 hover:text-white flex items-center gap-2 text-sm"
+              className="mb-6 text-zinc-500 hover:text-violet-400 flex items-center gap-2 text-sm transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
               Volver
             </button>
 
             <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 rounded-full text-indigo-400 text-xs font-medium mb-4">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
                 Paso 2 de 3
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Building2 className="w-8 h-8 text-white" />
+              <div className="relative group mx-auto w-16 h-16 mb-4">
+                <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur-lg opacity-40" />
+                <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-2xl flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-white" />
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-2">Crea tu espacio de trabajo</h2>
-              <p className="text-slate-400">Dale un nombre a tu espacio donde colaborará tu equipo</p>
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-2">Crea tu espacio de trabajo</h2>
+              <p className="text-zinc-400">Dale un nombre a tu espacio donde colaborará tu equipo</p>
             </div>
 
             <div className="space-y-4 mb-6">
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Nombre del espacio *
                 </label>
                 <input
@@ -281,11 +299,11 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                   value={espacioData.nombre}
                   onChange={(e) => setEspacioData({ ...espacioData, nombre: e.target.value })}
                   placeholder="Ej: Mi Empresa, Equipo Marketing..."
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all"
+                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-zinc-300 mb-2">
                   Descripción (opcional)
                 </label>
                 <textarea
@@ -293,13 +311,13 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                   onChange={(e) => setEspacioData({ ...espacioData, descripcion: e.target.value })}
                   placeholder="¿De qué trata este espacio?"
                   rows={3}
-                  className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none transition-all resize-none"
+                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all resize-none"
                 />
               </div>
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -307,19 +325,22 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             <button
               onClick={handleCrearEspacio}
               disabled={loading || !espacioData.nombre.trim()}
-              className="w-full py-4 bg-gradient-to-r from-emerald-600 to-teal-600 text-white font-semibold rounded-xl hover:from-emerald-500 hover:to-teal-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="relative w-full group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-emerald-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Creando...
-                </>
-              ) : (
-                <>
-                  Crear espacio
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
+              <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+              <span className="relative flex items-center justify-center gap-2">
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Creando...
+                  </>
+                ) : (
+                  <>
+                    Crear espacio
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </span>
             </button>
           </motion.div>
         )}
@@ -331,17 +352,20 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-lg"
+            className="w-full max-w-lg relative z-10"
           >
             <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-indigo-500/20 rounded-full text-indigo-400 text-xs font-medium mb-4">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
                 Paso 3 de 3
               </div>
-              <div className="w-16 h-16 bg-gradient-to-br from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                <Users className="w-8 h-8 text-white" />
+              <div className="relative group mx-auto w-16 h-16 mb-4">
+                <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-lg opacity-40" />
+                <div className="relative w-16 h-16 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-2xl flex items-center justify-center">
+                  <Users className="w-8 h-8 text-white" />
+                </div>
               </div>
-              <h2 className="text-3xl font-bold text-white mb-2">Invita a tu equipo</h2>
-              <p className="text-slate-400">
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">Invita a tu equipo</h2>
+              <p className="text-zinc-400">
                 Añade los emails de las personas que quieres invitar a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
               </p>
             </div>
@@ -350,19 +374,19 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
               {invitaciones.map((email, index) => (
                 <div key={index} className="flex gap-2">
                   <div className="flex-1 relative">
-                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-500" />
+                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
                     <input
                       type="email"
                       value={email}
                       onChange={(e) => handleEmailChange(index, e.target.value)}
                       placeholder="email@ejemplo.com"
-                      className="w-full pl-11 pr-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:border-violet-500 focus:ring-1 focus:ring-violet-500 outline-none transition-all"
+                      className="w-full pl-12 pr-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
                     />
                   </div>
                   {invitaciones.length > 1 && (
                     <button
                       onClick={() => handleRemoveEmail(index)}
-                      className="p-3 bg-slate-800 border border-slate-700 rounded-xl text-slate-400 hover:text-red-400 hover:border-red-500/50 transition-all"
+                      className="p-4 bg-black/40 border border-white/[0.08] rounded-2xl text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition-all"
                     >
                       <X className="w-5 h-5" />
                     </button>
@@ -373,14 +397,14 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
             <button
               onClick={handleAddEmail}
-              className="w-full py-3 border-2 border-dashed border-slate-700 rounded-xl text-slate-400 hover:text-violet-400 hover:border-violet-500/50 transition-all flex items-center justify-center gap-2 mb-6"
+              className="w-full py-4 border-2 border-dashed border-white/[0.08] rounded-2xl text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-all flex items-center justify-center gap-2 mb-6"
             >
               <Plus className="w-5 h-5" />
               Añadir otro email
             </button>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg text-red-400 text-sm">
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
                 {error}
               </div>
             )}
@@ -389,25 +413,28 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
               <button
                 onClick={handleEnviarInvitaciones}
                 disabled={loading}
-                className="w-full py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white font-semibold rounded-xl hover:from-violet-500 hover:to-purple-500 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50"
               >
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Enviando...
-                  </>
-                ) : (
-                  <>
-                    Enviar invitaciones
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
+                <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Enviando...
+                    </>
+                  ) : (
+                    <>
+                      Enviar invitaciones
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </span>
               </button>
 
               <button
                 onClick={handleSkipInvitaciones}
                 disabled={loading}
-                className="w-full py-3 text-slate-400 hover:text-white transition-colors text-sm"
+                className="w-full py-3 text-zinc-500 hover:text-violet-400 transition-colors text-sm font-medium"
               >
                 Omitir por ahora
               </button>
@@ -421,16 +448,19 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             key="completado"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md text-center"
+            className="w-full max-w-md text-center relative z-10"
           >
-            <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-emerald-600 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-500/30">
-              <Check className="w-12 h-12 text-white" />
+            <div className="relative mx-auto w-24 h-24 mb-6">
+              <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full blur-xl opacity-50 animate-pulse" />
+              <div className="relative w-24 h-24 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center shadow-2xl">
+                <Check className="w-12 h-12 text-white" />
+              </div>
             </div>
-            <h2 className="text-3xl font-bold text-white mb-4">¡Todo listo!</h2>
-            <p className="text-slate-300 mb-2">
+            <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-4">¡Todo listo!</h2>
+            <p className="text-zinc-300 mb-2">
               Tu espacio <span className="text-emerald-400 font-medium">{espacioCreado?.nombre}</span> está listo
             </p>
-            <p className="text-slate-500 text-sm">Redirigiendo...</p>
+            <p className="text-zinc-600 text-sm">Redirigiendo...</p>
             
             <div className="mt-8">
               <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
