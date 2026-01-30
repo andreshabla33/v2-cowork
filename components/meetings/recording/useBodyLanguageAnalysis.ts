@@ -342,6 +342,12 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
     }
   }, [workerReady, analyzeFrameWithWorker]);
 
+  // Referencia mutable para el callback de análisis (evita stale closure en setInterval)
+  const analyzeFrameRef = useRef(analyzeFrame);
+  useEffect(() => {
+    analyzeFrameRef.current = analyzeFrame;
+  }, [analyzeFrame]);
+
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {
     videoElementRef.current = videoElement;
@@ -361,9 +367,13 @@ export const useBodyLanguageAnalysis = (options: UseBodyLanguageAnalysisOptions 
       framesAnalyzed: 0,
     }));
 
-    analysisIntervalRef.current = setInterval(analyzeFrame, ANALYSIS_INTERVAL_MS);
+    // Usamos analyzeFrameRef.current para asegurar que siempre se llame la última versión
+    analysisIntervalRef.current = setInterval(() => {
+      analyzeFrameRef.current();
+    }, ANALYSIS_INTERVAL_MS);
+    
     console.log('🏃 [Body] Análisis de lenguaje corporal iniciado');
-  }, [loadPoseLandmarker, analyzeFrame]);
+  }, [loadPoseLandmarker]);
 
   // Detener análisis
   const stopAnalysis = useCallback(() => {

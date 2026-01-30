@@ -535,6 +535,12 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     }
   }, [workerReady, analyzeFrameWithWorker]);
 
+  // Referencia mutable para el callback de análisis (evita stale closure en setInterval)
+  const analyzeFrameRef = useRef(analyzeFrame);
+  useEffect(() => {
+    analyzeFrameRef.current = analyzeFrame;
+  }, [analyzeFrame]);
+
   // Iniciar análisis
   const startAnalysis = useCallback(async (videoElement: HTMLVideoElement) => {
     videoElementRef.current = videoElement;
@@ -561,10 +567,13 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     }));
 
     // Análisis cada 500ms - optimizado para rendimiento de audio
-    analysisIntervalRef.current = setInterval(analyzeFrame, ANALYSIS_INTERVAL_MS);
+    // Usamos analyzeFrameRef.current para asegurar que siempre se llame la última versión
+    analysisIntervalRef.current = setInterval(() => {
+      analyzeFrameRef.current();
+    }, ANALYSIS_INTERVAL_MS);
 
     console.log(`🎭 [Advanced] Análisis iniciado para: ${tipoGrabacion.toUpperCase()}`);
-  }, [loadFaceLandmarker, analyzeFrame, tipoGrabacion]);
+  }, [loadFaceLandmarker, tipoGrabacion]);
 
   // Detener análisis
   const stopAnalysis = useCallback(() => {
