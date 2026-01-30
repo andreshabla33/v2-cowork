@@ -54,6 +54,9 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   cargoUsuario = 'colaborador',
   onRecordingStateChange,
   onExternalTriggerHandled,
+  headlessMode,
+  externalTrigger,
+  onProcessingComplete,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
