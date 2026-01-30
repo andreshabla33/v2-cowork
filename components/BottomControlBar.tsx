@@ -38,8 +38,8 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2">
-      {/* Barra Principal Glassmorphism 2026 - Más compacta */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/50 hover:border-white/20">
+      {/* Barra Principal Glassmorphism 2026 - Más compacta con mejor efecto glass */}
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/30 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
         
         {/* Foto de usuario */}
         <div className="w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 mr-1">
@@ -171,9 +171,12 @@ const IconMic = ({ on }: { on: boolean }) => (
 );
 
 const IconCam = ({ on }: { on: boolean }) => (
-  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    {on ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/> 
-       : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />}
+  <svg className="w-5 h-5" fill={on ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
+    {on ? (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="0" d="M15.75 8.25a.75.75 0 01.75.75c0 1.12-.492 2.126-1.27 2.812a.75.75 0 11-1.004-1.124A2.25 2.25 0 0015 9a.75.75 0 01.75-.75zM4.5 7.5a3 3 0 013-3h9a3 3 0 013 3v9a3 3 0 01-3 3h-9a3 3 0 01-3-3v-9z M19.5 8.625c0-1.036.84-1.875 1.875-1.875h.75c1.036 0 1.875.84 1.875 1.875v6.75c0 1.035-.84 1.875-1.875 1.875h-.75a1.875 1.875 0 01-1.875-1.875v-6.75z" />
+    ) : (
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2zM3 3l18 18" />
+    )}
   </svg>
 );
 

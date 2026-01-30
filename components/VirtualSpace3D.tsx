@@ -2,7 +2,7 @@
 
 import React, { useRef, useEffect, useMemo, Suspense, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrthographicCamera, PerspectiveCamera, Grid, Text, OrbitControls } from '@react-three/drei';
+import { OrthographicCamera, PerspectiveCamera, Grid, Text, OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
@@ -101,9 +101,11 @@ interface AvatarProps {
   animationState?: AnimationState;
   direction?: string;
   reaction?: string | null;
+  videoStream?: MediaStream | null;
+  camOn?: boolean;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn }) => {
   return (
     <group position={position}>
       {/* Avatar 3D GLTF desde Supabase */}
@@ -113,36 +115,46 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         scale={1.2}
       />
       
-      {/* Indicador de estado */}
-      <mesh position={[0.85, 2.4, 0]}>
-        <sphereGeometry args={[0.10, 16, 16]} />
-        <meshBasicMaterial color={statusColors[status]} />
-      </mesh>
-      
-      {/* Reacción emoji encima del avatar */}
-      {reaction && (
-        <Text
-          position={[0, 3.0, 0]}
-          fontSize={0.5}
-          anchorX="center"
-          anchorY="middle"
-        >
-          {reaction}
-        </Text>
+      {/* Video Bubble above avatar (Gather style) */}
+      {camOn && videoStream && (
+        <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
+          <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125">
+             <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
+          </div>
+        </Html>
       )}
       
-      {/* Nombre flotante */}
-      <Text
-        position={[0, 2.4, 0]}
-        fontSize={0.28}
-        color={isCurrentUser ? '#60a5fa' : '#ffffff'}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={0.03}
-        outlineColor="#000000"
-      >
-        {name}
-      </Text>
+      {/* Indicador de estado (solo si no hay video) */}
+      {!camOn && (
+        <mesh position={[0.85, 2.4, 0]}>
+          <sphereGeometry args={[0.10, 16, 16]} />
+          <meshBasicMaterial color={statusColors[status]} />
+        </mesh>
+      )}
+      
+      {/* Reacción emoji encima del avatar (o video) */}
+      {reaction && (
+        <Html position={[0, camOn ? 5.2 : 3.0, 0]} center distanceFactor={10}>
+          <div className="text-4xl animate-bounce drop-shadow-lg filter">
+            {reaction}
+          </div>
+        </Html>
+      )}
+      
+      {/* Nombre flotante (oculto si hay cámara) */}
+      {!camOn && (
+        <Text
+          position={[0, 2.4, 0]}
+          fontSize={0.28}
+          color={isCurrentUser ? '#60a5fa' : '#ffffff'}
+          anchorX="center"
+          anchorY="middle"
+          outlineWidth={0.03}
+          outlineColor="#000000"
+        >
+          {name}
+        </Text>
+      )}
     </group>
   );
 };
@@ -183,9 +195,10 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
 interface PlayerProps {
   currentUser: User;
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
+  stream: MediaStream | null;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -313,13 +326,15 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition }) => {
         animationState={animationState}
         direction={direction}
         reaction={null}
+        videoStream={stream}
+        camOn={currentUser.isCameraOn}
       />
     </group>
   );
 };
 
 // ============== USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[] }> = ({ users }) => {
+const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream> }> = ({ users, remoteStreams }) => {
   return (
     <>
       {users.map((user) => {
@@ -338,6 +353,8 @@ const RemoteUsers: React.FC<{ users: User[] }> = ({ users }) => {
             status={user.status || PresenceStatus.AVAILABLE}
             animationState={animState}
             direction={user.direction || 'front'}
+            videoStream={remoteStreams.get(user.id)}
+            camOn={user.isCameraOn}
           />
         );
       })}
@@ -352,9 +369,11 @@ interface SceneProps {
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
   theme: string;
   orbitControlsRef: React.MutableRefObject<any>;
+  stream: MediaStream | null;
+  remoteStreams: Map<string, MediaStream>;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -438,10 +457,10 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} />
+      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} />
     </>
   );
 };
@@ -1281,7 +1300,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const pendingUpdateRef = useRef(false);
   // Ref para acceder al estado actual dentro de la función asíncrona
   const shouldHaveStreamRef = useRef(false);
-  shouldHaveStreamRef.current = hasActiveCall || currentUser.isScreenSharing;
+  shouldHaveStreamRef.current = hasActiveCall || currentUser.isScreenSharing || currentUser.isCameraOn || currentUser.isMicOn;
 
   // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
@@ -1454,6 +1473,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             setPosition={setPosition}
             theme={theme}
             orbitControlsRef={orbitControlsRef}
+            stream={stream}
+            remoteStreams={remoteStreams}
           />
         </Suspense>
       </Canvas>
@@ -1494,8 +1515,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         Centrar
       </button>
       
-      {/* VideoHUD - solo se muestra cuando hay usuarios cerca o cámara encendida */}
-      {(usersInCall.length > 0 || currentUser.isCameraOn) && (
+      {/* VideoHUD - solo se muestra cuando hay usuarios cerca (burbuja local ahora está en el avatar) */}
+      {usersInCall.length > 0 && (
         <VideoHUD
           userName={currentUser.name}
           visitorId={session?.user?.id || 'visitor'}
