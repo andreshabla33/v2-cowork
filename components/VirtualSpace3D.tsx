@@ -103,9 +103,10 @@ interface AvatarProps {
   reaction?: string | null;
   videoStream?: MediaStream | null;
   camOn?: boolean;
+  showVideoBubble?: boolean;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true }) => {
   return (
     <group position={position}>
       {/* Avatar 3D GLTF desde Supabase */}
@@ -116,7 +117,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       />
       
       {/* Video Bubble above avatar (Gather style) */}
-      {camOn && videoStream && (
+      {camOn && videoStream && showVideoBubble && (
         <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
           <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125">
              <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
@@ -196,9 +197,10 @@ interface PlayerProps {
   currentUser: User;
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
   stream: MediaStream | null;
+  showVideoBubble?: boolean;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -328,13 +330,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream }) => 
         reaction={null}
         videoStream={stream}
         camOn={currentUser.isCameraOn}
+        showVideoBubble={showVideoBubble}
       />
     </group>
   );
 };
 
 // ============== USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream> }> = ({ users, remoteStreams }) => {
+const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream>, showVideoBubble?: boolean }> = ({ users, remoteStreams, showVideoBubble = true }) => {
   return (
     <>
       {users.map((user) => {
@@ -355,6 +358,7 @@ const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStr
             direction={user.direction || 'front'}
             videoStream={remoteStreams.get(user.id)}
             camOn={user.isCameraOn}
+            showVideoBubble={showVideoBubble}
           />
         );
       })}
@@ -371,9 +375,10 @@ interface SceneProps {
   orbitControlsRef: React.MutableRefObject<any>;
   stream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
+  showVideoBubbles?: boolean;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -457,10 +462,10 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} />
+      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} showVideoBubble={showVideoBubbles} />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} />
     </>
   );
 };
@@ -656,7 +661,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
 
       {/* Contenedor de burbujas - Centrado en pantalla */}
       <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto z-50 transition-all duration-500 ${
-        usersInCall.length === 0 && !camOn ? 'opacity-0 pointer-events-none translate-x-[-100px]' : 'opacity-100 translate-x-0'
+        usersInCall.length === 0 && !camOn ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'
       } ${
         useGridLayout 
           ? 'grid grid-cols-2 gap-3 max-w-[600px]' 
@@ -1475,6 +1480,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             orbitControlsRef={orbitControlsRef}
             stream={stream}
             remoteStreams={remoteStreams}
+            showVideoBubbles={!hasActiveCall}
           />
         </Suspense>
       </Canvas>
