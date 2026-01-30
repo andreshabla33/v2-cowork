@@ -36,7 +36,7 @@ export function useAISummary(options: UseAISummaryOptions) {
   const generateSummary = useCallback(async (params: GenerateSummaryParams): Promise<AISummary | null> => {
     const { transcripcion, segments, emociones, insights, duracionSegundos, participantes } = params;
 
-    if (!transcripcion || transcripcion.trim().length < 50) {
+    if (!transcripcion || transcripcion.trim().length < 10) {
       setState(prev => ({
         ...prev,
         error: 'Transcripción muy corta para generar resumen',

@@ -48,7 +48,7 @@ serve(async (req) => {
       reunion_titulo,
     } = body;
 
-    if (!transcripcion || transcripcion.length < 50) {
+    if (!transcripcion || transcripcion.length < 10) {
       throw new Error('Transcripción muy corta para generar resumen');
     }
 
