@@ -8,7 +8,7 @@ import { useStore } from '@/store/useStore';
 import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
-import { RecordingManagerV2 } from './meetings/recording/RecordingManagerV2';
+import { RecordingManager } from './meetings/recording/RecordingManager';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -1673,7 +1673,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       
       {/* Recording Manager V2 con análisis conductual avanzado */}
       {hasActiveCall && (
-        <RecordingManagerV2
+        <RecordingManager
           espacioId={activeWorkspace?.id || ''}
           userId={session?.user?.id || ''}
           userName={currentUser.name}

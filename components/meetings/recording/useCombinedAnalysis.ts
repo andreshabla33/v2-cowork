@@ -187,18 +187,31 @@ export const useCombinedAnalysis = (options: UseCombinedAnalysisOptions) => {
     const emotionFrames = emotionFramesRef.current;
     const bodyFrames = bodyFramesRef.current;
     const microexpresiones = microexpresionesRef.current;
+    const predicciones = prediccionesRef.current; // Usar predicciones del sistema experto
 
     switch (tipoGrabacion) {
       case 'rrhh':
-        return generateAnalisisRRHH(emotionFrames, bodyFrames, microexpresiones);
+        return generateAnalisisRRHH(emotionFrames, bodyFrames, microexpresiones, predicciones);
       case 'deals':
-        return generateAnalisisDeals(emotionFrames, bodyFrames, microexpresiones);
+        return generateAnalisisDeals(emotionFrames, bodyFrames, microexpresiones, predicciones);
       case 'equipo':
-        return generateAnalisisEquipo(emotionFrames, bodyFrames, microexpresiones, participantes);
+        return generateAnalisisEquipo(emotionFrames, bodyFrames, microexpresiones, participantes, predicciones);
       default:
-        return generateAnalisisEquipo(emotionFrames, bodyFrames, microexpresiones, participantes);
+        return generateAnalisisEquipo(emotionFrames, bodyFrames, microexpresiones, participantes, predicciones);
     }
   }, [tipoGrabacion, participantes]);
+
+  // Calcular confianza general del análisis
+  const calculateConfianzaGeneral = useCallback((): number => {
+    const frames = emotionFramesRef.current;
+    if (frames.length === 0) return 0;
+
+    const avgConfidence = frames.reduce((sum, f) => sum + f.confianza_deteccion, 0) / frames.length;
+    const hasBaseline = baselineRef.current ? 0.1 : 0;
+    const hasEnoughFrames = frames.length > 100 ? 0.1 : 0;
+
+    return Math.min(1, avgConfidence + hasBaseline + hasEnoughFrames);
+  }, []);
 
   // Obtener resultado completo
   const getResultadoCompleto = useCallback((): ResultadoAnalisis => {
@@ -218,19 +231,7 @@ export const useCombinedAnalysis = (options: UseCombinedAnalysisOptions) => {
       procesado_en: new Date().toISOString(),
       confianza_general: calculateConfianzaGeneral(),
     };
-  }, [grabacionId, tipoGrabacion, participantes, generateAnalisisEspecifico]);
-
-  // Calcular confianza general del análisis
-  const calculateConfianzaGeneral = useCallback((): number => {
-    const frames = emotionFramesRef.current;
-    if (frames.length === 0) return 0;
-
-    const avgConfidence = frames.reduce((sum, f) => sum + f.confianza_deteccion, 0) / frames.length;
-    const hasBaseline = baselineRef.current ? 0.1 : 0;
-    const hasEnoughFrames = frames.length > 100 ? 0.1 : 0;
-
-    return Math.min(1, avgConfidence + hasBaseline + hasEnoughFrames);
-  }, []);
+  }, [grabacionId, tipoGrabacion, participantes, generateAnalisisEspecifico, calculateConfianzaGeneral]);
 
   return {
     isAnalyzing,
@@ -244,12 +245,20 @@ export const useCombinedAnalysis = (options: UseCombinedAnalysisOptions) => {
   };
 };
 
+// Helper para encontrar la predicción más reciente de un tipo
+function findLatestPrediction(predictions: PrediccionComportamiento[], type: string): PrediccionComportamiento | undefined {
+  return predictions
+    .filter(p => p.tipo === type)
+    .sort((a, b) => b.timestamp - a.timestamp)[0];
+}
+
 // ==================== GENERADORES DE ANÁLISIS POR TIPO ====================
 
 function generateAnalisisRRHH(
   emotionFrames: EmotionFrame[],
   bodyFrames: BodyLanguageFrame[],
-  microexpresiones: MicroexpresionData[]
+  microexpresiones: MicroexpresionData[],
+  predicciones: PrediccionComportamiento[]
 ): AnalisisRRHH {
   const avgEngagement = emotionFrames.length > 0
     ? emotionFrames.reduce((sum, f) => sum + f.engagement_score, 0) / emotionFrames.length
@@ -271,6 +280,31 @@ function generateAnalisisRRHH(
 
   const congruenciaScore = calculateCongruencia(emotionFrames, bodyFrames);
 
+  // Usar predicciones del sistema experto si existen, sino fallback
+  const predFit = findLatestPrediction(predicciones, 'fit_cultural') || {
+    tipo: 'fit_cultural',
+    probabilidad: avgEngagement * 0.7 + congruenciaScore * 0.3,
+    confianza: 0.6,
+    factores: avgEngagement > 0.6 ? ['Alto engagement'] : ['Engagement moderado'],
+    timestamp: Date.now(),
+  };
+
+  const predInteres = findLatestPrediction(predicciones, 'nivel_interes_puesto') || {
+    tipo: 'nivel_interes_puesto',
+    probabilidad: avgEngagement,
+    confianza: 0.7,
+    factores: ['Basado en engagement promedio'],
+    timestamp: Date.now(),
+  };
+
+  const predAutenticidad = findLatestPrediction(predicciones, 'autenticidad_respuestas') || {
+    tipo: 'autenticidad_respuestas',
+    probabilidad: congruenciaScore,
+    confianza: 0.65,
+    factores: microexpresiones.length > 5 ? ['Múltiples microexpresiones detectadas'] : ['Expresiones estables'],
+    timestamp: Date.now(),
+  };
+
   return {
     tipo: 'rrhh',
     congruencia_verbal_no_verbal: congruenciaScore,
@@ -285,27 +319,9 @@ function generateAnalisisRRHH(
       score: f.engagement_score,
     })),
     predicciones: {
-      fit_cultural: {
-        tipo: 'fit_cultural',
-        probabilidad: avgEngagement * 0.7 + congruenciaScore * 0.3,
-        confianza: 0.6,
-        factores: avgEngagement > 0.6 ? ['Alto engagement'] : ['Engagement moderado'],
-        timestamp: Date.now(),
-      },
-      nivel_interes_puesto: {
-        tipo: 'nivel_interes_puesto',
-        probabilidad: avgEngagement,
-        confianza: 0.7,
-        factores: ['Basado en engagement promedio'],
-        timestamp: Date.now(),
-      },
-      autenticidad_respuestas: {
-        tipo: 'autenticidad_respuestas',
-        probabilidad: congruenciaScore,
-        confianza: 0.65,
-        factores: microexpresiones.length > 5 ? ['Múltiples microexpresiones detectadas'] : ['Expresiones estables'],
-        timestamp: Date.now(),
-      },
+      fit_cultural: predFit,
+      nivel_interes_puesto: predInteres,
+      autenticidad_respuestas: predAutenticidad,
     },
     resumen: {
       fortalezas_observadas: generateFortalezasRRHH(avgEngagement, congruenciaScore),
@@ -320,7 +336,8 @@ function generateAnalisisRRHH(
 function generateAnalisisDeals(
   emotionFrames: EmotionFrame[],
   bodyFrames: BodyLanguageFrame[],
-  microexpresiones: MicroexpresionData[]
+  microexpresiones: MicroexpresionData[],
+  predicciones: PrediccionComportamiento[]
 ): AnalisisDeals {
   const momentosInteres = emotionFrames
     .filter(f => f.engagement_score > 0.7 || f.emocion_dominante === 'surprised')
@@ -351,7 +368,38 @@ function generateAnalisisDeals(
     ? emotionFrames.reduce((sum, f) => sum + f.engagement_score, 0) / emotionFrames.length
     : 0.5;
 
-  const probabilidadCierre = Math.min(1, avgEngagement * 0.5 + (momentosInteres.length / 10) * 0.3 - (señalesObjecion.length / 10) * 0.2);
+  const probabilidadCierreCalc = Math.min(1, avgEngagement * 0.5 + (momentosInteres.length / 10) * 0.3 - (señalesObjecion.length / 10) * 0.2);
+
+  // Usar predicciones del sistema experto
+  const predCierre = findLatestPrediction(predicciones, 'probabilidad_cierre') || {
+    tipo: 'probabilidad_cierre',
+    probabilidad: probabilidadCierreCalc,
+    confianza: 0.7,
+    factores: probabilidadCierreCalc > 0.6 
+      ? ['Alto engagement', 'Señales de interés positivas']
+      : ['Engagement moderado', 'Considerar objeciones'],
+    timestamp: Date.now(),
+  };
+
+  const predSiguientePaso = findLatestPrediction(predicciones, 'siguiente_paso_recomendado') || {
+    tipo: 'siguiente_paso',
+    probabilidad: predCierre.probabilidad > 0.5 ? 0.8 : 0.4,
+    confianza: 0.6,
+    factores: predCierre.probabilidad > 0.5
+      ? ['Proponer cierre o siguiente reunión']
+      : ['Abordar objeciones detectadas'],
+    timestamp: Date.now(),
+  };
+
+  const predObjecion = findLatestPrediction(predicciones, 'objecion_principal') || {
+    tipo: 'objecion_principal',
+    probabilidad: señalesObjecion.length > 0 ? 0.7 : 0.3,
+    confianza: 0.5,
+    factores: señalesObjecion.length > 0
+      ? ['Objeciones detectadas - revisar momentos específicos']
+      : ['Sin objeciones claras detectadas'],
+    timestamp: Date.now(),
+  };
 
   return {
     tipo: 'deals',
@@ -368,39 +416,15 @@ function generateAnalisisDeals(
         intensidad: m.intensidad,
       })),
     predicciones: {
-      probabilidad_cierre: {
-        tipo: 'probabilidad_cierre',
-        probabilidad: probabilidadCierre,
-        confianza: 0.7,
-        factores: probabilidadCierre > 0.6 
-          ? ['Alto engagement', 'Señales de interés positivas']
-          : ['Engagement moderado', 'Considerar objeciones'],
-        timestamp: Date.now(),
-      },
-      siguiente_paso_recomendado: {
-        tipo: 'siguiente_paso',
-        probabilidad: probabilidadCierre > 0.5 ? 0.8 : 0.4,
-        confianza: 0.6,
-        factores: probabilidadCierre > 0.5
-          ? ['Proponer cierre o siguiente reunión']
-          : ['Abordar objeciones detectadas'],
-        timestamp: Date.now(),
-      },
-      objecion_principal: {
-        tipo: 'objecion_principal',
-        probabilidad: señalesObjecion.length > 0 ? 0.7 : 0.3,
-        confianza: 0.5,
-        factores: señalesObjecion.length > 0
-          ? ['Objeciones detectadas - revisar momentos específicos']
-          : ['Sin objeciones claras detectadas'],
-        timestamp: Date.now(),
-      },
+      probabilidad_cierre: predCierre,
+      siguiente_paso_recomendado: predSiguientePaso,
+      objecion_principal: predObjecion,
     },
     resumen: {
       momentos_clave: momentosInteres.slice(0, 5).map(m => `${Math.round(m.timestamp)}s: Alto interés`),
       objeciones_detectadas: señalesObjecion.slice(0, 3).map(s => `${Math.round(s.timestamp)}s: Señal de objeción`),
-      recomendaciones_seguimiento: generateRecomendacionesDeals(probabilidadCierre, señalesObjecion.length),
-      probabilidad_cierre_estimada: probabilidadCierre,
+      recomendaciones_seguimiento: generateRecomendacionesDeals(predCierre.probabilidad, señalesObjecion.length),
+      probabilidad_cierre_estimada: predCierre.probabilidad,
     },
   };
 }
@@ -409,7 +433,8 @@ function generateAnalisisEquipo(
   emotionFrames: EmotionFrame[],
   bodyFrames: BodyLanguageFrame[],
   microexpresiones: MicroexpresionData[],
-  participantes: { id: string; nombre: string }[]
+  participantes: { id: string; nombre: string }[],
+  predicciones: PrediccionComportamiento[]
 ): AnalisisEquipo {
   const avgEngagement = emotionFrames.length > 0
     ? emotionFrames.reduce((sum, f) => sum + f.engagement_score, 0) / emotionFrames.length
@@ -430,6 +455,32 @@ function generateAnalisisEquipo(
       participantes_desconectados: participantes.map(p => p.nombre),
       posible_causa: 'Bajo engagement detectado',
     }));
+
+  const predAdopcion = findLatestPrediction(predicciones, 'adopcion_ideas') || {
+    tipo: 'adopcion_ideas',
+    probabilidad: avgEngagement,
+    confianza: 0.7,
+    factores: avgEngagement > 0.6 ? ['Equipo receptivo'] : ['Considerar más discusión'],
+    timestamp: Date.now(),
+  };
+
+  const predSeguimiento = findLatestPrediction(predicciones, 'necesidad_seguimiento') || {
+    tipo: 'necesidad_seguimiento',
+    probabilidad: momentosDesconexion.length > 5 ? 0.8 : 0.3,
+    confianza: 0.6,
+    factores: momentosDesconexion.length > 5
+      ? ['Múltiples momentos de desconexión']
+      : ['Reunión fluida'],
+    timestamp: Date.now(),
+  };
+
+  const predConflicto = findLatestPrediction(predicciones, 'riesgo_conflicto') || {
+    tipo: 'riesgo_conflicto',
+    probabilidad: microexpresiones.filter(m => m.emocion === 'angry').length > 3 ? 0.6 : 0.2,
+    confianza: 0.5,
+    factores: [],
+    timestamp: Date.now(),
+  };
 
   return {
     tipo: 'equipo',
@@ -453,29 +504,9 @@ function generateAnalisisEquipo(
       participantes_pasivos: [],
     },
     predicciones: {
-      adopcion_ideas: {
-        tipo: 'adopcion_ideas',
-        probabilidad: avgEngagement,
-        confianza: 0.7,
-        factores: avgEngagement > 0.6 ? ['Equipo receptivo'] : ['Considerar más discusión'],
-        timestamp: Date.now(),
-      },
-      necesidad_seguimiento: {
-        tipo: 'necesidad_seguimiento',
-        probabilidad: momentosDesconexion.length > 5 ? 0.8 : 0.3,
-        confianza: 0.6,
-        factores: momentosDesconexion.length > 5
-          ? ['Múltiples momentos de desconexión']
-          : ['Reunión fluida'],
-        timestamp: Date.now(),
-      },
-      riesgo_conflicto: {
-        tipo: 'riesgo_conflicto',
-        probabilidad: microexpresiones.filter(m => m.emocion === 'angry').length > 3 ? 0.6 : 0.2,
-        confianza: 0.5,
-        factores: [],
-        timestamp: Date.now(),
-      },
+      adopcion_ideas: predAdopcion,
+      necesidad_seguimiento: predSeguimiento,
+      riesgo_conflicto: predConflicto,
     },
     resumen: {
       ideas_mejor_recibidas: [],
