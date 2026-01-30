@@ -9,6 +9,7 @@ import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
 import { RecordingManager } from './meetings/recording/RecordingManager';
+import { BottomControlBar } from './BottomControlBar';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -17,32 +18,6 @@ const WORLD_SIZE = 100;
 const PROXIMITY_RADIUS = 180; // 180px para detectar proximidad
 
 // --- Iconos ---
-const IconMic = ({ on }: { on: boolean }) => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    {on ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-20a3 3 0 00-3 3v8a3 3 0 006 0V5a3 3 0 00-3-3z"/> 
-       : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" />}
-  </svg>
-);
-
-const IconCam = ({ on }: { on: boolean }) => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    {on ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/> 
-       : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />}
-  </svg>
-);
-
-const IconScreen = ({ on }: { on: boolean }) => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
-    {!on && <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M3 3l18 18" />}
-  </svg>
-);
-
-const IconReaction = () => (
-  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-  </svg>
-);
 
 const IconPrivacy = ({ on }: { on: boolean }) => (
   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,13 +33,6 @@ const IconExpand = ({ on }: { on: boolean }) => (
     ) : (
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
     )}
-  </svg>
-);
-
-const IconRecord = ({ on }: { on: boolean }) => (
-  <svg className="w-4 h-4" fill={on ? "currentColor" : "none"} stroke="currentColor" viewBox="0 0 24 24">
-    <circle cx="12" cy="12" r="6" strokeWidth="2.5" />
-    {on && <circle cx="12" cy="12" r="3" fill="currentColor" />}
   </svg>
 );
 
@@ -500,24 +468,15 @@ const StableVideo: React.FC<{ stream: MediaStream | null; muted?: boolean; class
 interface VideoHUDProps {
   userName: string;
   visitorId: string;
-  micOn: boolean;
   camOn: boolean;
   sharingOn: boolean;
   isPrivate: boolean;
-  isRecording: boolean;
-  recordingDuration: number;
   usersInCall: User[];
   stream: MediaStream | null;
   screenStream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   remoteScreenStreams: Map<string, MediaStream>;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
-  onToggleMic: () => void;
-  onToggleCam: () => void;
-  onToggleShare: () => void;
-  onTogglePrivacy: () => void;
-  onToggleRecording: () => void;
-  onTriggerReaction: (emoji: string) => void;
   onWaveUser: (userId: string) => void;
   currentReaction: string | null;
   theme: string;
@@ -526,14 +485,13 @@ interface VideoHUDProps {
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, visitorId, micOn, camOn, sharingOn, isPrivate, isRecording, recordingDuration, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
-  onToggleMic, onToggleCam, onToggleShare, onTogglePrivacy, onToggleRecording, onTriggerReaction, onWaveUser, currentReaction, theme, speakingUsers, userDistances
+  userName, visitorId, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
+  onWaveUser, currentReaction, theme, speakingUsers, userDistances
 }) => {
   const localVideoRef = useRef<HTMLVideoElement>(null);
   const screenVideoRef = useRef<HTMLVideoElement>(null);
   const accentColor = theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-600 text-white';
-  const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
-  const [showEmojis, setShowEmojis] = useState(false);
+  
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
   const [reactionFading, setReactionFading] = useState(false);
@@ -561,11 +519,6 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
       screenVideoRef.current.play().catch(e => console.warn("Auto-play error", e));
     }
   }, [screenStream]);
-
-  const handleEmojiClick = (emoji: string) => {
-    setShowEmojis(false);
-    onTriggerReaction(emoji);
-  };
 
   // Manejar video expandido sin titileo
   useEffect(() => {
@@ -725,36 +678,9 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           )}
           
-          {/* Controles */}
-          <div className="absolute bottom-3 left-2 right-2 flex justify-center items-center gap-1 transition-all duration-300 opacity-0 group-hover:opacity-100">
-            <button onClick={onToggleMic} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${micOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
-              <IconMic on={micOn}/>
-            </button>
-            <button onClick={onToggleCam} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${camOn ? 'bg-white/20 text-white hover:bg-white/40' : 'bg-red-500 text-white shadow-lg'}`}>
-              <IconCam on={camOn}/>
-            </button>
-            <button onClick={onToggleShare} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${sharingOn ? accentColor : 'bg-white/20 text-white hover:bg-white/40'}`}>
-              <IconScreen on={sharingOn}/>
-            </button>
-            <button onClick={onTogglePrivacy} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${isPrivate ? 'bg-amber-500 text-white shadow-lg' : 'bg-white/20 text-white hover:bg-white/40'}`}>
-              <IconPrivacy on={isPrivate}/>
-            </button>
-            <button onClick={onToggleRecording} className={`w-7 h-7 rounded-full flex items-center justify-center backdrop-blur-md border border-white/10 transition-all ${isRecording ? 'bg-red-600 text-white shadow-lg animate-pulse' : 'bg-white/20 text-white hover:bg-white/40'}`} title={isRecording ? 'Detener grabación' : 'Iniciar grabación'}>
-              <IconRecord on={isRecording}/>
-            </button>
-            <div className="relative">
-              <button onClick={() => setShowEmojis(!showEmojis)} className="w-7 h-7 rounded-full flex items-center justify-center bg-white/20 backdrop-blur-md border border-white/10 text-white hover:bg-white/40 transition-all">
-                <IconReaction />
-              </button>
-              {showEmojis && (
-                <div className="absolute bottom-9 left-1/2 -translate-x-1/2 bg-black/90 backdrop-blur-xl p-1.5 rounded-2xl border border-white/10 flex gap-1 shadow-2xl z-50">
-                  {emojis.map(e => (
-                    <button key={e} onClick={() => handleEmojiClick(e)} className="text-xl hover:scale-125 transition-transform p-1">{e}</button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <button onClick={() => setExpandedId('local')} className="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 backdrop-blur-md border border-white/10 text-white hover:bg-indigo-500 transition-all">
+          {/* Controles simplificados (solo expandir) */}
+          <div className="absolute bottom-3 right-3 flex justify-end items-center gap-1 transition-all duration-300 opacity-0 group-hover:opacity-100">
+            <button onClick={() => setExpandedId('local')} className="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 backdrop-blur-md border border-white/10 text-white hover:bg-indigo-500 transition-all shadow-lg">
               <IconExpand on={false}/>
             </button>
           </div>
@@ -768,7 +694,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbuja de screen share (separada) */}
         {sharingOn && screenStream && (
           <div className="relative bg-black rounded-[28px] overflow-hidden border border-indigo-500/50 shadow-2xl group w-52 h-36">
-            <StableVideo stream={screenStream} className="w-full h-full object-cover block" />
+            <StableVideo stream={screenStream} className="w-full h-full object-cover" />
             <div className="absolute top-3 left-3 bg-indigo-600 backdrop-blur-md px-2 py-1 rounded-lg">
               <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tu pantalla</span>
             </div>
@@ -1088,64 +1014,19 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [hasActiveCall]);
 
+  // Estado para trigger externo de grabación
+  const [recordingTrigger, setRecordingTrigger] = useState(false);
+  const [showEmojis, setShowEmojis] = useState(false);
+
   // Toggle grabación
   const handleToggleRecording = useCallback(async () => {
-    if (isRecording) {
-      // Detener grabación
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        mediaRecorderRef.current.stop();
-      }
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-      setIsRecording(false);
-      setRecordingDuration(0);
+    // Si estamos en modo headless, usamos el trigger
+    if (!isRecording) {
+      setRecordingTrigger(true);
     } else {
-      // Iniciar grabación
-      if (!stream) {
-        alert('Necesitas tener la cámara o micrófono activo para grabar');
-        return;
-      }
-      
-      try {
-        recordedChunksRef.current = [];
-        const recorder = new MediaRecorder(stream, { mimeType: 'video/webm;codecs=vp9,opus' });
-        
-        recorder.ondataavailable = (e) => {
-          if (e.data.size > 0) {
-            recordedChunksRef.current.push(e.data);
-          }
-        };
-        
-        recorder.onstop = async () => {
-          const blob = new Blob(recordedChunksRef.current, { type: 'video/webm' });
-          console.log('Grabación finalizada:', blob.size, 'bytes');
-          // Aquí se puede subir a Supabase Storage
-          const url = URL.createObjectURL(blob);
-          const a = document.createElement('a');
-          a.href = url;
-          a.download = `reunion_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.webm`;
-          a.click();
-          URL.revokeObjectURL(url);
-        };
-        
-        mediaRecorderRef.current = recorder;
-        recorder.start(1000);
-        setIsRecording(true);
-        
-        // Iniciar contador
-        const startTime = Date.now();
-        recordingIntervalRef.current = setInterval(() => {
-          setRecordingDuration(Math.floor((Date.now() - startTime) / 1000));
-        }, 1000);
-        
-      } catch (err) {
-        console.error('Error iniciando grabación:', err);
-        alert('No se pudo iniciar la grabación');
-      }
+      setRecordingTrigger(true); // El mismo trigger sirve para toggle en el manager
     }
-  }, [isRecording, stream]);
+  }, [isRecording]);
 
   // Trigger reaction con auto-clear y envío a otros usuarios
   const handleTriggerReaction = useCallback((emoji: string) => {
@@ -1611,36 +1492,41 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       </button>
       
       {/* VideoHUD - solo se muestra cuando hay usuarios cerca */}
-      {hasActiveCall && (
-        <VideoHUD
-          userName={currentUser.name}
-          visitorId={session?.user?.id || ''}
-          micOn={!!currentUser.isMicOn}
-          camOn={!!currentUser.isCameraOn}
-          sharingOn={!!currentUser.isScreenSharing}
-          isPrivate={!!currentUser.isPrivate}
-          isRecording={isRecording}
-          recordingDuration={recordingDuration}
-          usersInCall={usersInCall}
-          stream={stream}
-          screenStream={screenStream}
-          remoteStreams={remoteStreams}
-          remoteScreenStreams={remoteScreenStreams}
-          remoteReaction={remoteReaction}
-          onToggleMic={toggleMic}
-          onToggleCam={toggleCamera}
-          onToggleShare={handleToggleScreenShare}
-          onTogglePrivacy={togglePrivacy}
-          onToggleRecording={handleToggleRecording}
-          onTriggerReaction={handleTriggerReaction}
-          onWaveUser={handleWaveUser}
-          currentReaction={currentReaction}
-          theme={theme}
-          speakingUsers={speakingUsers}
-          userDistances={userDistances}
-        />
-      )}
-      
+      {/* HUD de video (burbujas) */}
+      <VideoHUD
+        userName={currentUser.name}
+        visitorId={session?.user?.id || 'visitor'}
+        camOn={currentUser.isCameraOn}
+        sharingOn={currentUser.isScreenSharing}
+        isPrivate={currentUser.isPrivate}
+        usersInCall={usersInCall}
+        stream={stream}
+        screenStream={screenStream}
+        remoteStreams={remoteStreams}
+        remoteScreenStreams={remoteScreenStreams}
+        remoteReaction={remoteReaction}
+        onWaveUser={handleWaveUser}
+        currentReaction={currentReaction}
+        theme={theme}
+        speakingUsers={speakingUsers}
+        userDistances={userDistances}
+      />
+
+      {/* Barra de Controles Inferior (Estilo 2026) */}
+      <BottomControlBar
+        onToggleMic={toggleMic}
+        onToggleCam={toggleCamera}
+        onToggleShare={handleToggleScreenShare}
+        onToggleRecording={handleToggleRecording}
+        onToggleEmojis={() => setShowEmojis(!showEmojis)}
+        isMicOn={currentUser.isMicOn}
+        isCamOn={currentUser.isCameraOn}
+        isSharing={currentUser.isScreenSharing}
+        isRecording={isRecording}
+        showEmojis={showEmojis}
+        onTriggerReaction={handleTriggerReaction}
+      />
+
       {/* Minimapa */}
       <Minimap currentUser={currentUser} users={onlineUsers} workspace={activeWorkspace} />
       
@@ -1686,6 +1572,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           onProcessingComplete={(resultado) => {
             console.log('✅ Análisis conductual completado:', resultado?.tipo_grabacion, resultado?.analisis);
           }}
+          headlessMode={true}
+          externalTrigger={recordingTrigger}
+          onExternalTriggerHandled={() => setRecordingTrigger(false)}
         />
       )}
     </div>

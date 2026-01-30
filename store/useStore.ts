@@ -131,7 +131,7 @@ export const useStore = create<AppState>((set, get) => ({
           .from('avatar_configuracion')
           .select('configuracion')
           .eq('usuario_id', user.id)
-          .single();
+          .maybeSingle();
 
         const { data: usuarioData } = await supabase
           .from('usuarios')

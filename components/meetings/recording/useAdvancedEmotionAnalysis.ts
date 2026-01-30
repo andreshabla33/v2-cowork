@@ -365,7 +365,8 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
     baselineRef.current = baseline;
     setState(prev => ({ ...prev, baselineComplete: true }));
     onBaselineComplete?.(baseline);
-    console.log('📊 Baseline calculado:', baseline);
+    // Log reducido para evitar spam en consola
+    console.log('📊 Baseline calculado (engagement_promedio:', baseline.engagement_promedio.toFixed(2), ')');
   }, [onBaselineComplete]);
 
   // Generar predicciones basadas en el tipo de grabación

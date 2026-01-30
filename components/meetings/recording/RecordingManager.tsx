@@ -33,6 +33,9 @@ interface RecordingManagerProps {
   cargoUsuario?: CargoLaboral; // Nuevo: cargo del usuario para permisos
   onRecordingStateChange?: (isRecording: boolean) => void;
   onProcessingComplete?: (resultado: ResultadoAnalisis | null) => void;
+  headlessMode?: boolean;
+  externalTrigger?: boolean;
+  onExternalTriggerHandled?: () => void;
 }
 
 interface ProcessingState {
@@ -50,7 +53,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   stream,
   cargoUsuario = 'colaborador',
   onRecordingStateChange,
-  onProcessingComplete,
+  onExternalTriggerHandled,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
@@ -267,7 +270,19 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     }
   }, [updateState, onRecordingStateChange, stopTranscription, combinedAnalysis]);
 
-  // Manejar clic en botón de grabar
+  // Manejar trigger externo
+  useEffect(() => {
+    if (externalTrigger && onExternalTriggerHandled) {
+      if (isRecording) {
+        stopRecording();
+      } else {
+        setShowTypeSelector(true);
+      }
+      onExternalTriggerHandled();
+    }
+  }, [externalTrigger, onExternalTriggerHandled, isRecording, stopRecording]);
+
+  // Manejar selección de tipo de grabar
   const handleRecordClick = useCallback(() => {
     if (isRecording) {
       stopRecording();
@@ -665,8 +680,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         </div>
       )}
 
-      {/* Botón flotante para iniciar grabación con análisis */}
-      {processingState.step === 'idle' && !isRecording && (
+      {/* Botón flotante para iniciar grabación con análisis (Solo si NO es headless) */}
+      {processingState.step === 'idle' && !isRecording && !headlessMode && (
         <div className="fixed bottom-6 right-6 z-[200]">
           {stream ? (
             <button
@@ -694,8 +709,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         </div>
       )}
 
-      {/* Indicador de grabación activa (esquina) */}
-      {isRecording && (
+      {/* Indicador de grabación activa (esquina) - Solo si NO es headless */}
+      {isRecording && !headlessMode && (
         <div className="fixed top-4 left-4 z-[200]">
           <div className="flex items-center gap-3 bg-red-600 px-4 py-2 rounded-full shadow-lg">
             <span className="w-3 h-3 bg-white rounded-full animate-pulse"></span>
