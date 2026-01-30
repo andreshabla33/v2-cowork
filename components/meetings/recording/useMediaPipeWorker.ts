@@ -185,15 +185,7 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
 
       return new Promise((resolve) => {
         // Guardar callback para esta solicitud
-        pendingCallbacksRef.current.set(timestamp, (result) => {
-          // Debug log para confirmar recepción (siempre loguear para debug)
-          console.log('✅ [Hook] Frame recibido del worker', { 
-            ts: timestamp, 
-            face: !!result.face?.hasDetection, 
-            pose: !!result.pose?.hasDetection 
-          });
-          resolve(result);
-        });
+        pendingCallbacksRef.current.set(timestamp, resolve);
 
         // Enviar al worker
         // Transferimos el ownership del ImageBitmap para evitar copias

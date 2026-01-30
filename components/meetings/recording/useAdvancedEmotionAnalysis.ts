@@ -44,9 +44,9 @@ interface AdvancedEmotionAnalysisState {
   microexpresionesDetectadas: number;
 }
 
-const ANALYSIS_INTERVAL_MS = 500; // 2 FPS - optimizado para rendimiento
+const ANALYSIS_INTERVAL_MS = 150; // ~6 FPS - Mayor frecuencia para microexpresiones
 const BASELINE_DURATION_MS = 5000; // 5 segundos de calibración
-const MICROEXPRESSION_MAX_DURATION_MS = 500;
+const MICROEXPRESSION_MAX_DURATION_MS = 500; // Standard microexpression upper bound
 const ABRUPT_CHANGE_THRESHOLD = 0.3;
 const USE_WEB_WORKER = true; // Activado con fallback automático si falla
 
@@ -290,30 +290,38 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
   const checkMicroexpression = useCallback((emotion: EmotionType, intensity: number, blendshapes: Record<string, number>) => {
     const now = performance.now();
     
-    if (!emotionStartTimeRef.current || emotionStartTimeRef.current.emotion !== emotion) {
-      // Nueva emoción detectada
-      if (emotionStartTimeRef.current && emotionStartTimeRef.current.emotion !== 'neutral') {
-        const duration = now - emotionStartTimeRef.current.startTime;
+    // Inicializar si no existe referencia previa
+    if (!emotionStartTimeRef.current) {
+      emotionStartTimeRef.current = { emotion, startTime: now };
+      return;
+    }
+
+    // Detectar cambio de emoción
+    if (emotionStartTimeRef.current.emotion !== emotion) {
+      const prevEmotion = emotionStartTimeRef.current.emotion;
+      const duration = now - emotionStartTimeRef.current.startTime;
+
+      // Criterios para microexpresión:
+      // 1. Duración muy corta (< 500ms) pero perceptible (> 40ms)
+      // 2. La emoción previa no era neutral (o era una emoción significativa)
+      if (duration < MICROEXPRESSION_MAX_DURATION_MS && duration > 40 && prevEmotion !== 'neutral') {
+        const micro: MicroexpresionData = {
+          timestamp_ms: now - startTimeRef.current - duration,
+          emocion: prevEmotion,
+          intensidad: 0.7, // Intensidad estimada del pico
+          duracion_ms: duration,
+          es_microexpresion: true,
+          action_units: blendshapes,
+        };
         
-        if (duration < MICROEXPRESSION_MAX_DURATION_MS && intensity > 0.2) {
-          const micro: MicroexpresionData = {
-            timestamp_ms: now - startTimeRef.current,
-            emocion: emotionStartTimeRef.current.emotion,
-            intensidad: intensity,
-            duracion_ms: duration,
-            es_microexpresion: true,
-            action_units: blendshapes,
-          };
-          
-          microexpresionesRef.current.push(micro);
-          setState(prev => ({ 
-            ...prev, 
-            microexpresionesDetectadas: prev.microexpresionesDetectadas + 1 
-          }));
-          
-          onMicroexpresion?.(micro);
-          console.log(`⚡ Microexpresión detectada: ${micro.emocion} (${Math.round(micro.duracion_ms)}ms)`);
-        }
+        microexpresionesRef.current.push(micro);
+        setState(prev => ({ 
+          ...prev, 
+          microexpresionesDetectadas: prev.microexpresionesDetectadas + 1 
+        }));
+        
+        onMicroexpresion?.(micro);
+        console.log(`⚡ Microexpresión detectada: ${micro.emocion} (${Math.round(micro.duracion_ms)}ms)`);
       }
       
       emotionStartTimeRef.current = { emotion, startTime: now };
@@ -329,93 +337,126 @@ export const useAdvancedEmotionAnalysis = (options: UseAdvancedEmotionAnalysisOp
       happy: 0, sad: 0, angry: 0, surprised: 0, 
       fearful: 0, disgusted: 0, contempt: 0, neutral: 0
     };
-    let engagementSuma = 0;
-    let variabilidadSuma = 0;
 
-    frames.forEach((frame, i) => {
-      for (const [emocion, score] of Object.entries(frame.emociones_scores)) {
-        emocionesSuma[emocion as EmotionType] += score;
-      }
-      engagementSuma += frame.engagement_score;
-
-      if (i > 0) {
-        const prevFrame = frames[i - 1];
-        for (const emocion of Object.keys(frame.emociones_scores) as EmotionType[]) {
-          variabilidadSuma += Math.abs(
-            frame.emociones_scores[emocion] - prevFrame.emociones_scores[emocion]
-          );
-        }
-      }
+    let engagementSum = 0;
+    
+    frames.forEach(frame => {
+      Object.entries(frame.emociones_scores).forEach(([emotion, score]) => {
+        emocionesSuma[emotion as EmotionType] = (emocionesSuma[emotion as EmotionType] || 0) + score;
+      });
+      engagementSum += frame.engagement_score;
     });
 
-    const n = frames.length;
+    const count = frames.length;
+    const promedios: Record<EmotionType, number> = { ...emocionesSuma };
+    // @ts-ignore
+    Object.keys(promedios).forEach(key => {
+      promedios[key as EmotionType] /= count;
+    });
+
     const baseline: BaselineEmocional = {
-      emociones_promedio: Object.fromEntries(
-        Object.entries(emocionesSuma).map(([k, v]) => [k, v / n])
-      ) as Record<EmotionType, number>,
-      engagement_promedio: engagementSuma / n,
-      variabilidad: variabilidadSuma / (n - 1) / Object.keys(emocionesSuma).length,
-      timestamp_inicio: frames[0].timestamp_segundos,
-      timestamp_fin: frames[n - 1].timestamp_segundos,
+      emociones_promedio: promedios,
+      engagement_promedio: engagementSum / count,
+      variabilidad: 0.1, // Valor estimado
+      timestamp_inicio: startTimeRef.current,
+      timestamp_fin: Date.now()
     };
 
     baselineRef.current = baseline;
-    setState(prev => ({ ...prev, baselineComplete: true, isCalibrating: false }));
+    setState(prev => ({ ...prev, baselineComplete: true }));
     onBaselineComplete?.(baseline);
-    
-    console.log('📊 Baseline establecido:', {
-      engagement: Math.round(baseline.engagement_promedio * 100) + '%',
-      variabilidad: baseline.variabilidad.toFixed(3),
-    });
+    console.log('📊 Baseline calculado:', baseline);
   }, [onBaselineComplete]);
 
   // Generar predicciones basadas en el tipo de grabación
   const generatePredictions = useCallback(() => {
     if (framesHistoryRef.current.length < 30) return;
 
-    const recentFrames = framesHistoryRef.current.slice(-30);
+    const recentFrames = framesHistoryRef.current.slice(-50); // Últimos ~7-10 segundos
     const avgEngagement = recentFrames.reduce((sum, f) => sum + f.engagement_score, 0) / recentFrames.length;
-    const avgStress = recentFrames.reduce((sum, f) => {
-      // Calcular estrés aproximado desde emociones negativas
-      return sum + (f.emociones_scores.fearful || 0) + (f.emociones_scores.angry || 0) * 0.5;
-    }, 0) / recentFrames.length;
+    
+    // Análisis de emociones negativas específicas
+    const avgFear = recentFrames.reduce((sum, f) => sum + (f.emociones_scores.fearful || 0), 0) / recentFrames.length;
+    const avgAnger = recentFrames.reduce((sum, f) => sum + (f.emociones_scores.angry || 0), 0) / recentFrames.length;
+    const avgSurprise = recentFrames.reduce((sum, f) => sum + (f.emociones_scores.surprised || 0), 0) / recentFrames.length;
+    const avgSadness = recentFrames.reduce((sum, f) => sum + (f.emociones_scores.sad || 0), 0) / recentFrames.length;
+    const avgStress = (avgFear + avgAnger) / 2;
 
     let prediccion: PrediccionComportamiento | null = null;
+    const timestamp = Date.now();
 
     switch (tipoGrabacion) {
       case 'deals':
+        // Lógica específica para Ventas
+        let cierreProb = avgEngagement * 0.6 + (1 - avgStress) * 0.4;
+        let factoresDeals: string[] = [];
+        
+        if (avgEngagement > 0.7) factoresDeals.push('Cliente altamente receptivo');
+        else if (avgEngagement < 0.4) factoresDeals.push('Cliente distraído o desinteresado');
+
+        if (avgSurprise > 0.3) {
+           factoresDeals.push('Sorpresa detectada: ¿Precio o propuesta inesperada?');
+           cierreProb += 0.1;
+        }
+        if (avgAnger > 0.2) {
+           factoresDeals.push('Resistencia/Molestia detectada: Manejar objeciones');
+           cierreProb -= 0.3;
+        }
+        if (avgSadness > 0.2) {
+           factoresDeals.push('Duda o decepción: Reforzar valor');
+           cierreProb -= 0.2;
+        }
+        
         prediccion = {
           tipo: 'probabilidad_cierre',
-          probabilidad: Math.min(1, avgEngagement * 1.2 - avgStress * 0.5),
-          confianza: 0.7,
-          factores: avgEngagement > 0.6 
-            ? ['Alto engagement detectado', 'Postura receptiva']
-            : ['Engagement moderado', 'Revisar objeciones'],
-          timestamp: Date.now(),
+          probabilidad: Math.max(0, Math.min(1, cierreProb)),
+          confianza: 0.75,
+          factores: factoresDeals.length > 0 ? factoresDeals : ['Interacción estándar'],
+          timestamp,
         };
         break;
 
       case 'rrhh':
+        // Lógica específica para Entrevistas
+        let autenticidad = 0.5 + (1 - avgStress) * 0.5;
+        let factoresRRHH: string[] = [];
+
+        if (avgStress > 0.4) {
+           factoresRRHH.push('Alto nivel de estrés: Posible tema sensible o nerviosismo');
+           autenticidad -= 0.2;
+        } else {
+           factoresRRHH.push('Candidato relajado y confiado');
+        }
+
+        if (avgEngagement > 0.6) factoresRRHH.push('Buena conexión interpersonal');
+        if (microexpresionesRef.current.length > 2) factoresRRHH.push('Incongruencias emocionales detectadas (Microexpresiones)');
+
         prediccion = {
           tipo: 'autenticidad_respuestas',
-          probabilidad: Math.min(1, 0.5 + avgEngagement * 0.3 - avgStress * 0.2),
-          confianza: 0.65,
-          factores: avgStress < 0.3
-            ? ['Nivel de estrés normal', 'Expresiones congruentes']
-            : ['Estrés elevado detectado', 'Verificar con preguntas de seguimiento'],
-          timestamp: Date.now(),
+          probabilidad: Math.max(0, Math.min(1, autenticidad)),
+          confianza: 0.7,
+          factores: factoresRRHH,
+          timestamp,
         };
         break;
 
       case 'equipo':
+        // Lógica específica para Reuniones de Equipo
+        let cohesion = avgEngagement;
+        let factoresEquipo: string[] = [];
+
+        if (avgEngagement > 0.6) factoresEquipo.push('Alta sintonía del equipo');
+        else if (avgEngagement < 0.3) factoresEquipo.push('Equipo desconectado/aburrido');
+
+        if (avgAnger > 0.15) factoresEquipo.push('Tensión latente detectada');
+        if (avgSurprise > 0.2) factoresEquipo.push('Reacción a nuevas noticias');
+        
         prediccion = {
           tipo: 'adopcion_ideas',
-          probabilidad: avgEngagement,
-          confianza: 0.75,
-          factores: avgEngagement > 0.5
-            ? ['Equipo engaged', 'Reacciones positivas']
-            : ['Engagement bajo', 'Considerar dinamizar'],
-          timestamp: Date.now(),
+          probabilidad: cohesion,
+          confianza: 0.8,
+          factores: factoresEquipo.length > 0 ? factoresEquipo : ['Dinámica neutral'],
+          timestamp,
         };
         break;
     }
