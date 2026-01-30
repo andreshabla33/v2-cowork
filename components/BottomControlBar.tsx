@@ -1,5 +1,7 @@
 import React from 'react';
 import { useStore } from '../store/useStore';
+import { AvatarPreview } from './Navbar';
+import { AvatarConfig } from '../types';
 
 interface BottomControlBarProps {
   onToggleMic: () => void;
@@ -13,6 +15,7 @@ interface BottomControlBarProps {
   isRecording: boolean;
   showEmojis: boolean;
   onTriggerReaction: (emoji: string) => void;
+  avatarConfig: AvatarConfig;
 }
 
 export const BottomControlBar: React.FC<BottomControlBarProps> = ({
@@ -27,20 +30,28 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   isRecording,
   showEmojis,
   onTriggerReaction,
+  avatarConfig,
 }) => {
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
 
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2">
-      {/* Barra Principal Glassmorphism 2026 */}
-      <div className="flex items-center gap-2 p-2 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/50 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(99,102,241,0.15)]">
+      {/* Barra Principal Glassmorphism 2026 - Más compacta */}
+      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/50 hover:border-white/20">
         
+        {/* Foto de usuario */}
+        <div className="w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 mr-1">
+          <div className="scale-75 mt-2">
+            <AvatarPreview config={avatarConfig} size="small" />
+          </div>
+        </div>
+
         {/* Micrófono */}
         <ControlButton 
           onClick={onToggleMic} 
           isActive={isMicOn} 
           activeColor="bg-zinc-700 text-white" 
-          inactiveColor="bg-red-500/90 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse-slow"
+          inactiveColor="bg-red-500/90 text-white animate-pulse-slow"
           icon={<IconMic on={isMicOn} />}
           tooltip={isMicOn ? "Silenciar" : "Activar micrófono"}
         />
@@ -50,18 +61,18 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           onClick={onToggleCam} 
           isActive={isCamOn} 
           activeColor="bg-zinc-700 text-white" 
-          inactiveColor="bg-red-500/90 text-white shadow-[0_0_15px_rgba(239,68,68,0.4)] animate-pulse-slow"
+          inactiveColor="bg-red-500/90 text-white animate-pulse-slow"
           icon={<IconCam on={isCamOn} />}
           tooltip={isCamOn ? "Apagar cámara" : "Activar cámara"}
         />
 
-        <div className="w-px h-8 bg-white/10 mx-1"></div>
+        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
         {/* Compartir Pantalla */}
         <ControlButton 
           onClick={onToggleShare} 
           isActive={isSharing} 
-          activeColor="bg-indigo-500 text-white shadow-[0_0_15px_rgba(99,102,241,0.4)]" 
+          activeColor="bg-indigo-500 text-white" 
           inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
           icon={<IconScreen on={isSharing} />}
           tooltip={isSharing ? "Dejar de compartir" : "Compartir pantalla"}
@@ -88,7 +99,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     onTriggerReaction(emoji);
                     onToggleEmojis(); // Cerrar al seleccionar
                   }}
-                  className="w-10 h-10 flex items-center justify-center text-2xl hover:bg-white/10 rounded-xl transition-all hover:scale-110 active:scale-95"
+                  className="w-8 h-8 flex items-center justify-center text-xl hover:bg-white/10 rounded-lg transition-all hover:scale-110 active:scale-95"
                 >
                   {emoji}
                 </button>
@@ -98,47 +109,36 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           )}
         </div>
 
-        <div className="w-px h-8 bg-white/10 mx-1"></div>
+        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
-        {/* Grabar con Análisis */}
+        {/* Grabar - Simplificado */}
         <button
           onClick={onToggleRecording}
           className={`
-            relative flex items-center gap-2 px-4 py-3 rounded-xl transition-all duration-300 group
+            relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
             ${isRecording 
-              ? 'bg-red-500/10 text-red-500 border border-red-500/50 shadow-[0_0_20px_rgba(239,68,68,0.2)]' 
-              : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10 hover:from-indigo-500/20 hover:to-purple-500/20 text-white border border-white/5 hover:border-indigo-500/30'
+              ? 'bg-red-500 text-white hover:bg-red-600' 
+              : 'bg-white/5 hover:bg-white/10 text-white'
             }
           `}
         >
-          {isRecording ? (
-            <>
-              <div className="relative w-3 h-3">
-                <span className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-75"></span>
-                <span className="relative block w-3 h-3 rounded-full bg-red-500"></span>
-              </div>
-              <span className="text-xs font-bold tracking-wide">GRABANDO</span>
-            </>
-          ) : (
-            <>
-              <div className="w-3 h-3 rounded-full bg-white group-hover:bg-indigo-400 transition-colors"></div>
-              <span className="text-xs font-medium text-white/90 group-hover:text-white">Grabar</span>
-              <span className="text-xs opacity-50 ml-1 group-hover:opacity-100 transition-opacity">✨ AI</span>
-            </>
-          )}
+          <div className={`w-3 h-3 rounded-sm ${isRecording ? 'bg-white' : 'bg-red-500 rounded-full'}`}></div>
+          <span className="text-xs font-medium text-white/90">
+            {isRecording ? 'Detener' : 'Grabar'}
+          </span>
         </button>
       </div>
     </div>
   );
 };
 
-// Subcomponente de botón genérico
+// Subcomponente de botón genérico - Más compacto
 const ControlButton = ({ onClick, isActive, activeColor, inactiveColor, icon, tooltip }: any) => (
   <div className="relative group/btn">
     <button
       onClick={onClick}
       className={`
-        w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-300
+        w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300
         ${isActive ? activeColor : inactiveColor}
       `}
     >

@@ -635,10 +635,11 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         </div>
       )}
 
-      <div className={`absolute left-6 top-1/2 -translate-y-1/2 pointer-events-auto z-50 ${
+      {/* Contenedor de burbujas - Centrado en pantalla */}
+      <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto z-50 transition-all duration-500 ${
         useGridLayout 
-          ? 'grid grid-cols-2 gap-3 max-w-[440px]' 
-          : 'flex flex-col gap-4'
+          ? 'grid grid-cols-2 gap-3 max-w-[600px]' 
+          : 'flex flex-row flex-wrap justify-center gap-4 max-w-[800px]'
       }`}>
         {/* Indicador de privacidad */}
         {isPrivate && (
@@ -1492,25 +1493,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       </button>
       
       {/* VideoHUD - solo se muestra cuando hay usuarios cerca */}
-      {/* HUD de video (burbujas) */}
-      <VideoHUD
-        userName={currentUser.name}
-        visitorId={session?.user?.id || 'visitor'}
-        camOn={currentUser.isCameraOn}
-        sharingOn={currentUser.isScreenSharing}
-        isPrivate={currentUser.isPrivate}
-        usersInCall={usersInCall}
-        stream={stream}
-        screenStream={screenStream}
-        remoteStreams={remoteStreams}
-        remoteScreenStreams={remoteScreenStreams}
-        remoteReaction={remoteReaction}
-        onWaveUser={handleWaveUser}
-        currentReaction={currentReaction}
-        theme={theme}
-        speakingUsers={speakingUsers}
-        userDistances={userDistances}
-      />
+      {usersInCall.length > 0 && (
+        <VideoHUD
+          userName={currentUser.name}
+          visitorId={session?.user?.id || 'visitor'}
+          camOn={currentUser.isCameraOn}
+          sharingOn={currentUser.isScreenSharing}
+          isPrivate={currentUser.isPrivate}
+          usersInCall={usersInCall}
+          stream={stream}
+          screenStream={screenStream}
+          remoteStreams={remoteStreams}
+          remoteScreenStreams={remoteScreenStreams}
+          remoteReaction={remoteReaction}
+          onWaveUser={handleWaveUser}
+          currentReaction={currentReaction}
+          theme={theme}
+          speakingUsers={speakingUsers}
+          userDistances={userDistances}
+        />
+      )}
 
       {/* Barra de Controles Inferior (Estilo 2026) */}
       <BottomControlBar
@@ -1525,6 +1527,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         isRecording={isRecording}
         showEmojis={showEmojis}
         onTriggerReaction={handleTriggerReaction}
+        avatarConfig={currentUser.avatarConfig!}
       />
 
       {/* Minimapa */}
