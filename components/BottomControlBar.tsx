@@ -16,6 +16,7 @@ interface BottomControlBarProps {
   showEmojis: boolean;
   onTriggerReaction: (emoji: string) => void;
   avatarConfig: AvatarConfig;
+  showShareButton: boolean;
 }
 
 export const BottomControlBar: React.FC<BottomControlBarProps> = ({
@@ -31,11 +32,12 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   showEmojis,
   onTriggerReaction,
   avatarConfig,
+  showShareButton,
 }) => {
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
 
   return (
-    <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2">
       {/* Barra Principal Glassmorphism 2026 - Más compacta */}
       <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/40 backdrop-blur-xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/50 hover:border-white/20">
         
@@ -66,17 +68,23 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           tooltip={isCamOn ? "Apagar cámara" : "Activar cámara"}
         />
 
-        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+        {showShareButton && (
+          <>
+            <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
-        {/* Compartir Pantalla */}
-        <ControlButton 
-          onClick={onToggleShare} 
-          isActive={isSharing} 
-          activeColor="bg-indigo-500 text-white" 
-          inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
-          icon={<IconScreen on={isSharing} />}
-          tooltip={isSharing ? "Dejar de compartir" : "Compartir pantalla"}
-        />
+            {/* Compartir Pantalla */}
+            <ControlButton 
+              onClick={onToggleShare} 
+              isActive={isSharing} 
+              activeColor="bg-indigo-500 text-white" 
+              inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+              icon={<IconScreen on={isSharing} />}
+              tooltip={isSharing ? "Dejar de compartir" : "Compartir pantalla"}
+            />
+          </>
+        )}
+
+        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
         {/* Reacciones */}
         <div className="relative">

@@ -637,6 +637,8 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
 
       {/* Contenedor de burbujas - Centrado en pantalla */}
       <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto z-50 transition-all duration-500 ${
+        usersInCall.length === 0 && !camOn ? 'opacity-0 pointer-events-none translate-x-[-100px]' : 'opacity-100 translate-x-0'
+      } ${
         useGridLayout 
           ? 'grid grid-cols-2 gap-3 max-w-[600px]' 
           : 'flex flex-row flex-wrap justify-center gap-4 max-w-[800px]'
@@ -1492,8 +1494,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         Centrar
       </button>
       
-      {/* VideoHUD - solo se muestra cuando hay usuarios cerca */}
-      {usersInCall.length > 0 && (
+      {/* VideoHUD - solo se muestra cuando hay usuarios cerca o cámara encendida */}
+      {(usersInCall.length > 0 || currentUser.isCameraOn) && (
         <VideoHUD
           userName={currentUser.name}
           visitorId={session?.user?.id || 'visitor'}
@@ -1528,6 +1530,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         showEmojis={showEmojis}
         onTriggerReaction={handleTriggerReaction}
         avatarConfig={currentUser.avatarConfig!}
+        showShareButton={usersInCall.length > 0}
       />
 
       {/* Minimapa */}
