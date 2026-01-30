@@ -125,7 +125,12 @@ self.onmessage = async function(event) {
       break;
       
     case 'analyze':
+      // Debug log para confirmar recepción
+      if (Math.random() < 0.05) console.log('🔧 [Worker] Procesando frame...', payload.timestamp);
       const analysis = analyzeFrame(payload);
+      if (analysis.face?.hasDetection || analysis.pose?.hasDetection) {
+         if (Math.random() < 0.05) console.log('✨ [Worker] Detección exitosa en frame');
+      }
       self.postMessage({ type: 'result', payload: analysis });
       break;
       
