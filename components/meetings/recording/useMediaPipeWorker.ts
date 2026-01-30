@@ -185,9 +185,14 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
 
       return new Promise((resolve) => {
         // Guardar callback para esta solicitud
-        pendingCallbacksRef.current.set(timestamp, resolve);
+        pendingCallbacksRef.current.set(timestamp, (result) => {
+          // Debug log para confirmar recepción
+          if (Math.random() < 0.05) console.log('✅ [Hook] Frame recibido del worker');
+          resolve(result);
+        });
 
         // Enviar al worker
+        // Transferimos el ownership del ImageBitmap para evitar copias
         workerRef.current!.postMessage({
           type: 'analyze',
           payload: {
@@ -196,12 +201,13 @@ export const useMediaPipeWorker = (options: UseMediaPipeWorkerOptions = {}) => {
             analyzeFace: options?.analyzeFace ?? enableFace,
             analyzePose: options?.analyzePose ?? enablePose,
           }
-        });
+        }, [imageBitmap]);
 
         // Timeout de seguridad (3 segundos)
         setTimeout(() => {
           if (pendingCallbacksRef.current.has(timestamp)) {
             pendingCallbacksRef.current.delete(timestamp);
+            console.warn('⚠️ [Hook] Timeout esperando frame', timestamp);
             resolve(null);
           }
         }, 3000);
