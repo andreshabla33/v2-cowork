@@ -501,15 +501,15 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       
       <Grid
         position={[0, -0.01, 0]}
-        args={[100, 100]}
-        cellSize={1}
-        cellThickness={0.5}
+        args={[200, 200]}
+        cellSize={2}
+        cellThickness={1}
         cellColor={gridColor}
-        sectionSize={5}
-        sectionThickness={1}
+        sectionSize={10}
+        sectionThickness={1.5}
         sectionColor={theme === 'arcade' ? '#003300' : '#4f46e5'}
-        fadeDistance={50}
-        fadeStrength={1.5}
+        fadeDistance={200}
+        fadeStrength={0}
         infiniteGrid
       />
       
@@ -1687,10 +1687,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         showRecordingButton={usersInCall.length > 0}
       />
 
-      {/* Input de Chat Flotante - Compacto */}
+      {/* Input de Chat Flotante - Minimalista */}
       {showChat && (
-        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[201] w-full max-w-xs px-4 animate-slide-up">
-          <div className="bg-black/70 backdrop-blur-lg p-2 rounded-xl border border-white/10 shadow-xl flex gap-1.5">
+        <div className="absolute bottom-[88px] left-1/2 -translate-x-1/2 z-[201] animate-slide-up">
+          <div className="bg-black/60 backdrop-blur-md px-1 py-1 rounded-2xl border border-white/10 flex gap-1 items-center">
             <input
               type="text"
               value={chatInput}
@@ -1702,14 +1702,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
               }}
               onKeyUp={(e) => e.stopPropagation()}
               placeholder="Mensaje..."
-              className="flex-1 bg-white/10 border border-white/5 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
+              className="w-40 bg-transparent border-none px-2 py-1 text-xs text-white placeholder-white/40 focus:outline-none"
               autoFocus
-              maxLength={140}
+              maxLength={100}
             />
             <button
               onClick={handleSendMessage}
               disabled={!chatInput.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
+              className="w-7 h-7 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white text-xs flex items-center justify-center transition-colors"
             >
               ➤
             </button>
