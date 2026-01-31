@@ -9,14 +9,17 @@ interface BottomControlBarProps {
   onToggleShare: () => void;
   onToggleRecording: () => void;
   onToggleEmojis: () => void;
+  onToggleChat: () => void;
   isMicOn: boolean;
   isCamOn: boolean;
   isSharing: boolean;
   isRecording: boolean;
   showEmojis: boolean;
+  showChat: boolean;
   onTriggerReaction: (emoji: string) => void;
   avatarConfig: AvatarConfig;
   showShareButton: boolean;
+  showRecordingButton: boolean;
 }
 
 export const BottomControlBar: React.FC<BottomControlBarProps> = ({
@@ -25,14 +28,17 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   onToggleShare,
   onToggleRecording,
   onToggleEmojis,
+  onToggleChat,
   isMicOn,
   isCamOn,
   isSharing,
   isRecording,
   showEmojis,
+  showChat,
   onTriggerReaction,
   avatarConfig,
   showShareButton,
+  showRecordingButton,
 }) => {
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
 
@@ -86,6 +92,16 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
         <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
+        {/* Chat */}
+        <ControlButton 
+          onClick={onToggleChat} 
+          isActive={showChat} 
+          activeColor="bg-blue-500/20 text-blue-400" 
+          inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
+          icon={<IconChat />}
+          tooltip="Chat"
+        />
+
         {/* Reacciones */}
         <div className="relative">
           <ControlButton 
@@ -117,24 +133,28 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           )}
         </div>
 
-        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+        {showRecordingButton && (
+          <>
+            <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
-        {/* Grabar - Simplificado */}
-        <button
-          onClick={onToggleRecording}
-          className={`
-            relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
-            ${isRecording 
-              ? 'bg-red-500 text-white hover:bg-red-600' 
-              : 'bg-white/5 hover:bg-white/10 text-white'
-            }
-          `}
-        >
-          <div className={`w-3 h-3 rounded-sm ${isRecording ? 'bg-white' : 'bg-red-500 rounded-full'}`}></div>
-          <span className="text-xs font-medium text-white/90">
-            {isRecording ? 'Detener' : 'Grabar'}
-          </span>
-        </button>
+            {/* Grabar - Simplificado */}
+            <button
+              onClick={onToggleRecording}
+              className={`
+                relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
+                ${isRecording 
+                  ? 'bg-red-500 text-white hover:bg-red-600' 
+                  : 'bg-white/5 hover:bg-white/10 text-white'
+                }
+              `}
+            >
+              <div className={`w-3 h-3 rounded-sm ${isRecording ? 'bg-white' : 'bg-red-500 rounded-full'}`}></div>
+              <span className="text-xs font-medium text-white/90">
+                {isRecording ? 'Detener' : 'Grabar'}
+              </span>
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -190,5 +210,11 @@ const IconScreen = ({ on }: { on: boolean }) => (
 const IconReaction = () => (
   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+  </svg>
+);
+
+const IconChat = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
   </svg>
 );

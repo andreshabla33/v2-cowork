@@ -10,6 +10,7 @@ import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
 import { RecordingManager } from './meetings/recording/RecordingManager';
 import { BottomControlBar } from './BottomControlBar';
+import { ChatService } from '../services/chatService';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -104,9 +105,10 @@ interface AvatarProps {
   videoStream?: MediaStream | null;
   camOn?: boolean;
   showVideoBubble?: boolean;
+  message?: string | null;
 }
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message }) => {
   return (
     <group position={position}>
       {/* Avatar 3D GLTF desde Supabase */}
@@ -115,6 +117,16 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         direction={direction}
         scale={1.2}
       />
+      
+      {/* Mensaje de Chat (Burbuja de texto) */}
+      {message && (
+        <Html position={[0, camOn ? 5.8 : 3.5, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
+          <div className="bg-white text-black px-4 py-2 rounded-2xl rounded-bl-none shadow-xl border border-gray-200 max-w-[200px] text-sm font-medium animate-pop-in relative">
+            {message}
+            <div className="absolute bottom-0 left-0 w-3 h-3 bg-white transform translate-y-1/2 -translate-x-1/2 rotate-45 border-b border-r border-gray-200"></div>
+          </div>
+        </Html>
+      )}
       
       {/* Video Bubble above avatar (Gather style) */}
       {camOn && videoStream && showVideoBubble && (
@@ -198,9 +210,10 @@ interface PlayerProps {
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
   stream: MediaStream | null;
   showVideoBubble?: boolean;
+  message?: string | null;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -331,13 +344,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         videoStream={stream}
         camOn={currentUser.isCameraOn}
         showVideoBubble={showVideoBubble}
+        message={message}
       />
     </group>
   );
 };
 
 // ============== USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream>, showVideoBubble?: boolean }> = ({ users, remoteStreams, showVideoBubble = true }) => {
+const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream>, showVideoBubble?: boolean, remoteMessages: Map<string, string> }> = ({ users, remoteStreams, showVideoBubble = true, remoteMessages }) => {
   return (
     <>
       {users.map((user) => {
@@ -359,6 +373,7 @@ const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStr
             videoStream={remoteStreams.get(user.id)}
             camOn={user.isCameraOn}
             showVideoBubble={showVideoBubble}
+            message={remoteMessages.get(user.id)}
           />
         );
       })}
@@ -376,9 +391,11 @@ interface SceneProps {
   stream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   showVideoBubbles?: boolean;
+  localMessage: string | null;
+  remoteMessages: Map<string, string>;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -401,56 +418,37 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       />
       
       {/* OrbitControls para rotación, zoom y pan */}
-      <OrbitControls
-        ref={orbitControlsRef}
-        enableDamping={true}
-        dampingFactor={0.05}
-        minDistance={5}
-        maxDistance={50}
-        maxPolarAngle={Math.PI / 2 - 0.1}
-        minPolarAngle={Math.PI / 6}
-        enablePan={true}
-        panSpeed={0.5}
-        rotateSpeed={0.5}
-        zoomSpeed={0.8}
-        mouseButtons={{
-          LEFT: THREE.MOUSE.ROTATE,
-          MIDDLE: THREE.MOUSE.DOLLY,
-          RIGHT: THREE.MOUSE.PAN
-        }}
-      />
-      
-      {/* Seguimiento de cámara al jugador */}
-      <CameraFollow orbitControlsRef={orbitControlsRef} />
-      
-      {/* Piso con grid */}
       <Grid
-        args={[WORLD_SIZE * 2, WORLD_SIZE * 2]}
-        position={[WORLD_SIZE / 2, 0, WORLD_SIZE / 2]}
+        position={[0, -0.01, 0]}
+        args={[100, 100]}
         cellSize={1}
         cellThickness={0.5}
         cellColor={gridColor}
         sectionSize={5}
         sectionThickness={1}
-        sectionColor={gridColor}
-        fadeDistance={100}
-        fadeStrength={1}
-        followCamera={false}
+        sectionColor={theme === 'arcade' ? '#003300' : '#4f46e5'}
+        fadeDistance={50}
+        fadeStrength={1.5}
+        infiniteGrid
       />
       
-      {/* Piso sólido */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[WORLD_SIZE / 2, -0.01, WORLD_SIZE / 2]} receiveShadow>
-        <planeGeometry args={[WORLD_SIZE * 2, WORLD_SIZE * 2]} />
-        <meshStandardMaterial color={themeColors[theme] || themeColors.dark} />
+      {/* Suelo base (para clicks) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} onClick={(e) => {
+        // Lógica de movimiento por click
+        const point = e.point;
+        setPosition(Math.round(point.x * 16), Math.round(point.z * 16), 'front', false, true);
+      }}>
+        <planeGeometry args={[1000, 1000]} />
+        <meshBasicMaterial visible={false} />
       </mesh>
-      
-      {/* Zonas de reunión visuales */}
-      <mesh position={[10, 0.02, 10]} rotation={[-Math.PI / 2, 0, 0]}>
-        <planeGeometry args={[6, 6]} />
-        <meshBasicMaterial color="#3b82f6" opacity={0.15} transparent />
+
+      {/* Mesas y objetos (Demo) */}
+      <mesh position={[10, 0.5, 10]} castShadow receiveShadow>
+        <boxGeometry args={[4, 1, 2]} />
+        <meshStandardMaterial color="#1e293b" />
       </mesh>
-      <Text position={[10, 0.1, 13.5]} fontSize={0.3} color="#3b82f6" anchorX="center">
-        Sala 1
+      <Text position={[10, 1.5, 10]} fontSize={0.5} color="white" anchorX="center" anchorY="middle">
+        Mesa de Reunión
       </Text>
       
       <mesh position={[25, 0.02, 10]} rotation={[-Math.PI / 2, 0, 0]}>
@@ -462,10 +460,10 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} showVideoBubble={showVideoBubbles} />
+      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} showVideoBubble={showVideoBubbles} message={localMessage} />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} />
     </>
   );
 };
@@ -659,8 +657,8 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         </div>
       )}
 
-      {/* Contenedor de burbujas - Centrado en pantalla */}
-      <div className={`absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-auto z-50 transition-all duration-500 ${
+      {/* Contenedor de burbujas - Posicionado arriba centrado */}
+      <div className={`absolute left-1/2 top-24 -translate-x-1/2 pointer-events-auto z-50 transition-all duration-500 ${
         usersInCall.length === 0 && !camOn ? 'opacity-0 pointer-events-none scale-95' : 'opacity-100 scale-100'
       } ${
         useGridLayout 
@@ -1044,6 +1042,39 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   // Estado para trigger externo de grabación
   const [recordingTrigger, setRecordingTrigger] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const [chatInput, setChatInput] = useState('');
+  const [localMessage, setLocalMessage] = useState<string | null>(null);
+  const [remoteMessages, setRemoteMessages] = useState<Map<string, string>>(new Map());
+
+  // Enviar mensaje de chat
+  const handleSendMessage = useCallback(async () => {
+    if (!chatInput.trim() || !session?.user?.id) return;
+    
+    const content = chatInput.trim();
+    
+    // 1. Mostrar mensaje localmente (burbuja)
+    setLocalMessage(content);
+    setTimeout(() => setLocalMessage(null), 5000);
+    
+    // 2. Broadcast a otros usuarios para burbuja
+    if (webrtcChannelRef.current) {
+      webrtcChannelRef.current.send({
+        type: 'broadcast',
+        event: 'chat',
+        payload: { message: content, from: session.user.id, fromName: currentUser.name }
+      });
+    }
+    
+    // 3. Persistir mensaje (solo a usuarios cercanos en llamada)
+    if (usersInCall.length > 0) {
+      const recipientIds = usersInCall.map(u => u.id);
+      await ChatService.sendMessage(content, session.user.id, activeWorkspace?.id || '', recipientIds);
+    }
+    
+    setChatInput('');
+    setShowChat(false);
+  }, [chatInput, session?.user?.id, currentUser.name, usersInCall, activeWorkspace?.id]);
 
   // Toggle grabación
   const handleToggleRecording = useCallback(async () => {
@@ -1214,6 +1245,25 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           console.log('Received reaction from', payload.fromName, ':', payload.emoji);
           setRemoteReaction({ emoji: payload.emoji, from: payload.from, fromName: payload.fromName });
           setTimeout(() => setRemoteReaction(null), 3000);
+        }
+      })
+      .on('broadcast', { event: 'chat' }, ({ payload }) => {
+        // Recibir mensaje de chat
+        if (payload.from !== session.user.id) {
+          console.log('Received chat from', payload.fromName, ':', payload.message);
+          setRemoteMessages(prev => {
+            const newMap = new Map(prev);
+            newMap.set(payload.from, payload.message);
+            return newMap;
+          });
+          // Limpiar mensaje después de 5s
+          setTimeout(() => {
+            setRemoteMessages(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(payload.from);
+              return newMap;
+            });
+          }, 5000);
         }
       })
       .subscribe();
@@ -1481,6 +1531,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             stream={stream}
             remoteStreams={remoteStreams}
             showVideoBubbles={!hasActiveCall}
+            localMessage={localMessage}
+            remoteMessages={remoteMessages}
           />
         </Suspense>
       </Canvas>
@@ -1550,15 +1602,49 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         onToggleShare={handleToggleScreenShare}
         onToggleRecording={handleToggleRecording}
         onToggleEmojis={() => setShowEmojis(!showEmojis)}
+        onToggleChat={() => setShowChat(!showChat)}
         isMicOn={currentUser.isMicOn}
         isCamOn={currentUser.isCameraOn}
         isSharing={currentUser.isScreenSharing}
         isRecording={isRecording}
         showEmojis={showEmojis}
+        showChat={showChat}
         onTriggerReaction={handleTriggerReaction}
         avatarConfig={currentUser.avatarConfig!}
         showShareButton={usersInCall.length > 0}
+        showRecordingButton={usersInCall.length > 0}
       />
+
+      {/* Input de Chat Flotante */}
+      {showChat && (
+        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[201] w-full max-w-md px-4 animate-slide-up">
+          <div className="bg-black/80 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl flex gap-2">
+            <input
+              type="text"
+              value={chatInput}
+              onChange={(e) => setChatInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSendMessage();
+                if (e.key === 'Escape') setShowChat(false);
+              }}
+              placeholder="Escribe un mensaje..."
+              className="flex-1 bg-white/10 border border-white/5 rounded-xl px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              autoFocus
+              maxLength={140}
+            />
+            <button
+              onClick={handleSendMessage}
+              disabled={!chatInput.trim()}
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 rounded-xl font-medium transition-colors"
+            >
+              Enviar
+            </button>
+          </div>
+          <div className="text-center mt-2 text-[10px] text-white/50">
+            Presiona Enter para enviar • Esc para cancelar
+          </div>
+        </div>
+      )}
 
       {/* Minimapa */}
       <Minimap currentUser={currentUser} users={onlineUsers} workspace={activeWorkspace} />
