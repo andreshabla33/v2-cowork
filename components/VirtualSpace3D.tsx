@@ -301,14 +301,6 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   const keysPressed = useRef<Set<string>>(new Set());
   const lastSyncTime = useRef(0);
   const { camera } = useThree();
-  
-  // Ref para posición anterior de la cámara para cálculo de delta
-  const prevPlayerPos = useRef({ x: positionRef.current.x, z: positionRef.current.z });
-
-  useEffect(() => {
-    // Inicializar posición previa
-    prevPlayerPos.current = { x: positionRef.current.x, z: positionRef.current.z };
-  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -396,30 +388,10 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       groupRef.current.position.x = positionRef.current.x;
       groupRef.current.position.z = positionRef.current.z;
     }
-    
-    // Actualizar cámara para seguir al jugador (Sincronizado para evitar jitter)
-    if (orbitControlsRef.current) {
-      const controls = orbitControlsRef.current;
-      
-      // Calcular cambio en posición
-      const deltaX = positionRef.current.x - prevPlayerPos.current.x;
-      const deltaZ = positionRef.current.z - prevPlayerPos.current.z;
-      
-      if (Math.abs(deltaX) > 0.0001 || Math.abs(deltaZ) > 0.0001) {
-        // Mover cámara y target juntos
-        camera.position.x += deltaX;
-        camera.position.z += deltaZ;
-        controls.target.x += deltaX;
-        controls.target.z += deltaZ;
-        controls.update();
-      }
-      
-      prevPlayerPos.current = { x: positionRef.current.x, z: positionRef.current.z };
-    }
 
     if (newDirection !== direction) setDirection(newDirection);
 
-    // Actualizar target para CameraFollow
+    // Actualizar posición para CameraFollow (única fuente de verdad)
     (camera as any).userData.playerPosition = { x: positionRef.current.x, z: positionRef.current.z };
 
     // Sincronizar posición con el store
