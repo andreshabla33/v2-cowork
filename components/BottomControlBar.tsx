@@ -43,7 +43,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2">
+    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2" onClick={(e) => e.stopPropagation()}>
       {/* Barra Principal Glassmorphism 2026 - Más compacta con mejor efecto glass */}
       <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/30 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
         

@@ -1108,16 +1108,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [remoteMessages, setRemoteMessages] = useState<Map<string, string>>(new Map());
 
-  // Manejar tecla Escape global para cerrar chat
+  // Manejar tecla Escape global para cerrar chat y emojis
   useEffect(() => {
     const handleGlobalKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape' && showChat) {
+      // No activar si está escribiendo
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (isTyping) return;
+      
+      // Escape cierra chat y emojis
+      if (e.key === 'Escape') {
         setShowChat(false);
+        setShowEmojis(false);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [showChat]);
+  }, [showChat, showEmojis]);
 
   // Enviar mensaje de chat
   const handleSendMessage = useCallback(async () => {
@@ -1179,6 +1186,25 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       });
     }
   }, [session?.user?.id, currentUser.name]);
+
+  // Atajos de teclado numérico 1-8 para emojis rápidos
+  useEffect(() => {
+    const emojiKeys = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
+    
+    const handleNumericKeys = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
+      if (isTyping) return;
+      
+      const num = parseInt(e.key);
+      if (num >= 1 && num <= 8) {
+        handleTriggerReaction(emojiKeys[num - 1]);
+      }
+    };
+    
+    window.addEventListener('keydown', handleNumericKeys);
+    return () => window.removeEventListener('keydown', handleNumericKeys);
+  }, [handleTriggerReaction]);
 
   // ========== WebRTC para video remoto ==========
   const createPeerConnection = useCallback((peerId: string) => {
@@ -1586,8 +1612,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [currentUser.x, currentUser.y]);
 
+  // Cerrar chat y emojis al hacer clic en el canvas
+  const handleCanvasClick = useCallback(() => {
+    setShowChat(false);
+    setShowEmojis(false);
+  }, []);
+
   return (
-    <div className="w-full h-full relative bg-black">
+    <div className="w-full h-full relative bg-black" onClick={handleCanvasClick}>
       <Canvas
         shadows
         gl={{ 
@@ -1681,8 +1713,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         onToggleCam={toggleCamera}
         onToggleShare={handleToggleScreenShare}
         onToggleRecording={handleToggleRecording}
-        onToggleEmojis={() => setShowEmojis(!showEmojis)}
-        onToggleChat={() => setShowChat(!showChat)}
+        onToggleEmojis={() => { setShowEmojis(!showEmojis); setShowChat(false); }}
+        onToggleChat={() => { setShowChat(!showChat); setShowEmojis(false); }}
         isMicOn={currentUser.isMicOn}
         isCamOn={currentUser.isCameraOn}
         isSharing={currentUser.isScreenSharing}
@@ -1697,7 +1729,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
       {/* Input de Chat Flotante - Minimalista */}
       {showChat && (
-        <div className="absolute bottom-[88px] left-1/2 -translate-x-1/2 z-[201] animate-slide-up">
+        <div className="absolute bottom-[88px] left-1/2 -translate-x-1/2 z-[201] animate-slide-up" onClick={(e) => e.stopPropagation()}>
           <div className="bg-black/60 backdrop-blur-md px-1 py-1 rounded-2xl border border-white/10 flex gap-1 items-center">
             <input
               type="text"
