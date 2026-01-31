@@ -116,6 +116,15 @@
         animation: emoji-float-2026 2s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
         pointer-events: none;
       }
+      
+      /* 2026 Chat Bubble Animation - Soft pop-in */
+      @keyframes chat-bubble-in {
+        0% { opacity: 0; transform: scale(0.8) translateY(8px); }
+        100% { opacity: 1; transform: scale(1) translateY(0); }
+      }
+      .animate-chat-bubble { 
+        animation: chat-bubble-in 0.25s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+      }
     </style>
   <script type="importmap">
 {

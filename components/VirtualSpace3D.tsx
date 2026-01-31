@@ -159,12 +159,17 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         scale={1.2}
       />
       
-      {/* Mensaje de Chat (Burbuja de texto) */}
+      {/* Mensaje de Chat - Burbuja moderna 2026 (glassmorphism + pill shape) */}
       {message && (
-        <Html position={[0, camOn ? 5.8 : 3.5, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
-          <div className="bg-white text-black px-4 py-2 rounded-2xl rounded-bl-none shadow-xl border border-gray-200 max-w-[200px] text-sm font-medium animate-pop-in relative">
-            {message}
-            <div className="absolute bottom-0 left-0 w-3 h-3 bg-white transform translate-y-1/2 -translate-x-1/2 rotate-45 border-b border-r border-gray-200"></div>
+        <Html position={[0, camOn ? 5.8 : 3.2, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
+          <div className="animate-chat-bubble">
+            <div className="bg-white/95 backdrop-blur-sm text-gray-800 px-3 py-1.5 rounded-full shadow-lg max-w-[180px] text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis">
+              {message}
+            </div>
+            {/* Indicador de cola sutil */}
+            <div className="flex justify-center -mt-0.5">
+              <div className="w-2 h-2 bg-white/95 rotate-45 shadow-sm"></div>
+            </div>
           </div>
         </Html>
       )}
