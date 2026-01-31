@@ -178,10 +178,10 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         </Html>
       )}
       
-      {/* Reacción emoji encima del avatar (o video) */}
+      {/* Reacción emoji encima del avatar - Animación 2026 */}
       {reaction && (
-        <Html position={[0, camOn ? 5.2 : 3.0, 0]} center distanceFactor={10}>
-          <div className="text-4xl animate-bounce drop-shadow-lg filter">
+        <Html position={[0, camOn ? 4.5 : 2.8, 0]} center distanceFactor={8} zIndexRange={[200, 0]}>
+          <div className="animate-emoji-float text-5xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             {reaction}
           </div>
         </Html>
