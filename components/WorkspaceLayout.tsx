@@ -259,13 +259,14 @@ export const WorkspaceLayout: React.FC = () => {
 
         <div className="flex-1 relative overflow-hidden">
           {activeSubTab === 'space' && <VirtualSpace3D theme={theme} />}
-          <div className={`h-full w-full overflow-y-auto ${activeSubTab !== 'space' ? 'animate-in fade-in duration-500' : ''}`}>
-            {activeSubTab === 'tasks' && <TaskBoard />}
-            {activeSubTab === 'miembros' && <MiembrosView />}
-            {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
-            {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
-            {activeSubTab === 'calendar' && <CalendarPanel />}
-            {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
+          {activeSubTab !== 'space' && (
+            <div className="h-full w-full overflow-y-auto animate-in fade-in duration-500">
+              {activeSubTab === 'tasks' && <TaskBoard />}
+              {activeSubTab === 'miembros' && <MiembrosView />}
+              {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
+              {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
+              {activeSubTab === 'calendar' && <CalendarPanel />}
+              {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
             {activeSubTab === 'settings' && (
               <div className="p-16 max-w-4xl mx-auto">
                 <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">Configuración</h2>
@@ -286,7 +287,8 @@ export const WorkspaceLayout: React.FC = () => {
                 </div>
               </div>
             )}
-          </div>
+            </div>
+          )}
         </div>
 
         {/* El contenedor ahora es puramente de posicionamiento, no tiene estilos propios */}

@@ -78,10 +78,10 @@ const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = 
 
 // Colores por tema
 const themeColors: Record<string, string> = {
-  dark: '#000000',
-  light: '#f5f5f5',
-  purple: '#1a1025',
-  arcade: '#050505',
+  dark: '#0a0a0f',
+  light: '#e8e8ec',
+  space: '#020617',
+  arcade: '#000000',
 };
 
 // Colores de estado
