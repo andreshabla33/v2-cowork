@@ -178,14 +178,6 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         </Html>
       )}
       
-      {/* Indicador de estado (solo si no hay video) */}
-      {!camOn && (
-        <mesh position={[0.85, 2.4, 0]}>
-          <sphereGeometry args={[0.10, 16, 16]} />
-          <meshBasicMaterial color={statusColors[status]} />
-        </mesh>
-      )}
-      
       {/* Reacción emoji encima del avatar (o video) */}
       {reaction && (
         <Html position={[0, camOn ? 5.2 : 3.0, 0]} center distanceFactor={10}>
@@ -195,19 +187,22 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         </Html>
       )}
       
-      {/* Nombre flotante (oculto si hay cámara) */}
+      {/* Nombre flotante con indicador de estado (oculto si hay cámara) */}
       {!camOn && (
-        <Text
-          position={[0, 2.4, 0]}
-          fontSize={0.28}
-          color={isCurrentUser ? '#60a5fa' : '#ffffff'}
-          anchorX="center"
-          anchorY="middle"
-          outlineWidth={0.03}
-          outlineColor="#000000"
-        >
-          {name}
-        </Text>
+        <Html position={[0, 2.4, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
+          <div className="flex items-center gap-1 whitespace-nowrap">
+            <span 
+              className="text-sm font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
+              style={{ color: isCurrentUser ? '#60a5fa' : '#ffffff' }}
+            >
+              {name}
+            </span>
+            <span 
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: statusColors[status] }}
+            />
+          </div>
+        </Html>
       )}
     </group>
   );
@@ -243,22 +238,35 @@ const RemoteUsers: React.FC<{ users: User[]; remoteStreams: Map<string, MediaStr
 
 const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> = ({ orbitControlsRef }) => {
   const { camera } = useThree();
-  const lastPlayerPos = useRef({ x: 0, z: 0 });
+  const lastPlayerPos = useRef<{ x: number; z: number } | null>(null);
+  const initialized = useRef(false);
   
   useFrame(() => {
     const playerPos = (camera as any).userData?.playerPosition;
     if (!playerPos || !orbitControlsRef.current) return;
     
+    const controls = orbitControlsRef.current;
+    
+    // Primera vez: centrar cámara en el jugador
+    if (!initialized.current) {
+      controls.target.set(playerPos.x, 0, playerPos.z);
+      camera.position.set(playerPos.x, 15, playerPos.z + 15);
+      lastPlayerPos.current = { x: playerPos.x, z: playerPos.z };
+      initialized.current = true;
+      return;
+    }
+    
     // Detectar si el jugador se movió
-    const moved = Math.abs(playerPos.x - lastPlayerPos.current.x) > 0.01 || 
-                  Math.abs(playerPos.z - lastPlayerPos.current.z) > 0.01;
+    if (!lastPlayerPos.current) {
+      lastPlayerPos.current = { x: playerPos.x, z: playerPos.z };
+      return;
+    }
+    
+    const deltaX = playerPos.x - lastPlayerPos.current.x;
+    const deltaZ = playerPos.z - lastPlayerPos.current.z;
+    const moved = Math.abs(deltaX) > 0.001 || Math.abs(deltaZ) > 0.001;
     
     if (moved) {
-      // Actualizar el target de OrbitControls para seguir al jugador
-      const controls = orbitControlsRef.current;
-      const deltaX = playerPos.x - lastPlayerPos.current.x;
-      const deltaZ = playerPos.z - lastPlayerPos.current.z;
-      
       // Mover target y cámara juntos (mantiene la rotación actual)
       controls.target.x += deltaX;
       controls.target.z += deltaZ;
