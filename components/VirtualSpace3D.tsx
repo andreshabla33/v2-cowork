@@ -463,7 +463,7 @@ interface SceneProps {
 }
 
 const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages }) => {
-  const gridColor = theme === 'arcade' ? '#050505' : '#1a1025';
+  const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
     <>
@@ -486,6 +486,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       
       {/* OrbitControls para rotación, zoom y pan */}
       <OrbitControls
+        ref={orbitControlsRef}
         enableZoom={true}
         enablePan={true}
         enableRotate={true}
@@ -495,6 +496,9 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         maxDistance={50}
       />
       
+      {/* Cámara que sigue al jugador */}
+      <CameraFollow orbitControlsRef={orbitControlsRef} />
+      
       <Grid
         position={[0, -0.01, 0]}
         args={[100, 100]}
@@ -503,7 +507,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         cellColor={gridColor}
         sectionSize={5}
         sectionThickness={1}
-        sectionColor={theme === 'arcade' ? '#050505' : '#1a1025'}
+        sectionColor={theme === 'arcade' ? '#003300' : '#4f46e5'}
         fadeDistance={50}
         fadeStrength={1.5}
         infiniteGrid
@@ -1683,10 +1687,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         showRecordingButton={usersInCall.length > 0}
       />
 
-      {/* Input de Chat Flotante */}
+      {/* Input de Chat Flotante - Compacto */}
       {showChat && (
-        <div className="absolute bottom-24 left-1/2 -translate-x-1/2 z-[201] w-full max-w-md px-4 animate-slide-up">
-          <div className="bg-black/80 backdrop-blur-xl p-3 rounded-2xl border border-white/10 shadow-2xl flex gap-2">
+        <div className="absolute bottom-20 left-1/2 -translate-x-1/2 z-[201] w-full max-w-xs px-4 animate-slide-up">
+          <div className="bg-black/70 backdrop-blur-lg p-2 rounded-xl border border-white/10 shadow-xl flex gap-1.5">
             <input
               type="text"
               value={chatInput}
@@ -1697,21 +1701,18 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
                 if (e.key === 'Escape') setShowChat(false);
               }}
               onKeyUp={(e) => e.stopPropagation()}
-              placeholder="Escribe un mensaje..."
-              className="flex-1 bg-white/10 border border-white/5 rounded-xl px-4 py-2 text-white placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+              placeholder="Mensaje..."
+              className="flex-1 bg-white/10 border border-white/5 rounded-lg px-3 py-1.5 text-sm text-white placeholder-white/40 focus:outline-none focus:ring-1 focus:ring-indigo-500/50"
               autoFocus
               maxLength={140}
             />
             <button
               onClick={handleSendMessage}
               disabled={!chatInput.trim()}
-              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-4 rounded-xl font-medium transition-colors"
+              className="bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-lg text-sm font-medium transition-colors"
             >
-              Enviar
+              ➤
             </button>
-          </div>
-          <div className="text-center mt-2 text-[10px] text-white/50">
-            Presiona Enter para enviar • Esc para cancelar
           </div>
         </div>
       )}
