@@ -78,10 +78,10 @@ const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = 
 
 // Colores por tema
 const themeColors: Record<string, string> = {
-  dark: '#1a1d21',
+  dark: '#000000',
   light: '#f5f5f5',
-  purple: '#2d1b4e',
-  arcade: '#0a0a0a',
+  purple: '#1a1025',
+  arcade: '#050505',
 };
 
 // Colores de estado
@@ -90,6 +90,47 @@ const statusColors: Record<PresenceStatus, string> = {
   [PresenceStatus.BUSY]: '#ef4444',
   [PresenceStatus.AWAY]: '#eab308',
   [PresenceStatus.DND]: '#a855f7',
+};
+
+// ============== COMPONENTE VIDEO ESTABLE ==============
+interface StableVideoProps {
+  stream: MediaStream | null;
+  muted?: boolean;
+  className?: string;
+}
+
+const StableVideo: React.FC<StableVideoProps> = ({ stream, muted = false, className = '' }) => {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const streamIdRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const newStreamId = stream?.id || null;
+    
+    // Solo actualizar si el stream realmente cambió
+    if (streamIdRef.current !== newStreamId) {
+      streamIdRef.current = newStreamId;
+      
+      if (stream) {
+        video.srcObject = stream;
+        video.play().catch(() => {});
+      } else {
+        video.srcObject = null;
+      }
+    }
+  }, [stream]);
+
+  return (
+    <video
+      ref={videoRef}
+      autoPlay
+      playsInline
+      muted={muted}
+      className={className}
+    />
+  );
 };
 
 // ============== AVATAR 3D GLTF (vista 2.5D isométrica) ==============
@@ -172,7 +213,34 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   );
 };
 
-// ============== CAMERA FOLLOW (sigue al jugador) ==============
+// ============== COMPONENTE USUARIOS REMOTOS ==============
+const RemoteUsers: React.FC<{ users: User[]; remoteStreams: Map<string, MediaStream>; showVideoBubble?: boolean; remoteMessages: Map<string, string> }> = ({ users, remoteStreams, showVideoBubble, remoteMessages }) => {
+  const { currentUser } = useStore();
+  
+  return (
+    <>
+      {users.filter(u => u.id !== currentUser.id).map(u => (
+        <group key={u.id} position={[u.x / 16, 0, u.y / 16]}>
+          <Avatar
+            position={new THREE.Vector3(0, 0, 0)}
+            config={u.avatarConfig}
+            name={u.name}
+            status={u.status}
+            isCurrentUser={false}
+            animationState="idle"
+            direction={u.direction}
+            reaction={null}
+            videoStream={remoteStreams.get(u.id) || null}
+            camOn={u.isCameraOn}
+            showVideoBubble={showVideoBubble}
+            message={remoteMessages.get(u.id)}
+          />
+        </group>
+      ))}
+    </>
+  );
+};
+
 const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> = ({ orbitControlsRef }) => {
   const { camera } = useThree();
   const lastPlayerPos = useRef({ x: 0, z: 0 });
@@ -203,7 +271,6 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
   
   return null;
 };
-
 // ============== JUGADOR CONTROLABLE CON ANIMACIONES ==============
 interface PlayerProps {
   currentUser: User;
@@ -314,6 +381,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       setAnimationState('idle');
     }
 
+    if (newDirection !== direction) setDirection(newDirection);
+
     // Mover el grupo del avatar
     if (groupRef.current) {
       groupRef.current.position.x = positionRef.current.x;
@@ -341,6 +410,9 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
     }
 
     if (newDirection !== direction) setDirection(newDirection);
+
+    // Actualizar target para CameraFollow
+    (camera as any).userData.playerPosition = { x: positionRef.current.x, z: positionRef.current.z };
 
     // Sincronizar posición con el store
     const now = state.clock.getElapsedTime();
@@ -373,37 +445,6 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         message={message}
       />
     </group>
-  );
-};
-
-// ============== USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[], remoteStreams: Map<string, MediaStream>, showVideoBubble?: boolean, remoteMessages: Map<string, string> }> = ({ users, remoteStreams, showVideoBubble = true, remoteMessages }) => {
-  return (
-    <>
-      {users.map((user) => {
-        // Determinar estado de animación para usuarios remotos
-        let animState: AnimationState = 'idle';
-        if (user.isSitting) animState = 'sit';
-        else if (user.isRunning) animState = 'run';
-        else if (user.isMoving) animState = 'walk';
-
-        return (
-          <Avatar
-            key={user.id}
-            position={new THREE.Vector3((user.x || 400) / 16, 0, (user.y || 400) / 16)}
-            config={user.avatarConfig}
-            name={user.name}
-            status={user.status || PresenceStatus.AVAILABLE}
-            animationState={animState}
-            direction={user.direction || 'front'}
-            videoStream={remoteStreams.get(user.id)}
-            camOn={user.isCameraOn}
-            showVideoBubble={showVideoBubble}
-            message={remoteMessages.get(user.id)}
-          />
-        );
-      })}
-    </>
   );
 };
 
@@ -445,7 +486,6 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       
       {/* OrbitControls para rotación, zoom y pan */}
       <OrbitControls
-        ref={orbitControlsRef}
         enableZoom={true}
         enablePan={true}
         enableRotate={true}
@@ -512,25 +552,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
   );
 };
 
-// ============== COMPONENTE VIDEO ESTABLE ==============
-const StableVideo: React.FC<{ stream: MediaStream | null; muted?: boolean; className?: string }> = ({ stream, muted = false, className = '' }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      if (videoRef.current.srcObject !== stream) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.play().catch(() => {});
-      }
-    }
-  }, [stream]);
-
-  return stream ? (
-    <video ref={videoRef} autoPlay playsInline muted={muted} className={className} />
-  ) : null;
-};
-
-// ============== VIDEO HUD (burbuja con cámara) ==============
+// ============== VIDEO HUD COMPONENT ==============
 interface VideoHUDProps {
   userName: string;
   visitorId: string;
@@ -551,42 +573,33 @@ interface VideoHUDProps {
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
-  userName, visitorId, camOn, sharingOn, isPrivate, usersInCall, stream, screenStream, remoteStreams, remoteScreenStreams, remoteReaction,
-  onWaveUser, currentReaction, theme, speakingUsers, userDistances
+  userName,
+  visitorId,
+  camOn,
+  sharingOn,
+  isPrivate,
+  usersInCall,
+  stream,
+  screenStream,
+  remoteStreams,
+  remoteScreenStreams,
+  remoteReaction,
+  onWaveUser,
+  currentReaction,
+  theme,
+  speakingUsers,
+  userDistances,
 }) => {
-  const localVideoRef = useRef<HTMLVideoElement>(null);
-  const screenVideoRef = useRef<HTMLVideoElement>(null);
-  const accentColor = theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-600 text-white';
-  
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const expandedVideoRef = useRef<HTMLVideoElement>(null);
-  const [reactionFading, setReactionFading] = useState(false);
-  const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
+  const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
+  const [useGridLayout, setUseGridLayout] = useState(false);
+  const expandedVideoRef = useRef<HTMLVideoElement>(null);
   
-  // Calcular layout basado en número de usuarios
-  const totalUsers = usersInCall.length + 1; // +1 por el usuario local
-  const useGridLayout = totalUsers >= 3;
-  
-  // Indicador de speaking para usuario local
+  // Detectar si el usuario local está hablando
   const isSpeakingLocal = speakingUsers.has(visitorId);
 
-  useEffect(() => {
-    if (localVideoRef.current && stream) {
-      localVideoRef.current.srcObject = stream;
-      localVideoRef.current.play().catch(e => console.warn("Auto-play error", e));
-    }
-  }, [stream]);
-
-  useEffect(() => {
-    if (screenVideoRef.current && screenStream) {
-      screenVideoRef.current.srcObject = screenStream;
-      screenVideoRef.current.play().catch(e => console.warn("Auto-play error", e));
-    }
-  }, [screenStream]);
-
-  // Manejar video expandido sin titileo
   useEffect(() => {
     if (!expandedVideoRef.current || !expandedId) return;
     let targetStream: MediaStream | null = null;
@@ -1090,6 +1103,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [chatInput, setChatInput] = useState('');
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [remoteMessages, setRemoteMessages] = useState<Map<string, string>>(new Map());
+
+  // Manejar tecla Escape global para cerrar chat
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && showChat) {
+        setShowChat(false);
+      }
+    };
+    window.addEventListener('keydown', handleGlobalKeyDown);
+    return () => window.removeEventListener('keydown', handleGlobalKeyDown);
+  }, [showChat]);
 
   // Enviar mensaje de chat
   const handleSendMessage = useCallback(async () => {
