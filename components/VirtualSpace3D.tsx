@@ -418,6 +418,19 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       />
       
       {/* OrbitControls para rotación, zoom y pan */}
+      <OrbitControls
+        ref={orbitControlsRef}
+        enableZoom={true}
+        enablePan={true}
+        enableRotate={true}
+        maxPolarAngle={Math.PI / 2.1}
+        minDistance={5}
+        maxDistance={50}
+      />
+      
+      {/* Cámara que sigue al jugador */}
+      <CameraFollow orbitControlsRef={orbitControlsRef} />
+
       <Grid
         position={[0, -0.01, 0]}
         args={[100, 100]}
