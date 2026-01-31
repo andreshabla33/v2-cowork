@@ -96,10 +96,11 @@ const statusColors: Record<PresenceStatus, string> = {
 interface StableVideoProps {
   stream: MediaStream | null;
   muted?: boolean;
+  muteAudio?: boolean; // Silenciar solo audio (para modo DND/Away/Busy)
   className?: string;
 }
 
-const StableVideo: React.FC<StableVideoProps> = ({ stream, muted = false, className = '' }) => {
+const StableVideo: React.FC<StableVideoProps> = ({ stream, muted = false, muteAudio = false, className = '' }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamIdRef = useRef<string | null>(null);
 
@@ -127,7 +128,7 @@ const StableVideo: React.FC<StableVideoProps> = ({ stream, muted = false, classN
       ref={videoRef}
       autoPlay
       playsInline
-      muted={muted}
+      muted={muted || muteAudio}
       className={className}
     />
   );
@@ -579,6 +580,7 @@ interface VideoHUDProps {
   theme: string;
   speakingUsers: Set<string>;
   userDistances: Map<string, number>;
+  muteRemoteAudio: boolean;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
@@ -598,6 +600,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   theme,
   speakingUsers,
   userDistances,
+  muteRemoteAudio,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -823,7 +826,11 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                 </div>
               )}
               {remoteStream ? (
-                <StableVideo stream={remoteStream} className="absolute inset-0 w-full h-full object-cover" />
+                <StableVideo 
+                  stream={remoteStream} 
+                  className="absolute inset-0 w-full h-full object-cover" 
+                  muteAudio={muteRemoteAudio}
+                />
               ) : (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
@@ -1109,6 +1116,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [recordingTrigger, setRecordingTrigger] = useState(false);
   const [showEmojis, setShowEmojis] = useState(false);
   const [showChat, setShowChat] = useState(false);
+  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [localMessage, setLocalMessage] = useState<string | null>(null);
   const [remoteMessages, setRemoteMessages] = useState<Map<string, string>>(new Map());
@@ -1121,15 +1129,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA');
       if (isTyping) return;
       
-      // Escape cierra chat y emojis
+      // Escape cierra chat, emojis y status picker
       if (e.key === 'Escape') {
         setShowChat(false);
         setShowEmojis(false);
+        setShowStatusPicker(false);
       }
     };
     window.addEventListener('keydown', handleGlobalKeyDown);
     return () => window.removeEventListener('keydown', handleGlobalKeyDown);
-  }, [showChat, showEmojis]);
+  }, [showChat, showEmojis, showStatusPicker]);
 
   // Enviar mensaje de chat
   const handleSendMessage = useCallback(async () => {
@@ -1617,10 +1626,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [currentUser.x, currentUser.y]);
 
-  // Cerrar chat y emojis al hacer clic en el canvas
+  // Cerrar chat, emojis y status picker al hacer clic en el canvas
   const handleCanvasClick = useCallback(() => {
     setShowChat(false);
     setShowEmojis(false);
+    setShowStatusPicker(false);
   }, []);
 
   return (
@@ -1709,6 +1719,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           theme={theme}
           speakingUsers={speakingUsers}
           userDistances={userDistances}
+          muteRemoteAudio={currentUser.status !== PresenceStatus.AVAILABLE}
         />
       )}
 
@@ -1718,14 +1729,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         onToggleCam={toggleCamera}
         onToggleShare={handleToggleScreenShare}
         onToggleRecording={handleToggleRecording}
-        onToggleEmojis={() => { setShowEmojis(!showEmojis); setShowChat(false); }}
-        onToggleChat={() => { setShowChat(!showChat); setShowEmojis(false); }}
+        onToggleEmojis={() => { setShowEmojis(!showEmojis); setShowChat(false); setShowStatusPicker(false); }}
+        onToggleChat={() => { setShowChat(!showChat); setShowEmojis(false); setShowStatusPicker(false); }}
         isMicOn={currentUser.isMicOn}
         isCamOn={currentUser.isCameraOn}
         isSharing={currentUser.isScreenSharing}
         isRecording={isRecording}
         showEmojis={showEmojis}
         showChat={showChat}
+        showStatusPicker={showStatusPicker}
+        onToggleStatusPicker={() => { setShowStatusPicker(!showStatusPicker); setShowEmojis(false); setShowChat(false); }}
         onTriggerReaction={handleTriggerReaction}
         avatarConfig={currentUser.avatarConfig!}
         showShareButton={usersInCall.length > 0}

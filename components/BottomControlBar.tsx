@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '../store/useStore';
 import { AvatarPreview } from './Navbar';
 import { AvatarConfig, PresenceStatus } from '../types';
@@ -16,6 +16,8 @@ interface BottomControlBarProps {
   isRecording: boolean;
   showEmojis: boolean;
   showChat: boolean;
+  showStatusPicker: boolean;
+  onToggleStatusPicker: () => void;
   onTriggerReaction: (emoji: string) => void;
   avatarConfig: AvatarConfig;
   showShareButton: boolean;
@@ -23,7 +25,7 @@ interface BottomControlBarProps {
 }
 
 // Configuración de estados con iconos y colores (estilo 2026)
-const STATUS_CONFIG = {
+export const STATUS_CONFIG = {
   [PresenceStatus.AVAILABLE]: { color: '#22c55e', icon: '●', label: 'Disponible' },
   [PresenceStatus.BUSY]: { color: '#ef4444', icon: '◉', label: 'Ocupado' },
   [PresenceStatus.AWAY]: { color: '#f59e0b', icon: '◐', label: 'Ausente' },
@@ -43,13 +45,14 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   isRecording,
   showEmojis,
   showChat,
+  showStatusPicker,
+  onToggleStatusPicker,
   onTriggerReaction,
   avatarConfig,
   showShareButton,
   showRecordingButton,
 }) => {
   const { currentUser, updateStatus } = useStore();
-  const [showStatusPicker, setShowStatusPicker] = useState(false);
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
   
   const currentStatus = currentUser.status || PresenceStatus.AVAILABLE;
@@ -63,7 +66,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         {/* Foto de usuario con indicador de estado */}
         <div className="relative">
           <button 
-            onClick={() => setShowStatusPicker(!showStatusPicker)}
+            onClick={onToggleStatusPicker}
             className="w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 mr-1 hover:border-white/20 transition-colors cursor-pointer"
           >
             <div className="scale-75 mt-2">
@@ -85,7 +88,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     key={status}
                     onClick={() => {
                       updateStatus(status as PresenceStatus);
-                      setShowStatusPicker(false);
+                      onToggleStatusPicker();
                     }}
                     className={`
                       w-8 h-8 rounded-lg flex items-center justify-center text-lg transition-all duration-150

@@ -1,7 +1,7 @@
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useStore } from '../store/useStore';
-import { ThemeType, AvatarConfig, PresenceStatus } from '../types';
+import { ThemeType, AvatarConfig } from '../types';
 
 export const AvatarPreview: React.FC<{
   config: AvatarConfig, 
@@ -56,8 +56,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onVibenToggle }) => {
-  const { theme, setTheme, currentUser, updateStatus } = useStore();
-  const [showStatusMenu, setShowStatusMenu] = useState(false);
+  const { theme, setTheme, currentUser } = useStore();
 
   const themes: {id: ThemeType, label: string, icon: string, color: string}[] = [
     { id: 'dark', label: 'Dark', icon: '🌑', color: 'bg-zinc-950' },
@@ -65,15 +64,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onViben
     { id: 'space', label: 'Espacial', icon: '🚀', color: 'bg-indigo-950' },
     { id: 'arcade', label: 'Arcade', icon: '🎮', color: 'bg-black' }
   ];
-
-  const statuses = [
-    { id: PresenceStatus.AVAILABLE, label: 'Disponible', color: 'bg-green-500' },
-    { id: PresenceStatus.BUSY, label: 'Ocupado', color: 'bg-red-500' },
-    { id: PresenceStatus.AWAY, label: 'Ausente', color: 'bg-yellow-500' },
-    { id: PresenceStatus.DND, label: 'No molestar', color: 'bg-indigo-500' }
-  ];
-
-  const currentStatus = statuses.find(s => s.id === currentUser.status) || statuses[0];
 
   return (
     <nav className={`h-16 border-b transition-all duration-500 flex items-center justify-between px-6 z-50 ${theme === 'dark' ? 'bg-zinc-950/80 border-zinc-800 text-white' : theme === 'light' ? 'bg-white/80 border-zinc-200 text-zinc-900' : theme === 'space' ? 'bg-[#020617]/80 border-indigo-900 text-indigo-100' : 'bg-black/80 border-[#00ff41]/30 text-[#00ff41]'} backdrop-blur-md`}>
@@ -89,31 +79,6 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onViben
         </div>
       </div>
       <div className="flex items-center gap-4">
-        {/* Status Selector */}
-        <div className="relative">
-          <button 
-            onClick={() => setShowStatusMenu(!showStatusMenu)}
-            className={`flex items-center gap-2 px-3 py-1.5 rounded-full border transition-all ${theme === 'light' ? 'bg-zinc-100 border-zinc-200' : 'bg-black/20 border-white/10'}`}
-          >
-            <div className={`w-2 h-2 rounded-full ${currentStatus.color}`} />
-            <span className="text-[9px] font-black uppercase tracking-widest opacity-60">{currentStatus.label}</span>
-          </button>
-          {showStatusMenu && (
-            <div className={`absolute top-full mt-2 right-0 border rounded-2xl shadow-2xl p-2 min-w-[140px] z-[100] animate-in slide-in-from-top-2 duration-200 ${theme === 'light' ? 'bg-white border-zinc-200' : 'bg-zinc-900 border-white/10'}`}>
-              {statuses.map(s => (
-                <button 
-                  key={s.id} 
-                  onClick={() => { updateStatus(s.id); setShowStatusMenu(false); }}
-                  className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl transition-colors group ${theme === 'light' ? 'hover:bg-zinc-50' : 'hover:bg-white/5'}`}
-                >
-                  <div className={`w-2 h-2 rounded-full ${s.color}`} />
-                  <span className={`text-[9px] font-black uppercase tracking-widest ${theme === 'light' ? 'text-zinc-600 group-hover:text-black' : 'text-zinc-400 group-hover:text-white'}`}>{s.label}</span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
         {/* Theme Selector Icon Buttons */}
         <div className={`flex items-center gap-1 p-1 border rounded-full ${theme === 'light' ? 'bg-zinc-100 border-zinc-200' : 'bg-black/20 border-white/10'}`}>
           {themes.map(t => (
