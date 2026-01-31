@@ -150,7 +150,25 @@ interface AvatarProps {
   message?: string | null;
 }
 
+// Labels de estado para mostrar al hacer clic
+const STATUS_LABELS: Record<PresenceStatus, string> = {
+  [PresenceStatus.AVAILABLE]: 'Disponible',
+  [PresenceStatus.BUSY]: 'Ocupado',
+  [PresenceStatus.AWAY]: 'Ausente',
+  [PresenceStatus.DND]: 'No molestar',
+};
+
 const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message }) => {
+  const [showStatusLabel, setShowStatusLabel] = useState(false);
+  
+  // Auto-ocultar el label después de 2 segundos
+  useEffect(() => {
+    if (showStatusLabel) {
+      const timer = setTimeout(() => setShowStatusLabel(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [showStatusLabel]);
+  
   return (
     <group position={position}>
       {/* Avatar 3D GLTF desde Supabase */}
@@ -193,10 +211,13 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
         </Html>
       )}
       
-      {/* Nombre flotante con indicador de estado (oculto si hay cámara) */}
+      {/* Nombre flotante con indicador de estado - Clickeable para ver estado */}
       {!camOn && (
         <Html position={[0, 2.4, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
-          <div className="flex items-center gap-1 whitespace-nowrap">
+          <div 
+            className={`flex items-center gap-1 whitespace-nowrap ${!isCurrentUser ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+            onClick={() => !isCurrentUser && setShowStatusLabel(true)}
+          >
             <span 
               className="text-sm font-medium drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]"
               style={{ color: isCurrentUser ? '#60a5fa' : '#ffffff' }}
@@ -208,6 +229,17 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
               style={{ backgroundColor: statusColors[status] }}
             />
           </div>
+          {/* Tooltip con nombre del estado al hacer clic */}
+          {showStatusLabel && !isCurrentUser && (
+            <div className="absolute -top-8 left-1/2 -translate-x-1/2 animate-emoji-popup">
+              <div 
+                className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider text-white shadow-lg whitespace-nowrap"
+                style={{ backgroundColor: statusColors[status] }}
+              >
+                {STATUS_LABELS[status]}
+              </div>
+            </div>
+          )}
         </Html>
       )}
     </group>
