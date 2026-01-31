@@ -487,31 +487,40 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       {/* OrbitControls para rotación, zoom y pan */}
       <OrbitControls
         ref={orbitControlsRef}
-        enableZoom={true}
-        enablePan={true}
-        enableRotate={true}
-        enableDamping={false}
-        maxPolarAngle={Math.PI / 2.1}
+        enableDamping={true}
+        dampingFactor={0.05}
         minDistance={5}
         maxDistance={50}
+        maxPolarAngle={Math.PI / 2 - 0.1}
+        minPolarAngle={Math.PI / 6}
+        enablePan={true}
+        panSpeed={0.5}
+        rotateSpeed={0.5}
+        zoomSpeed={0.8}
       />
       
       {/* Cámara que sigue al jugador */}
       <CameraFollow orbitControlsRef={orbitControlsRef} />
       
       <Grid
-        position={[0, -0.01, 0]}
-        args={[200, 200]}
-        cellSize={2}
-        cellThickness={1}
+        args={[WORLD_SIZE * 2, WORLD_SIZE * 2]}
+        position={[WORLD_SIZE / 2, 0, WORLD_SIZE / 2]}
+        cellSize={1}
+        cellThickness={0.5}
         cellColor={gridColor}
-        sectionSize={10}
-        sectionThickness={1.5}
-        sectionColor={theme === 'arcade' ? '#003300' : '#4f46e5'}
-        fadeDistance={200}
-        fadeStrength={0}
-        infiniteGrid
+        sectionSize={5}
+        sectionThickness={1}
+        sectionColor={gridColor}
+        fadeDistance={100}
+        fadeStrength={1}
+        followCamera={false}
       />
+      
+      {/* Piso sólido */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[WORLD_SIZE / 2, -0.01, WORLD_SIZE / 2]} receiveShadow>
+        <planeGeometry args={[WORLD_SIZE * 2, WORLD_SIZE * 2]} />
+        <meshStandardMaterial color={themeColors[theme] || themeColors.dark} />
+      </mesh>
       
       {/* Suelo base (para clicks) - Bajado para evitar Z-fighting */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} onClick={(e) => {
