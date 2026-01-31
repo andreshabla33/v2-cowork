@@ -138,26 +138,20 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         )}
       </div>
 
-      {/* Emoji Picker Popup - Centrado sobre la barra (2026 Glassmorphism) */}
+      {/* Emoji Picker Popup - Minimalista (NO cierra al hacer clic para spam rápido) */}
       {showEmojis && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 animate-emoji-popup">
-          <div className="p-2.5 bg-black/70 backdrop-blur-2xl rounded-2xl border border-white/15 shadow-[0_8px_40px_rgba(0,0,0,0.5)] flex gap-1.5">
-            {emojis.map((emoji, index) => (
+        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 animate-emoji-popup">
+          <div className="px-2 py-1.5 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 flex gap-0.5">
+            {emojis.map((emoji) => (
               <button
                 key={emoji}
-                onClick={() => {
-                  onTriggerReaction(emoji);
-                  onToggleEmojis();
-                }}
-                className="w-10 h-10 flex items-center justify-center text-2xl rounded-xl transition-all duration-200 hover:bg-white/15 hover:scale-125 active:scale-90 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]"
-                style={{ animationDelay: `${index * 30}ms` }}
+                onClick={() => onTriggerReaction(emoji)}
+                className="w-7 h-7 flex items-center justify-center text-lg rounded-lg transition-all duration-150 hover:bg-white/20 hover:scale-110 active:scale-90"
               >
                 {emoji}
               </button>
             ))}
           </div>
-          {/* Flecha indicadora */}
-          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-black/70 border-r border-b border-white/15 transform rotate-45"></div>
         </div>
       )}
     </div>

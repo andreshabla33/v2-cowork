@@ -287,9 +287,10 @@ interface PlayerProps {
   showVideoBubble?: boolean;
   message?: string | null;
   orbitControlsRef: React.MutableRefObject<any>;
+  reactions?: Array<{ id: string; emoji: string }>;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [] }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -418,12 +419,20 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         isCurrentUser={true}
         animationState={animationState}
         direction={direction}
-        reaction={null}
+        reaction={reactions.length > 0 ? reactions[reactions.length - 1].emoji : null}
         videoStream={stream}
         camOn={currentUser.isCameraOn}
         showVideoBubble={showVideoBubble}
         message={message}
       />
+      {/* Múltiples emojis flotantes estilo Gather */}
+      {reactions.map((r, idx) => (
+        <Html key={r.id} position={[0.3 * (idx % 3 - 1), 3.2 + (idx * 0.3), 0]} center distanceFactor={8} zIndexRange={[200, 0]}>
+          <div className="animate-emoji-float text-4xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+            {r.emoji}
+          </div>
+        </Html>
+      ))}
     </group>
   );
 };
@@ -440,9 +449,10 @@ interface SceneProps {
   showVideoBubbles?: boolean;
   localMessage: string | null;
   remoteMessages: Map<string, string>;
+  localReactions: Array<{ id: string; emoji: string }>;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -537,6 +547,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         showVideoBubble={showVideoBubbles} 
         message={localMessage} 
         orbitControlsRef={orbitControlsRef}
+        reactions={localReactions}
       />
       
       {/* Usuarios remotos */}
@@ -927,7 +938,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerVideoTrackCountRef = useRef<Map<string, number>>(new Map()); // Rastrear video tracks por peer
   const webrtcChannelRef = useRef<any>(null);
-  const [currentReaction, setCurrentReaction] = useState<string | null>(null);
+  const [localReactions, setLocalReactions] = useState<Array<{ id: string; emoji: string }>>([]);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
   const orbitControlsRef = useRef<any>(null);
   
@@ -1147,10 +1158,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [isRecording]);
 
-  // Trigger reaction con auto-clear y envío a otros usuarios
+  // Trigger reaction - permite múltiples emojis rápidos (estilo Gather)
   const handleTriggerReaction = useCallback((emoji: string) => {
-    setCurrentReaction(emoji);
-    setTimeout(() => setCurrentReaction(null), 3000);
+    const reactionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
+    // Agregar nueva reacción al array
+    setLocalReactions(prev => [...prev, { id: reactionId, emoji }]);
+    
+    // Remover esta reacción específica después de 2s
+    setTimeout(() => {
+      setLocalReactions(prev => prev.filter(r => r.id !== reactionId));
+    }, 2000);
     
     // Enviar reacción a otros usuarios por el canal WebRTC
     if (webrtcChannelRef.current && session?.user?.id) {
@@ -1594,6 +1612,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             showVideoBubbles={!hasActiveCall}
             localMessage={localMessage}
             remoteMessages={remoteMessages}
+            localReactions={localReactions}
           />
         </Suspense>
       </Canvas>
@@ -1649,7 +1668,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           remoteScreenStreams={remoteScreenStreams}
           remoteReaction={remoteReaction}
           onWaveUser={handleWaveUser}
-          currentReaction={currentReaction}
+          currentReaction={localReactions.length > 0 ? localReactions[localReactions.length - 1].emoji : null}
           theme={theme}
           speakingUsers={speakingUsers}
           userDistances={userDistances}
