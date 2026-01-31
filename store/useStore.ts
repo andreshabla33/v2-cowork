@@ -118,39 +118,67 @@ export const useStore = create<AppState>((set, get) => ({
   setActiveChatGroupId: (id) => set({ activeChatGroupId: id }),
 
   initialize: async () => {
-    if (get().isInitializing) return;
+    if (get().isInitializing) {
+      console.log("initialize: Already initializing, skipping");
+      return;
+    }
     set({ isInitializing: true });
+    console.log("initialize: Starting...");
     
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        console.error("initialize: Session error", sessionError);
+        set({ session: null, view: 'dashboard', initialized: true, isInitializing: false });
+        return;
+      }
+      
       if (session) {
+        console.log("initialize: Session found for", session.user.email);
         set({ session });
         const { user } = session;
 
-        const { data: avatarConfigData } = await supabase
-          .from('avatar_configuracion')
-          .select('configuracion')
-          .eq('usuario_id', user.id)
-          .maybeSingle();
+        // Cargar datos opcionales (no bloquear si fallan)
+        let avatarConfig = initialAvatar;
+        let statusData = { estado_disponibilidad: PresenceStatus.AVAILABLE, estado_personalizado: '' };
+        
+        try {
+          const { data: avatarConfigData } = await supabase
+            .from('avatar_configuracion')
+            .select('configuracion')
+            .eq('usuario_id', user.id)
+            .maybeSingle();
+          if (avatarConfigData?.configuracion) avatarConfig = avatarConfigData.configuracion;
+        } catch (e) {
+          console.warn("initialize: Could not load avatar config", e);
+        }
 
-        const { data: usuarioData } = await supabase
-          .from('usuarios')
-          .select('estado_disponibilidad, estado_personalizado')
-          .eq('id', user.id)
-          .single();
+        try {
+          const { data: usuarioData } = await supabase
+            .from('usuarios')
+            .select('estado_disponibilidad, estado_personalizado')
+            .eq('id', user.id)
+            .maybeSingle();
+          if (usuarioData) statusData = usuarioData as any;
+        } catch (e) {
+          console.warn("initialize: Could not load user status", e);
+        }
 
         set({ 
           currentUser: {
             ...get().currentUser,
             id: user.id,
-            name: user.user_metadata?.full_name || user.email.split('@')[0],
-            avatarConfig: avatarConfigData?.configuracion || initialAvatar,
-            status: usuarioData?.estado_disponibilidad || PresenceStatus.AVAILABLE,
-            statusText: usuarioData?.estado_personalizado || ''
+            name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
+            avatarConfig,
+            status: statusData.estado_disponibilidad || PresenceStatus.AVAILABLE,
+            statusText: statusData.estado_personalizado || ''
           }
         });
 
         const workspaces = await get().fetchWorkspaces();
+        console.log("initialize: Workspaces loaded:", workspaces.length);
+        
         const savedId = localStorage.getItem(STORAGE_WS_KEY);
         
         // Verificar si hay token de invitación en la URL
@@ -158,29 +186,36 @@ export const useStore = create<AppState>((set, get) => ({
         const invitationToken = urlParams.get('token');
         
         if (invitationToken) {
-          // Si hay token de invitación, ir a procesarlo
+          console.log("initialize: Invitation token found, going to invitation view");
           set({ view: 'invitation' });
         } else if (workspaces.length === 0) {
-          // Usuario nuevo sin espacios -> Onboarding de creador
+          console.log("initialize: No workspaces, going to onboarding_creador");
           set({ view: 'onboarding_creador' });
         } else if (savedId) {
           const found = workspaces.find(w => w.id === savedId);
           if (found) {
+            console.log("initialize: Restoring workspace", found.name);
             get().setActiveWorkspace(found, (found as any).userRole);
             set({ view: 'workspace' });
           } else {
+            console.log("initialize: Saved workspace not found, going to dashboard");
             set({ view: 'dashboard' });
           }
         } else {
+          console.log("initialize: Going to dashboard");
           set({ view: 'dashboard' });
         }
       } else {
+        console.log("initialize: No session, going to dashboard");
         set({ session: null, view: 'dashboard' });
       }
     } catch (error) {
       console.error("Initialization failed:", error);
+      // En caso de error, ir al dashboard para no quedarse cargando
+      set({ view: 'dashboard' });
     } finally {
       set({ initialized: true, isInitializing: false });
+      console.log("initialize: Complete");
     }
   },
 
@@ -211,18 +246,26 @@ export const useStore = create<AppState>((set, get) => ({
   fetchWorkspaces: async () => {
     const { session } = get();
     const userId = session?.user?.id;
-    if (!userId) return [];
+    if (!userId) {
+      console.log("fetchWorkspaces: No userId, returning empty");
+      return [];
+    }
     
     try {
+      console.log("fetchWorkspaces: Fetching for user", userId);
       const { data, error } = await supabase
         .from('espacios_trabajo')
         .select(`id, nombre, descripcion, slug, miembros_espacio!inner (rol, aceptado)`)
         .eq('miembros_espacio.usuario_id', userId)
         .eq('miembros_espacio.aceptado', true);
       
-      if (error) throw error;
+      if (error) {
+        console.error("fetchWorkspaces Supabase Error:", error.message, error.code, error.details);
+        throw error;
+      }
 
-      const workspaces = data.map((ws: any) => ({
+      console.log("fetchWorkspaces: Found", data?.length || 0, "workspaces");
+      const workspaces = (data || []).map((ws: any) => ({
         id: ws.id,
         name: ws.nombre,
         descripcion: ws.descripcion,
@@ -236,7 +279,7 @@ export const useStore = create<AppState>((set, get) => ({
       set({ workspaces, authFeedback: null });
       return workspaces;
     } catch (err: any) {
-      console.error("Fetch Workspaces Error:", err);
+      console.error("Fetch Workspaces Error:", err?.message || err);
       return [];
     }
   },
