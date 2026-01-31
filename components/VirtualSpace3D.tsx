@@ -211,9 +211,10 @@ interface PlayerProps {
   stream: MediaStream | null;
   showVideoBubble?: boolean;
   message?: string | null;
+  orbitControlsRef: React.MutableRefObject<any>;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -225,6 +226,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   const keysPressed = useRef<Set<string>>(new Set());
   const lastSyncTime = useRef(0);
   const { camera } = useThree();
+  
+  // Ref para posición anterior de la cámara para cálculo de delta
+  const prevPlayerPos = useRef({ x: positionRef.current.x, z: positionRef.current.z });
+
+  useEffect(() => {
+    // Inicializar posición previa
+    prevPlayerPos.current = { x: positionRef.current.x, z: positionRef.current.z };
+  }, []);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -310,11 +319,28 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       groupRef.current.position.x = positionRef.current.x;
       groupRef.current.position.z = positionRef.current.z;
     }
+    
+    // Actualizar cámara para seguir al jugador (Sincronizado para evitar jitter)
+    if (orbitControlsRef.current) {
+      const controls = orbitControlsRef.current;
+      
+      // Calcular cambio en posición
+      const deltaX = positionRef.current.x - prevPlayerPos.current.x;
+      const deltaZ = positionRef.current.z - prevPlayerPos.current.z;
+      
+      if (Math.abs(deltaX) > 0.0001 || Math.abs(deltaZ) > 0.0001) {
+        // Mover cámara y target juntos
+        camera.position.x += deltaX;
+        camera.position.z += deltaZ;
+        controls.target.x += deltaX;
+        controls.target.z += deltaZ;
+        controls.update();
+      }
+      
+      prevPlayerPos.current = { x: positionRef.current.x, z: positionRef.current.z };
+    }
 
     if (newDirection !== direction) setDirection(newDirection);
-
-    // Actualizar target para OrbitControls
-    (camera as any).userData.playerPosition = { x: positionRef.current.x, z: positionRef.current.z };
 
     // Sincronizar posición con el store
     const now = state.clock.getElapsedTime();
@@ -396,7 +422,7 @@ interface SceneProps {
 }
 
 const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages }) => {
-  const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
+  const gridColor = theme === 'arcade' ? '#050505' : '#1a1025';
 
   return (
     <>
@@ -423,14 +449,12 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         enableZoom={true}
         enablePan={true}
         enableRotate={true}
+        enableDamping={false}
         maxPolarAngle={Math.PI / 2.1}
         minDistance={5}
         maxDistance={50}
       />
       
-      {/* Cámara que sigue al jugador */}
-      <CameraFollow orbitControlsRef={orbitControlsRef} />
-
       <Grid
         position={[0, -0.01, 0]}
         args={[100, 100]}
@@ -439,14 +463,14 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         cellColor={gridColor}
         sectionSize={5}
         sectionThickness={1}
-        sectionColor={theme === 'arcade' ? '#003300' : '#4f46e5'}
+        sectionColor={theme === 'arcade' ? '#050505' : '#1a1025'}
         fadeDistance={50}
         fadeStrength={1.5}
         infiniteGrid
       />
       
-      {/* Suelo base (para clicks) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.02, 0]} onClick={(e) => {
+      {/* Suelo base (para clicks) - Bajado para evitar Z-fighting */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} onClick={(e) => {
         // Lógica de movimiento por click
         const point = e.point;
         setPosition(Math.round(point.x * 16), Math.round(point.z * 16), 'front', false, true);
@@ -473,7 +497,14 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       </Text>
       
       {/* Jugador actual */}
-      <Player currentUser={currentUser} setPosition={setPosition} stream={stream} showVideoBubble={showVideoBubbles} message={localMessage} />
+      <Player 
+        currentUser={currentUser} 
+        setPosition={setPosition} 
+        stream={stream} 
+        showVideoBubble={showVideoBubbles} 
+        message={localMessage} 
+        orbitControlsRef={orbitControlsRef}
+      />
       
       {/* Usuarios remotos */}
       <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} />
@@ -1521,7 +1552,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   }, [currentUser.x, currentUser.y]);
 
   return (
-    <div className="w-full h-full relative">
+    <div className="w-full h-full relative bg-black">
       <Canvas
         shadows
         gl={{ 
@@ -1531,7 +1562,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         }}
         onCreated={({ gl }) => {
           console.log('Canvas created successfully');
-          gl.setClearColor(themeColors[theme] || '#1a1d21');
+          gl.setClearColor(themeColors[theme] || '#000000');
         }}
       >
         <Suspense fallback={null}>
