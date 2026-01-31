@@ -96,7 +96,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         <ControlButton 
           onClick={onToggleChat} 
           isActive={showChat} 
-          activeColor="bg-blue-500/20 text-blue-400" 
+          activeColor="bg-blue-500 text-white" 
           inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
           icon={<IconChat />}
           tooltip="Chat"
@@ -107,7 +107,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           <ControlButton 
             onClick={onToggleEmojis} 
             isActive={showEmojis} 
-            activeColor="bg-amber-500/20 text-amber-400" 
+            activeColor="bg-amber-500 text-white" 
             inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
             icon={<IconReaction />}
             tooltip="Reacciones"
