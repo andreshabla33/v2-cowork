@@ -912,23 +912,53 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbujas de screen share de otros usuarios */}
         {usersInCall.map((u) => {
           const remoteScreen = remoteScreenStreams.get(u.id);
-          // Solo mostrar si hay un stream con video tracks activos
-          if (!remoteScreen || remoteScreen.getVideoTracks().length === 0) return null;
+          const remoteStream = remoteStreams.get(u.id);
+          const hasActiveScreen = remoteScreen && remoteScreen.getVideoTracks().length > 0;
+          const hasActiveCamera = remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState === 'live');
+          
+          // Solo mostrar si hay un stream de pantalla con video tracks activos
+          if (!hasActiveScreen) return null;
+          
           return (
-            <div key={`screen-${u.id}`} className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/30 shadow-2xl group w-52 h-36">
-              <StableVideo stream={remoteScreen} className="w-full h-full object-cover" />
-              {/* Label minimalista y transparente */}
-              <div className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-md opacity-60 group-hover:opacity-100 transition-opacity">
-                <span className="text-[8px] font-medium text-white/80 truncate max-w-[80px] block">{u.name.split(' ')[0]}</span>
+            <React.Fragment key={`screen-group-${u.id}`}>
+              {/* Burbuja de pantalla compartida */}
+              <div className="relative bg-black rounded-[28px] overflow-hidden border border-green-500/30 shadow-2xl group w-52 h-36">
+                <StableVideo stream={remoteScreen} className="w-full h-full object-cover" />
+                {/* Label minimalista y transparente */}
+                <div className="absolute top-2 left-2 bg-black/30 backdrop-blur-sm px-1.5 py-0.5 rounded-md opacity-60 group-hover:opacity-100 transition-opacity">
+                  <span className="text-[8px] font-medium text-white/80 truncate max-w-[80px] block">{u.name.split(' ')[0]}</span>
+                </div>
+                {/* Icono de pantalla pequeño */}
+                <div className="absolute top-2 right-2 w-5 h-5 rounded-md bg-green-500/20 backdrop-blur-sm flex items-center justify-center opacity-60">
+                  <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </div>
+                <button onClick={() => setExpandedId(`screen-${u.id}`)} className="absolute bottom-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 backdrop-blur-sm text-white/70 opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-all">
+                  <IconExpand on={false}/>
+                </button>
               </div>
-              {/* Icono de pantalla pequeño */}
-              <div className="absolute top-2 right-2 w-5 h-5 rounded-md bg-green-500/20 backdrop-blur-sm flex items-center justify-center opacity-60">
-                <svg className="w-3 h-3 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-              </div>
-              <button onClick={() => setExpandedId(`screen-${u.id}`)} className="absolute bottom-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center bg-white/10 backdrop-blur-sm text-white/70 opacity-0 group-hover:opacity-100 hover:bg-white/20 transition-all">
-                <IconExpand on={false}/>
-              </button>
-            </div>
+              
+              {/* Burbuja de cámara pequeña (PiP) cuando también comparte pantalla */}
+              {hasActiveCamera && (
+                <div className="relative bg-black rounded-2xl overflow-hidden border border-indigo-500/40 shadow-xl group w-28 h-20">
+                  <StableVideo 
+                    stream={remoteStream} 
+                    className="w-full h-full object-cover" 
+                    muteAudio={muteRemoteAudio}
+                  />
+                  {/* Nombre pequeño */}
+                  <div className="absolute bottom-1 left-1 bg-black/60 backdrop-blur-sm px-1 py-0.5 rounded">
+                    <span className="text-[7px] font-medium text-white/80">{u.name.split(' ')[0]}</span>
+                  </div>
+                  {/* Icono de cámara */}
+                  <div className="absolute top-1 right-1 w-4 h-4 rounded bg-indigo-500/30 backdrop-blur-sm flex items-center justify-center">
+                    <svg className="w-2.5 h-2.5 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                  </div>
+                  <button onClick={() => setExpandedId(u.id)} className="absolute inset-0 w-full h-full opacity-0 group-hover:opacity-100 bg-black/20 flex items-center justify-center transition-all">
+                    <IconExpand on={false}/>
+                  </button>
+                </div>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
