@@ -248,7 +248,15 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
 };
 
 // ============== COMPONENTE USUARIOS REMOTOS ==============
-const RemoteUsers: React.FC<{ users: User[]; remoteStreams: Map<string, MediaStream>; showVideoBubble?: boolean; remoteMessages: Map<string, string> }> = ({ users, remoteStreams, showVideoBubble, remoteMessages }) => {
+interface RemoteUsersProps {
+  users: User[];
+  remoteStreams: Map<string, MediaStream>;
+  showVideoBubble?: boolean;
+  remoteMessages: Map<string, string>;
+  remoteReaction: { emoji: string; from: string; fromName: string } | null;
+}
+
+const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, remoteMessages, remoteReaction }) => {
   const { currentUser } = useStore();
   
   return (
@@ -263,7 +271,7 @@ const RemoteUsers: React.FC<{ users: User[]; remoteStreams: Map<string, MediaStr
             isCurrentUser={false}
             animationState="idle"
             direction={u.direction}
-            reaction={null}
+            reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}
             videoStream={remoteStreams.get(u.id) || null}
             camOn={u.isCameraOn}
             showVideoBubble={showVideoBubble}
@@ -489,9 +497,10 @@ interface SceneProps {
   localMessage: string | null;
   remoteMessages: Map<string, string>;
   localReactions: Array<{ id: string; emoji: string }>;
+  remoteReaction: { emoji: string; from: string; fromName: string } | null;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -590,7 +599,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} remoteReaction={remoteReaction} />
     </>
   );
 };
@@ -1759,6 +1768,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             localMessage={localMessage}
             remoteMessages={remoteMessages}
             localReactions={localReactions}
+            remoteReaction={remoteReaction}
           />
         </Suspense>
       </Canvas>
