@@ -40,6 +40,7 @@ interface RecordingManagerProps {
   onRecordingStateChange?: (isRecording: boolean) => void;
   onProcessingComplete?: (resultado: ResultadoAnalisis | null) => void;
   onDurationChange?: (duration: number) => void;
+  onTipoGrabacionChange?: (tipo: string | null) => void;
   headlessMode?: boolean;
   externalTrigger?: boolean;
   onExternalTriggerHandled?: () => void;
@@ -66,6 +67,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   externalTrigger,
   onProcessingComplete,
   onDurationChange,
+  onTipoGrabacionChange,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
@@ -257,6 +259,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         duration: 0 
       });
       onRecordingStateChange?.(true);
+      onTipoGrabacionChange?.(tipo); // Notificar el tipo para el banner
 
       // Iniciar transcripción
       const audioTracks = stream.getAudioTracks();

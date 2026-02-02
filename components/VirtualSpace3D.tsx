@@ -1025,6 +1025,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   // Estado de grabación
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
+  const [consentimientoAceptado, setConsentimientoAceptado] = useState(false); // Para tipos con disclaimer
+  const [tipoGrabacionActual, setTipoGrabacionActual] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordedChunksRef = useRef<Blob[]>([]);
@@ -1179,6 +1181,35 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       if (currentUser.isPrivate) setPrivacy(false);
     }
   }, [hasActiveCall]);
+
+  // Escuchar notificaciones de consentimiento aceptado (para el grabador)
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const channel = supabase
+      .channel('consentimiento_respuesta_grabador')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'notificaciones',
+          filter: `usuario_id=eq.${session.user.id}`,
+        },
+        (payload) => {
+          const notif = payload.new as any;
+          if (notif.tipo === 'consentimiento_respuesta' && notif.titulo?.includes('Aceptado')) {
+            console.log('✅ Consentimiento aceptado por el evaluado');
+            setConsentimientoAceptado(true);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [session?.user?.id]);
 
   // Estado para trigger externo de grabación
   const [recordingTrigger, setRecordingTrigger] = useState(false);
@@ -1732,8 +1763,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         </Suspense>
       </Canvas>
       
-      {/* Banner de grabación - VISIBLE PARA TODOS */}
-      {isRecording && (
+      {/* Banner de grabación - Solo visible cuando el consentimiento fue aceptado (para tipos con disclaimer) */}
+      {isRecording && (tipoGrabacionActual === null || !['rrhh_entrevista', 'rrhh_one_to_one'].includes(tipoGrabacionActual) || consentimientoAceptado) && (
         <div className="fixed top-0 left-0 right-0 z-[200] flex justify-center pointer-events-none animate-slide-down">
           <div className="bg-red-600 text-white px-6 py-2.5 rounded-b-2xl flex items-center gap-3 shadow-2xl border-b border-x border-red-400/30 pointer-events-auto">
             <span className="relative flex h-3 w-3">
@@ -1885,9 +1916,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           usuariosEnLlamada={usersInCall.map(u => ({ id: u.id, nombre: u.name }))}
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
-            if (!recording) setRecordingDuration(0); // Reset al detener
+            if (!recording) {
+              setRecordingDuration(0);
+              setConsentimientoAceptado(false);
+              setTipoGrabacionActual(null);
+            }
           }}
           onDurationChange={(duration) => setRecordingDuration(duration)}
+          onTipoGrabacionChange={(tipo) => setTipoGrabacionActual(tipo)}
           onProcessingComplete={(resultado) => {
             console.log('✅ Análisis conductual completado:', resultado?.tipo_grabacion, resultado?.analisis);
           }}
