@@ -14,6 +14,7 @@ interface BottomControlBarProps {
   isCamOn: boolean;
   isSharing: boolean;
   isRecording: boolean;
+  recordingDuration?: number;
   showEmojis: boolean;
   showChat: boolean;
   showStatusPicker: boolean;
@@ -43,6 +44,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   isCamOn,
   isSharing,
   isRecording,
+  recordingDuration = 0,
   showEmojis,
   showChat,
   showStatusPicker,
@@ -169,22 +171,37 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           <>
             <div className="w-px h-6 bg-white/10 mx-0.5"></div>
 
-            {/* Grabar - Simplificado */}
-            <button
-              onClick={onToggleRecording}
-              className={`
-                relative flex items-center gap-2 px-3 py-2 rounded-xl transition-all duration-300 group
-                ${isRecording 
-                  ? 'bg-red-500 text-white hover:bg-red-600' 
-                  : 'bg-white/5 hover:bg-white/10 text-white'
-                }
-              `}
-            >
-              <div className={`w-3 h-3 rounded-sm ${isRecording ? 'bg-white' : 'bg-red-500 rounded-full'}`}></div>
-              <span className="text-xs font-medium text-white/90">
-                {isRecording ? 'Detener' : 'Grabar'}
-              </span>
-            </button>
+            {isRecording ? (
+              /* Indicador de grabación activa - Minimalista estilo 2026 */
+              <div className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-xl bg-red-500/15 border border-red-500/30">
+                {/* Punto rojo parpadeante */}
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                {/* Timer */}
+                <span className="text-xs font-mono text-red-400 tabular-nums min-w-[36px]">
+                  {String(Math.floor(recordingDuration / 60)).padStart(2, '0')}:{String(recordingDuration % 60).padStart(2, '0')}
+                </span>
+                {/* Botón Stop */}
+                <button
+                  onClick={onToggleRecording}
+                  className="w-7 h-7 rounded-lg bg-red-500 hover:bg-red-600 flex items-center justify-center transition-colors"
+                  title="Detener grabación"
+                >
+                  <div className="w-2.5 h-2.5 bg-white rounded-sm"></div>
+                </button>
+              </div>
+            ) : (
+              /* Botón para iniciar grabación */
+              <button
+                onClick={onToggleRecording}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all duration-300"
+              >
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <span className="text-xs font-medium text-white/90">Grabar</span>
+              </button>
+            )}
           </>
         )}
       </div>
