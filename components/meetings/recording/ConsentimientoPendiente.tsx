@@ -102,11 +102,23 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
           table: 'notificaciones',
           filter: `usuario_id=eq.${session.user.id}`,
         },
-        (payload) => {
+        async (payload) => {
           const notif = payload.new as any;
           console.log('🔔 Nueva notificación en tiempo real:', notif);
-          if (notif.tipo === 'consentimiento_grabacion') {
-            const datos = notif.datos_extra as any; // Columna correcta: datos_extra
+          if (notif.tipo === 'consentimiento_grabacion' && !notif.leida) {
+            // Verificar que la grabación aún necesita consentimiento
+            const { data: grabacion } = await supabase
+              .from('grabaciones')
+              .select('consentimiento_evaluado')
+              .eq('id', notif.entidad_id)
+              .single();
+            
+            if (grabacion?.consentimiento_evaluado) {
+              console.log('⏭️ Grabación ya tiene consentimiento, ignorando');
+              return;
+            }
+            
+            const datos = notif.datos_extra as any;
             console.log('📦 Datos extra (realtime):', datos);
             setSolicitud({
               grabacion_id: notif.entidad_id,
