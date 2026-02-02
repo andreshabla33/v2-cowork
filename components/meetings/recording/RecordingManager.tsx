@@ -204,7 +204,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       startTimeRef.current = Date.now();
 
       // Registrar en Supabase
-      await supabase.from('grabaciones').insert({
+      console.log('💾 Insertando grabación en BD...', { espacio_id: espacioId, creado_por: userId });
+      const { error: insertError } = await supabase.from('grabaciones').insert({
         id: grabacionIdRef.current,
         espacio_id: espacioId,
         creado_por: userId,
@@ -214,8 +215,15 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         tiene_video: true,
         tiene_audio: true,
         formato: 'webm',
-        evaluado_id: evaluadoId || null, // Guardar el ID del evaluado si existe
+        evaluado_id: evaluadoId || null,
       });
+      
+      if (insertError) {
+        console.error('❌ Error insertando grabación:', insertError);
+        updateState({ step: 'error', message: `Error creando grabación: ${insertError.message}` });
+        return;
+      }
+      console.log('✅ Grabación insertada en BD');
 
       // Si hay evaluado, enviar solicitud de consentimiento
       if (evaluadoId) {
