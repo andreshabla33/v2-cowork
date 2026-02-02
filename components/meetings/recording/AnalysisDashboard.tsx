@@ -258,13 +258,15 @@ const EmotionTimeline: React.FC<{
   frames: { timestamp_segundos: number; emocion_dominante: EmotionType; engagement_score: number }[];
   duration: number;
 }> = ({ frames, duration }) => {
-  if (frames.length === 0) return <p className="text-white/50 text-sm">Sin datos</p>;
+  if (frames.length === 0) return <p className="text-white/50 text-sm">Sin datos de timeline</p>;
 
-  // Agrupar en segmentos de 10 segundos
-  const segmentDuration = Math.max(10, duration / 20);
-  const segments: { emotion: EmotionType; engagement: number }[] = [];
+  // Usar segmentos más pequeños: 1-2 segundos dependiendo de la duración
+  const numSegments = Math.min(30, Math.max(10, Math.ceil(duration)));
+  const segmentDuration = duration / numSegments;
+  const segments: { emotion: EmotionType; engagement: number; hasData: boolean }[] = [];
 
-  for (let t = 0; t < duration; t += segmentDuration) {
+  for (let i = 0; i < numSegments; i++) {
+    const t = i * segmentDuration;
     const segmentFrames = frames.filter(
       f => f.timestamp_segundos >= t && f.timestamp_segundos < t + segmentDuration
     );
@@ -279,21 +281,30 @@ const EmotionTimeline: React.FC<{
       segments.push({
         emotion: dominant,
         engagement: engSum / segmentFrames.length,
+        hasData: true,
+      });
+    } else {
+      // Interpolar con el segmento anterior si no hay datos
+      const lastSeg = segments[segments.length - 1];
+      segments.push({
+        emotion: lastSeg?.emotion || 'neutral',
+        engagement: lastSeg?.engagement || 0.5,
+        hasData: false,
       });
     }
   }
 
   return (
-    <div className="flex gap-1 h-12">
+    <div className="flex gap-0.5 h-14 bg-white/5 rounded-lg p-1">
       {segments.map((seg, i) => (
         <div
           key={i}
-          className={`flex-1 rounded ${EMOTION_COLORS[seg.emotion]} transition-all hover:opacity-80`}
-          style={{ opacity: 0.3 + seg.engagement * 0.7 }}
-          title={`${seg.emotion} - Engagement: ${Math.round(seg.engagement * 100)}%`}
+          className={`flex-1 rounded ${EMOTION_COLORS[seg.emotion]} transition-all hover:scale-y-110 cursor-pointer`}
+          style={{ opacity: seg.hasData ? (0.4 + seg.engagement * 0.6) : 0.2 }}
+          title={`${Math.round(i * segmentDuration)}s - ${seg.emotion} (${Math.round(seg.engagement * 100)}%)`}
         >
-          <div className="h-full flex items-end justify-center pb-1">
-            <span className="text-xs">{EMOTION_ICONS[seg.emotion]}</span>
+          <div className="h-full flex items-end justify-center pb-0.5">
+            {seg.hasData && <span className="text-[10px]">{EMOTION_ICONS[seg.emotion]}</span>}
           </div>
         </div>
       ))}
