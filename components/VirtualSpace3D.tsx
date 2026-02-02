@@ -833,9 +833,14 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
         {/* Burbujas de usuarios cercanos */}
         {usersInCall.map((u) => {
           const remoteStream = remoteStreams.get(u.id);
+          const remoteScreen = remoteScreenStreams.get(u.id);
           const isSpeaking = speakingUsers.has(u.id);
           const distance = userDistances.get(u.id) || 100;
           const isWaving = waveAnimation === u.id;
+          
+          // Si el usuario está compartiendo pantalla, no mostrar su cámara aquí (se muestra como PiP junto a la pantalla)
+          const isScreenSharing = remoteScreen && remoteScreen.getVideoTracks().length > 0;
+          if (isScreenSharing) return null;
           
           return (
             <div key={u.id} className={`relative bg-zinc-900 rounded-[28px] overflow-hidden shadow-2xl group transition-all duration-300 ${
