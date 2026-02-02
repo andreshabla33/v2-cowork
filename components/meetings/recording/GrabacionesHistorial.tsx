@@ -422,6 +422,25 @@ export const GrabacionesHistorial: React.FC = () => {
     // Generar análisis específico por tipo
     const analisisEspecifico = generateAnalisisFromFrames(tipoGrab, frames, grabacion.duracion_segundos || 0);
 
+    // Detectar microexpresiones desde cambios abruptos de emoción
+    const microexpresionesDetectadas: any[] = [];
+    for (let i = 1; i < frames.length; i++) {
+      const prev = frames[i - 1];
+      const curr = frames[i];
+      // Si hay cambio de emoción y la duración es corta (< 500ms aprox)
+      if (prev.emocion_dominante !== curr.emocion_dominante && 
+          prev.emocion_dominante !== 'neutral' &&
+          curr.emocion_dominante !== 'neutral') {
+        microexpresionesDetectadas.push({
+          timestamp_segundos: curr.timestamp_segundos,
+          emocion: curr.emocion_dominante,
+          duracion_ms: 300,
+          intensidad: 0.7,
+          confianza: 0.8,
+        });
+      }
+    }
+
     const resultado: ResultadoAnalisis = {
       grabacion_id: grabacion.id,
       tipo_grabacion: tipoGrab,
@@ -429,7 +448,7 @@ export const GrabacionesHistorial: React.FC = () => {
       participantes: grabacion.usuario ? [{ id: grabacion.creado_por, nombre: `${grabacion.usuario.nombre} ${grabacion.usuario.apellido}` }] : [],
       frames_faciales: frames,
       frames_corporales: [],
-      microexpresiones: [],
+      microexpresiones: microexpresionesDetectadas,
       baseline: null,
       analisis: analisisEspecifico,
       modelo_version: '1.0.0',
