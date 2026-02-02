@@ -82,12 +82,12 @@ const ESTADO_CONFIG: Record<string, { color: string; icon: string; label: string
 };
 
 const TIPO_CONFIG: Record<string, { color: string; icon: string; label: string }> = {
-  rrhh: { color: 'from-purple-500 to-pink-600', icon: '👥', label: 'RRHH' },
-  rrhh_entrevista: { color: 'from-purple-500 to-pink-600', icon: '🎯', label: 'Entrevista' },
-  rrhh_one_to_one: { color: 'from-purple-500 to-pink-600', icon: '🤝', label: 'One-to-One' },
-  deals: { color: 'from-emerald-500 to-teal-600', icon: '💼', label: 'Deal/Negociación' },
-  equipo: { color: 'from-blue-500 to-indigo-600', icon: '🚀', label: 'Equipo' },
-  reunion: { color: 'from-slate-500 to-gray-600', icon: '📹', label: 'Reunión' },
+  rrhh: { color: 'from-violet-600/80 to-violet-800/80', icon: '👥', label: 'RRHH' },
+  rrhh_entrevista: { color: 'from-violet-600/80 to-violet-800/80', icon: '🎯', label: 'Entrevista' },
+  rrhh_one_to_one: { color: 'from-violet-600/80 to-violet-800/80', icon: '🤝', label: 'One-to-One' },
+  deals: { color: 'from-emerald-600/80 to-emerald-800/80', icon: '💼', label: 'Negociación' },
+  equipo: { color: 'from-indigo-600/80 to-indigo-800/80', icon: '🚀', label: 'Equipo' },
+  reunion: { color: 'from-zinc-600/80 to-zinc-800/80', icon: '📹', label: 'Reunión' },
 };
 
 // Dropdown personalizado
@@ -603,22 +603,34 @@ export const GrabacionesHistorial: React.FC = () => {
       <div className="max-w-6xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className={`text-3xl font-black uppercase tracking-tight ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
-              � Transcripciones
-            </h1>
-            <p className={`text-sm mt-1 ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
-              Historial de reuniones con transcripciones y análisis conductual
-            </p>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 flex items-center justify-center shadow-lg shadow-violet-600/20">
+                <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <div>
+                <h1 className={`text-2xl font-bold tracking-tight ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                  Grabaciones
+                </h1>
+                <p className={`text-xs ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-500'}`}>
+                  Transcripciones y análisis conductual
+                </p>
+              </div>
+            </div>
           </div>
           <button
             onClick={cargarGrabaciones}
-            className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 ${
               isArcade 
                 ? 'bg-[#00ff41] text-black hover:bg-white' 
-                : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                : 'bg-white/5 border border-white/10 text-zinc-300 hover:bg-white/10 hover:text-white'
             }`}
           >
-            🔄 Actualizar
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Actualizar
           </button>
         </div>
 
@@ -732,22 +744,22 @@ export const GrabacionesHistorial: React.FC = () => {
                 >
                   <div className="flex items-start gap-4">
                     {/* Icono tipo */}
-                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${tipoConfig.color} flex items-center justify-center text-2xl shadow-lg`}>
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${tipoConfig.color} flex items-center justify-center text-xl shadow-md`}>
                       {tipoConfig.icon}
                     </div>
 
                     {/* Info principal */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-3 mb-1">
-                        <h3 className={`font-bold text-lg ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
-                          {grabacion.archivo_nombre || tipoConfig.label}
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className={`font-semibold ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>
+                          Reunión {new Date(grabacion.creado_en).toLocaleDateString('es', { day: 'numeric', month: 'short' })}
                         </h3>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-gradient-to-r ${tipoConfig.color} text-white`}>
-                          {tipoConfig.icon} {tipoConfig.label}
+                        <span className="px-2 py-0.5 rounded-md text-[10px] font-medium bg-white/10 text-zinc-300">
+                          {tipoConfig.label}
                         </span>
-                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${estadoConfig.color} text-white`}>
-                          {estadoConfig.icon} {estadoConfig.label}
-                        </span>
+                        {grabacion.estado === 'completado' && (
+                          <span className="w-2 h-2 rounded-full bg-emerald-500" title="Completado" />
+                        )}
                       </div>
 
                       <div className={`flex items-center gap-4 text-sm ${isArcade ? 'text-[#00ff41]/60' : 'text-zinc-400'}`}>
@@ -765,76 +777,53 @@ export const GrabacionesHistorial: React.FC = () => {
                         </p>
                       )}
 
-                      {/* Badges */}
-                      <div className="flex items-center gap-2 mt-3">
-                        {/* Badge de rol: Creador o Participante */}
-                        {grabacion.esCreador ? (
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                            isArcade ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/20 text-amber-400'
-                          }`}>
-                            👑 Tu grabación
+                      {/* Tags minimalistas */}
+                      <div className="flex items-center gap-1.5 mt-2">
+                        {grabacion.esCreador && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-violet-500/15 text-violet-400">
+                            Creador
                           </span>
-                        ) : grabacion.esParticipante ? (
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                            isArcade ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-500/20 text-cyan-400'
-                          }`}>
-                            👤 Participante
-                          </span>
-                        ) : null}
+                        )}
                         {tieneTranscripcion && (
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-blue-500/20 text-blue-400'
-                          }`}>
-                            📝 {grabacion.transcripciones!.length} segmentos
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-white/5 text-zinc-400">
+                            {grabacion.transcripciones!.length} segmento{grabacion.transcripciones!.length > 1 ? 's' : ''}
                           </span>
                         )}
-                        {/* Análisis solo visible si es creador */}
                         {tieneAnalisis && grabacion.esCreador && (
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-purple-500/20 text-purple-400'
-                          }`}>
-                            🧠 Análisis disponible
-                          </span>
-                        )}
-                        {grabacion.resumenes_ai && grabacion.resumenes_ai.length > 0 && grabacion.esCreador && (
-                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
-                            isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-emerald-500/20 text-emerald-400'
-                          }`}>
-                            ✨ Resumen AI
+                          <span className="px-2 py-0.5 rounded text-[10px] font-medium bg-indigo-500/15 text-indigo-400">
+                            Análisis
                           </span>
                         )}
                       </div>
                     </div>
 
                     {/* Acciones */}
-                    <div className="flex flex-col gap-2">
-                      {/* Botón Ver Análisis: SOLO para el creador */}
+                    <div className="flex items-center gap-2">
                       {tieneAnalisis && grabacion.esCreador && (
                         <button
                           onClick={() => verAnalisis(grabacion)}
-                          className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             isArcade 
                               ? 'bg-[#00ff41] text-black hover:bg-white' 
-                              : 'bg-indigo-600 text-white hover:bg-indigo-500'
+                              : 'bg-violet-600 text-white hover:bg-violet-500'
                           }`}
                         >
-                          📊 Ver Análisis
+                          Ver Análisis
                         </button>
                       )}
-                      {/* Botón Transcripción: para creador Y participantes */}
                       {tieneTranscripcion && (
                         <button
                           onClick={() => {
                             setGrabacionSeleccionada(grabacion);
                             setShowTranscripcion(true);
                           }}
-                          className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
+                          className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
                             isArcade 
-                              ? 'border-2 border-[#00ff41] text-[#00ff41] hover:bg-[#00ff41] hover:text-black' 
-                              : 'border border-white/20 text-white hover:bg-white/10'
+                              ? 'border border-[#00ff41] text-[#00ff41] hover:bg-[#00ff41]/10' 
+                              : 'border border-white/20 text-zinc-300 hover:bg-white/5 hover:text-white'
                           }`}
                         >
-                          📝 Transcripción
+                          Transcripción
                         </button>
                       )}
                     </div>
