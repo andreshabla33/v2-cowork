@@ -396,26 +396,33 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
 
       // Guardar transcripción en Supabase
       if (transcript && transcript.trim().length > 0) {
-        const transcripcionRecord = {
-          grabacion_id: grabacionIdRef.current,
-          texto: transcript,
-          inicio_segundos: 0,
-          fin_segundos: duration,
-          speaker_id: userId,
-          speaker_nombre: userName,
-          confianza: 0.9,
-          idioma: 'es',
-        };
-        
-        const { error: transcError } = await supabase
-          .from('transcripciones')
-          .insert(transcripcionRecord);
-        
-        if (transcError) {
-          console.error('Error guardando transcripción:', transcError);
-        } else {
-          console.log('✅ Transcripción guardada en Supabase');
+        console.log('📝 Guardando transcripción en BD...');
+        try {
+          const transcripcionRecord = {
+            grabacion_id: grabacionIdRef.current,
+            texto: transcript,
+            inicio_segundos: 0,
+            fin_segundos: duration,
+            speaker_id: userId,
+            speaker_nombre: userName,
+            confianza: 0.9,
+            idioma: 'es',
+          };
+          
+          const { error: transcError } = await supabase
+            .from('transcripciones')
+            .insert(transcripcionRecord);
+          
+          if (transcError) {
+            console.error('❌ Error guardando transcripción:', transcError);
+          } else {
+            console.log('✅ Transcripción guardada en Supabase');
+          }
+        } catch (err) {
+          console.error('❌ Error inesperado guardando transcripción:', err);
         }
+      } else {
+        console.log('⚠️ Sin transcripción que guardar');
       }
 
       updateState({ progress: 70, message: 'Guardando análisis conductual...' });
@@ -450,45 +457,57 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
 
       updateState({ progress: 80, message: 'Generando resumen AI...' });
 
-      // Generar resumen AI
+      // Generar resumen AI (con timeout para no bloquear)
       const avgEngagement = emotionFrames.length > 0
         ? emotionFrames.reduce((sum, f) => sum + f.engagement_score, 0) / emotionFrames.length
         : 0.5;
 
-      // Obtener token de sesión para autenticar la llamada
-      const { data: sessionData } = await supabase.auth.getSession();
-      const accessToken = sessionData?.session?.access_token;
-      
-      if (accessToken) {
-        const { data: aiData, error: aiError } = await supabase.functions.invoke('generar-resumen-ai', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          body: {
-            grabacion_id: grabacionIdRef.current,
-            espacio_id: espacioId,
-            creador_id: userId,
-            transcripcion: transcript,
-            emociones: emotionFrames.slice(-50),
-            duracion_segundos: duration,
-            participantes: [userName],
-            reunion_titulo: reunionTitulo,
-            tipo_grabacion: tipoGrabacion,
-            metricas_adicionales: {
-              engagement_promedio: avgEngagement,
-              microexpresiones_detectadas: resultadoAnalisis.microexpresiones.length,
-              tipo_analisis: tipoGrabacion,
-            },
-          },
-        });
+      try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token;
         
-        if (aiError) {
-          console.warn('⚠️ Error generando resumen AI:', aiError.message);
+        if (accessToken) {
+          console.log('🤖 Llamando a generar-resumen-ai...');
+          // Usar Promise.race con timeout de 30 segundos
+          const aiPromise = supabase.functions.invoke('generar-resumen-ai', {
+            headers: { Authorization: `Bearer ${accessToken}` },
+            body: {
+              grabacion_id: grabacionIdRef.current,
+              espacio_id: espacioId,
+              creador_id: userId,
+              transcripcion: transcript,
+              emociones: emotionFrames.slice(-50),
+              duracion_segundos: duration,
+              participantes: [userName],
+              reunion_titulo: reunionTitulo,
+              tipo_grabacion: tipoGrabacion,
+              metricas_adicionales: {
+                engagement_promedio: avgEngagement,
+                microexpresiones_detectadas: resultadoAnalisis.microexpresiones.length,
+                tipo_analisis: tipoGrabacion,
+              },
+            },
+          });
+          
+          const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Timeout')), 30000)
+          );
+          
+          try {
+            const { error: aiError } = await Promise.race([aiPromise, timeoutPromise]) as any;
+            if (aiError) {
+              console.warn('⚠️ Error generando resumen AI:', aiError.message);
+            } else {
+              console.log('✅ Resumen AI generado');
+            }
+          } catch (timeoutErr) {
+            console.warn('⚠️ Timeout generando resumen AI, continuando...');
+          }
         } else {
-          console.log('✅ Resumen AI generado');
+          console.warn('⚠️ No hay sesión activa para generar resumen AI');
         }
-      } else {
-        console.warn('⚠️ No hay sesión activa para generar resumen AI');
+      } catch (aiErr) {
+        console.warn('⚠️ Error en proceso AI, continuando:', aiErr);
       }
 
       // Actualizar grabación en Supabase (metadatos sin archivo de video)
