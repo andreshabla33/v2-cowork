@@ -439,7 +439,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       const emotionFrames = resultadoAnalisis.frames_faciales;
       if (emotionFrames.length > 0) {
         const emotionRecords = emotionFrames
-          .filter((_, i) => i % 5 === 0) // Cada 5 frames para no saturar
+          .filter((_, i) => i % 2 === 0) // Cada 2 frames para mejor resolución
           .map((e) => ({
             id: crypto.randomUUID(),
             grabacion_id: grabacionIdRef.current,
