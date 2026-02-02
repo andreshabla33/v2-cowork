@@ -60,9 +60,10 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
 
       if (notificaciones && notificaciones.length > 0) {
         const notif = notificaciones[0];
-        const metadata = notif.metadata as any;
+        const datos = notif.datos_extra as any; // Columna correcta: datos_extra
         
         console.log('📩 Notificación encontrada:', notif);
+        console.log('📦 Datos extra:', datos);
         
         // Verificar que la grabación aún necesita consentimiento
         const { data: grabacion } = await supabase
@@ -77,9 +78,9 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
         if (grabacion && !grabacion.consentimiento_evaluado) {
           setSolicitud({
             grabacion_id: notif.entidad_id,
-            tipo_grabacion: metadata?.tipo_grabacion || 'rrhh_entrevista',
-            creador_id: metadata?.creador_id || '',
-            creador_nombre: metadata?.creador_nombre || 'Alguien',
+            tipo_grabacion: datos?.tipo_grabacion || 'rrhh_entrevista',
+            creador_id: datos?.creador_id || '',
+            creador_nombre: datos?.creador_nombre || 'Alguien',
             espacio_id: notif.espacio_id,
             titulo: notif.titulo,
           });
@@ -103,16 +104,19 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
         },
         (payload) => {
           const notif = payload.new as any;
+          console.log('🔔 Nueva notificación en tiempo real:', notif);
           if (notif.tipo === 'consentimiento_grabacion') {
-            const metadata = notif.metadata as any;
+            const datos = notif.datos_extra as any; // Columna correcta: datos_extra
+            console.log('📦 Datos extra (realtime):', datos);
             setSolicitud({
               grabacion_id: notif.entidad_id,
-              tipo_grabacion: metadata?.tipo_grabacion || 'rrhh_entrevista',
-              creador_id: metadata?.creador_id || '',
-              creador_nombre: metadata?.creador_nombre || 'Alguien',
+              tipo_grabacion: datos?.tipo_grabacion || 'rrhh_entrevista',
+              creador_id: datos?.creador_id || '',
+              creador_nombre: datos?.creador_nombre || 'Alguien',
               espacio_id: notif.espacio_id,
               titulo: notif.titulo,
             });
+            console.log('✅ Modal de consentimiento activado via realtime');
           }
         }
       )
