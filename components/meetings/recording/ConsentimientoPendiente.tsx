@@ -130,6 +130,7 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
   const responderConsentimiento = useCallback(async (acepta: boolean) => {
     if (!solicitud) return;
 
+    console.log('🔄 Respondiendo consentimiento:', { grabacion_id: solicitud.grabacion_id, acepta });
     setIsResponding(true);
     try {
       const { data, error } = await supabase.rpc('responder_consentimiento_grabacion', {
@@ -137,19 +138,33 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
         p_acepta: acepta,
       });
 
-      if (error) throw error;
+      console.log('📤 Respuesta RPC:', { data, error });
+
+      if (error) {
+        console.error('❌ Error en RPC:', error);
+        throw error;
+      }
 
       // Marcar notificación como leída
-      await supabase
+      const { error: updateError } = await supabase
         .from('notificaciones')
         .update({ leida: true })
         .eq('entidad_id', solicitud.grabacion_id)
         .eq('tipo', 'consentimiento_grabacion');
 
+      if (updateError) {
+        console.warn('⚠️ Error marcando notificación como leída:', updateError);
+      }
+
+      console.log('✅ Consentimiento respondido exitosamente');
       onConsentimientoRespondido?.(solicitud.grabacion_id, acepta);
       setSolicitud(null);
     } catch (err) {
-      console.error('Error respondiendo consentimiento:', err);
+      console.error('❌ Error respondiendo consentimiento:', err);
+      // Cerrar modal de todos modos después de un error
+      setTimeout(() => {
+        setSolicitud(null);
+      }, 2000);
     } finally {
       setIsResponding(false);
     }
