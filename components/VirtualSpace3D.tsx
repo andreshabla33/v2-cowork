@@ -1764,7 +1764,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             orbitControlsRef={orbitControlsRef}
             stream={stream}
             remoteStreams={remoteStreams}
-            showVideoBubbles={!hasActiveCall}
+            showVideoBubbles={true}
             localMessage={localMessage}
             remoteMessages={remoteMessages}
             localReactions={localReactions}
