@@ -24,13 +24,19 @@ import {
   tienePermisoAnalisis,
 } from './types/analysis';
 
+interface UsuarioEnLlamada {
+  id: string;
+  nombre: string;
+}
+
 interface RecordingManagerProps {
   espacioId: string;
   userId: string;
   userName: string;
   reunionTitulo?: string;
   stream: MediaStream | null;
-  cargoUsuario?: CargoLaboral; // Nuevo: cargo del usuario para permisos
+  cargoUsuario?: CargoLaboral;
+  usuariosEnLlamada?: UsuarioEnLlamada[]; // Usuarios en la llamada para seleccionar evaluado
   onRecordingStateChange?: (isRecording: boolean) => void;
   onProcessingComplete?: (resultado: ResultadoAnalisis | null) => void;
   headlessMode?: boolean;
@@ -52,6 +58,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   reunionTitulo,
   stream,
   cargoUsuario = 'colaborador',
+  usuariosEnLlamada = [],
   onRecordingStateChange,
   onExternalTriggerHandled,
   headlessMode,
@@ -150,7 +157,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   }, [stream]);
 
   // Iniciar grabación
-  const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true) => {
+  const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true, evaluadoId?: string) => {
     if (!stream) {
       updateState({ step: 'error', message: 'No hay stream de audio/video disponible' });
       return;
@@ -199,10 +206,36 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         creado_por: userId,
         estado: 'grabando',
         inicio_grabacion: new Date().toISOString(),
-        tipo: tipo, // Guardar tipo detallado (rrhh_entrevista, deals, equipo, etc.)
+        tipo: tipo,
         tiene_video: true,
         tiene_audio: true,
         formato: 'webm',
+        evaluado_id: evaluadoId || null, // Guardar el ID del evaluado si existe
+      });
+
+      // Si hay evaluado, enviar solicitud de consentimiento
+      if (evaluadoId) {
+        console.log('📨 Enviando solicitud de consentimiento a:', evaluadoId);
+        const { error: consentError } = await supabase.rpc('solicitar_consentimiento_grabacion', {
+          p_grabacion_id: grabacionIdRef.current,
+          p_evaluado_id: evaluadoId,
+          p_tipo_grabacion: tipo,
+        });
+        if (consentError) {
+          console.warn('⚠️ Error enviando solicitud de consentimiento:', consentError);
+        } else {
+          console.log('✅ Solicitud de consentimiento enviada');
+        }
+      }
+
+      // Registrar al grabador como participante
+      await supabase.from('participantes_grabacion').insert({
+        grabacion_id: grabacionIdRef.current,
+        usuario_id: userId,
+        nombre_mostrado: userName,
+        es_evaluado: false,
+        consentimiento_dado: true,
+        consentimiento_fecha: new Date().toISOString(),
       });
 
       // Iniciar grabación
@@ -295,12 +328,12 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   }, [isRecording, stopRecording]);
 
   // Manejar selección de tipo
-  const handleTypeSelect = useCallback((tipo: TipoGrabacionDetallado, analisis: boolean) => {
-    console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis);
+  const handleTypeSelect = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean, evaluadoId?: string) => {
+    console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis, 'evaluado:', evaluadoId);
     setTipoGrabacion(tipo);
     setConAnalisis(analisis);
     setShowTypeSelector(false);
-    startRecording(tipo, analisis);
+    await startRecording(tipo, analisis, evaluadoId);
   }, [startRecording]);
 
   // Procesar grabación
@@ -537,6 +570,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         onClose={() => setShowTypeSelector(false)}
         onSelect={handleTypeSelect}
         cargoUsuario={cargoUsuario}
+        usuariosEnLlamada={usuariosEnLlamada}
+        currentUserId={userId}
       />
 
       {/* Dashboard de resultados */}

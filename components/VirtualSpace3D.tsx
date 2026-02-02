@@ -9,6 +9,7 @@ import { User, PresenceStatus } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
 import { RecordingManager } from './meetings/recording/RecordingManager';
+import { ConsentimientoPendiente } from './meetings/recording/ConsentimientoPendiente';
 import { BottomControlBar } from './BottomControlBar';
 import { ChatService } from '../services/chatService';
 
@@ -1881,6 +1882,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           reunionTitulo={`Reunión ${new Date().toLocaleDateString()}`}
           stream={stream}
           cargoUsuario={cargoUsuario as any}
+          usuariosEnLlamada={usersInCall.map(u => ({ id: u.id, nombre: u.name }))}
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
           }}
@@ -1892,6 +1894,13 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           onExternalTriggerHandled={() => setRecordingTrigger(false)}
         />
       )}
+
+      {/* Modal de consentimiento para usuarios evaluados */}
+      <ConsentimientoPendiente
+        onConsentimientoRespondido={(grabacionId, acepto) => {
+          console.log(`📝 Consentimiento ${acepto ? 'aceptado' : 'rechazado'} para grabación:`, grabacionId);
+        }}
+      />
     </div>
   );
 };

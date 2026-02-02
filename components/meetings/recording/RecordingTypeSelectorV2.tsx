@@ -10,6 +10,7 @@
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { supabase } from '../../../lib/supabase';
 import { 
   TipoGrabacionDetallado, 
   CargoLaboral,
@@ -20,11 +21,18 @@ import {
   ConfiguracionGrabacion,
 } from './types/analysis';
 
+interface UsuarioEnLlamada {
+  id: string;
+  nombre: string;
+}
+
 interface RecordingTypeSelectorV2Props {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (tipo: TipoGrabacionDetallado, conAnalisis: boolean) => void;
+  onSelect: (tipo: TipoGrabacionDetallado, conAnalisis: boolean, evaluadoId?: string) => void;
   cargoUsuario: CargoLaboral;
+  usuariosEnLlamada?: UsuarioEnLlamada[]; // Usuarios disponibles para seleccionar como evaluado
+  currentUserId?: string; // ID del usuario actual (grabador)
 }
 
 export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = ({
@@ -32,12 +40,22 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
   onClose,
   onSelect,
   cargoUsuario,
+  usuariosEnLlamada = [],
+  currentUserId,
 }) => {
   const [selectedType, setSelectedType] = useState<TipoGrabacionDetallado | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
   const [disclaimerAccepted, setDisclaimerAccepted] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
   const [hoveredType, setHoveredType] = useState<TipoGrabacionDetallado | null>(null);
+  const [selectedEvaluado, setSelectedEvaluado] = useState<string | null>(null);
+  const [isSendingConsent, setIsSendingConsent] = useState(false);
+
+  // Filtrar usuarios disponibles como evaluados (excluir al grabador)
+  const evaluadosDisponibles = useMemo(() => 
+    usuariosEnLlamada.filter(u => u.id !== currentUserId),
+    [usuariosEnLlamada, currentUserId]
+  );
 
   // Tipos disponibles según cargo
   const tiposDisponibles = useMemo(() => 
@@ -76,8 +94,16 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
     }
   };
 
-  const handleDisclaimerAccept = () => {
-    if (selectedType) {
+  const handleDisclaimerAccept = async () => {
+    if (!selectedType) return;
+    
+    // Si hay evaluados disponibles y se seleccionó uno, enviar solicitud de consentimiento
+    if (evaluadosDisponibles.length > 0 && selectedEvaluado) {
+      // Pasar el evaluado seleccionado para que se envíe la solicitud
+      onSelect(selectedType, true, selectedEvaluado);
+      resetState();
+    } else if (evaluadosDisponibles.length === 0) {
+      // No hay otros usuarios, grabar sin evaluado específico
       onSelect(selectedType, true);
       resetState();
     }
@@ -99,6 +125,8 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
     setShowDisclaimer(false);
     setDisclaimerAccepted(false);
     setHoveredType(null);
+    setSelectedEvaluado(null);
+    setIsSendingConsent(false);
   };
 
   const handleClose = () => {
@@ -138,19 +166,84 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
             </div>
           </div>
 
-          {/* Disclaimer */}
+          {/* Contenido del disclaimer */}
           <div className="p-6">
-            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-5 mb-5">
-              <div className="flex items-start gap-3 mb-3">
-                <span className="text-2xl">⚠️</span>
-                <h4 className="text-amber-300 font-semibold">Aviso Legal Importante</h4>
+            {/* Selector de persona a evaluar */}
+            {evaluadosDisponibles.length > 0 ? (
+              <div className="mb-5">
+                <label className="block text-white/60 text-xs font-semibold uppercase tracking-wider mb-3">
+                  🎯 Selecciona a la persona a evaluar
+                </label>
+                <div className="grid gap-2">
+                  {evaluadosDisponibles.map((usuario) => (
+                    <button
+                      key={usuario.id}
+                      onClick={() => setSelectedEvaluado(usuario.id)}
+                      className={`p-4 rounded-xl text-left transition-all flex items-center gap-3 ${
+                        selectedEvaluado === usuario.id
+                          ? 'bg-indigo-600/30 border-2 border-indigo-500 text-white'
+                          : 'bg-white/5 border border-white/10 text-white/70 hover:bg-white/10'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-lg font-bold ${
+                        selectedEvaluado === usuario.id ? 'bg-indigo-500' : 'bg-white/10'
+                      }`}>
+                        {usuario.nombre.charAt(0).toUpperCase()}
+                      </div>
+                      <div>
+                        <p className="font-semibold">{usuario.nombre}</p>
+                        <p className="text-xs text-white/40">Recibirá solicitud de consentimiento</p>
+                      </div>
+                      {selectedEvaluado === usuario.id && (
+                        <svg className="w-5 h-5 ml-auto text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="text-amber-200/90 text-sm leading-relaxed whitespace-pre-wrap pl-9">
-                {config.disclaimerTexto}
+            ) : (
+              <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-5 text-center">
+                <span className="text-2xl mb-2 block">👤</span>
+                <p className="text-amber-200/90 text-sm">
+                  No hay otros participantes en la llamada.
+                  <br />
+                  <span className="text-xs text-amber-200/60">La grabación continuará sin evaluado específico.</span>
+                </p>
+              </div>
+            )}
+
+            {/* Disclaimer legal */}
+            <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4 mb-5">
+              <div className="flex items-start gap-3">
+                <span className="text-xl">⚠️</span>
+                <div>
+                  <h4 className="text-amber-300 font-semibold text-sm mb-1">Aviso Legal</h4>
+                  <p className="text-amber-200/80 text-xs leading-relaxed">
+                    {config.disclaimerTexto}
+                  </p>
+                </div>
               </div>
             </div>
 
-            {/* Checkbox de aceptación mejorado */}
+            {/* Info sobre el flujo */}
+            {evaluadosDisponibles.length > 0 && selectedEvaluado && (
+              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-5">
+                <div className="flex items-start gap-3">
+                  <span className="text-xl">📨</span>
+                  <div>
+                    <h4 className="text-indigo-300 font-semibold text-sm mb-1">Solicitud de Consentimiento</h4>
+                    <p className="text-indigo-200/80 text-xs leading-relaxed">
+                      Se enviará una solicitud a <strong>{evaluadosDisponibles.find(u => u.id === selectedEvaluado)?.nombre}</strong> para que acepte ser grabado/a. 
+                      La grabación iniciará cuando acepte.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Checkbox de confirmación */}
             <label className="flex items-start gap-4 cursor-pointer group p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-transparent hover:border-white/10">
               <div className="relative mt-0.5 flex-shrink-0">
                 <input
@@ -172,7 +265,9 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
                 </div>
               </div>
               <span className="text-white/80 text-sm leading-relaxed">
-                Confirmo que el participante ha sido <strong className="text-white">informado</strong> y ha dado su <strong className="text-white">consentimiento expreso</strong> para el análisis conductual
+                Entiendo que {evaluadosDisponibles.length > 0 && selectedEvaluado 
+                  ? <><strong className="text-white">se solicitará consentimiento</strong> al participante seleccionado</>
+                  : <>el análisis conductual requiere <strong className="text-white">consentimiento</strong></>}
               </span>
             </label>
           </div>
@@ -187,18 +282,24 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
             </button>
             <button
               onClick={handleDisclaimerAccept}
-              disabled={!disclaimerAccepted}
+              disabled={!disclaimerAccepted || (evaluadosDisponibles.length > 0 && !selectedEvaluado) || isSendingConsent}
               className={`flex-1 px-4 py-3 rounded-xl text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                disclaimerAccepted
-                  ? 'bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 shadow-lg shadow-red-500/25 cursor-pointer'
+                disclaimerAccepted && (evaluadosDisponibles.length === 0 || selectedEvaluado)
+                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25 cursor-pointer'
                   : 'bg-white/10 cursor-not-allowed opacity-50'
               }`}
             >
-              <span className="relative flex h-3 w-3">
-                <span className={`${disclaimerAccepted ? 'animate-ping' : ''} absolute inline-flex h-full w-full rounded-full bg-white opacity-75`}></span>
-                <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-              </span>
-              Iniciar Grabación
+              {isSendingConsent ? (
+                <span className="animate-spin">⏳</span>
+              ) : (
+                <span className="relative flex h-3 w-3">
+                  <span className={`${disclaimerAccepted && selectedEvaluado ? 'animate-ping' : ''} absolute inline-flex h-full w-full rounded-full bg-white opacity-75`}></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
+                </span>
+              )}
+              {evaluadosDisponibles.length > 0 && selectedEvaluado 
+                ? 'Solicitar Consentimiento e Iniciar'
+                : 'Iniciar Grabación'}
             </button>
           </div>
         </div>

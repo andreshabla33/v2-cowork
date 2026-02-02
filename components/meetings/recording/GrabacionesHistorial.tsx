@@ -35,11 +35,16 @@ interface Grabacion {
   inicio_grabacion: string;
   fin_grabacion: string | null;
   creado_en: string;
+  evaluado_id?: string | null;
+  consentimiento_evaluado?: boolean;
   // Relaciones
   transcripciones?: Transcripcion[];
   analisis_comportamiento?: AnalisisComportamiento[];
   resumenes_ai?: ResumenAI[];
   usuario?: { nombre: string; apellido: string };
+  // Permisos calculados
+  esCreador?: boolean;
+  esParticipante?: boolean;
 }
 
 interface Transcripcion {
@@ -263,41 +268,77 @@ export const GrabacionesHistorial: React.FC = () => {
   }, [activeWorkspace?.id]);
 
   const cargarGrabaciones = async () => {
-    if (!activeWorkspace?.id) {
-      console.log('GrabacionesHistorial: No hay activeWorkspace.id');
+    if (!activeWorkspace?.id || !session?.user?.id) {
+      console.log('GrabacionesHistorial: No hay activeWorkspace.id o session.user.id');
       setIsLoading(false);
       return;
     }
     
+    const userId = session.user.id;
     setIsLoading(true);
     setError(null);
     console.log('GrabacionesHistorial: Cargando grabaciones para espacio:', activeWorkspace.id);
 
     try {
-      // Primero intentar consulta simple
-      const { data, error: fetchError } = await supabase
+      // Obtener grabaciones donde el usuario es creador
+      const { data: grabacionesCreador, error: errorCreador } = await supabase
         .from('grabaciones')
         .select('*')
         .eq('espacio_id', activeWorkspace.id)
+        .eq('creado_por', userId)
         .order('creado_en', { ascending: false });
 
-      console.log('GrabacionesHistorial: Respuesta:', { data, error: fetchError });
+      if (errorCreador) throw errorCreador;
 
-      if (fetchError) {
-        console.error('GrabacionesHistorial: Error en query:', fetchError);
-        throw fetchError;
+      // Obtener grabaciones donde el usuario es participante
+      const { data: participaciones, error: errorParticipaciones } = await supabase
+        .from('participantes_grabacion')
+        .select('grabacion_id')
+        .eq('usuario_id', userId);
+
+      let grabacionesParticipante: any[] = [];
+      if (!errorParticipaciones && participaciones && participaciones.length > 0) {
+        const idsParticipante = participaciones.map(p => p.grabacion_id);
+        const { data: grabsParticipante } = await supabase
+          .from('grabaciones')
+          .select('*')
+          .eq('espacio_id', activeWorkspace.id)
+          .in('id', idsParticipante)
+          .neq('creado_por', userId) // Excluir las que ya tenemos como creador
+          .order('creado_en', { ascending: false });
+        grabacionesParticipante = grabsParticipante || [];
       }
+
+      // Combinar y marcar permisos
+      const todasGrabaciones = [
+        ...(grabacionesCreador || []).map(g => ({ ...g, esCreador: true, esParticipante: false })),
+        ...grabacionesParticipante.map(g => ({ ...g, esCreador: false, esParticipante: true }))
+      ];
+
+      // Ordenar por fecha
+      todasGrabaciones.sort((a, b) => new Date(b.creado_en).getTime() - new Date(a.creado_en).getTime());
+
+      console.log('GrabacionesHistorial: Grabaciones encontradas:', todasGrabaciones.length);
       
-      // Si hay grabaciones, cargar datos relacionados
-      if (data && data.length > 0) {
-        // Cargar transcripciones y análisis por separado
+      // Cargar datos relacionados según permisos
+      if (todasGrabaciones.length > 0) {
         const grabacionesConDatos = await Promise.all(
-          data.map(async (grabacion) => {
-            const [transcRes, analisisRes, resumenRes] = await Promise.all([
-              supabase.from('transcripciones').select('*').eq('grabacion_id', grabacion.id),
-              supabase.from('analisis_comportamiento').select('*').eq('grabacion_id', grabacion.id),
-              supabase.from('resumenes_ai').select('*').eq('grabacion_id', grabacion.id)
-            ]);
+          todasGrabaciones.map(async (grabacion) => {
+            // Transcripciones: todos pueden ver (creador y participantes)
+            const transcRes = await supabase
+              .from('transcripciones')
+              .select('*')
+              .eq('grabacion_id', grabacion.id);
+            
+            // Análisis: SOLO si es creador
+            let analisisRes = { data: [] as any[] };
+            let resumenRes = { data: [] as any[] };
+            if (grabacion.esCreador) {
+              [analisisRes, resumenRes] = await Promise.all([
+                supabase.from('analisis_comportamiento').select('*').eq('grabacion_id', grabacion.id),
+                supabase.from('resumenes_ai').select('*').eq('grabacion_id', grabacion.id)
+              ]);
+            }
             
             return {
               ...grabacion,
@@ -312,7 +353,7 @@ export const GrabacionesHistorial: React.FC = () => {
         setGrabaciones([]);
       }
       
-      console.log('GrabacionesHistorial: Grabaciones cargadas:', data?.length || 0);
+      console.log('GrabacionesHistorial: Grabaciones cargadas:', todasGrabaciones.length);
     } catch (err: any) {
       console.error('GrabacionesHistorial: Error cargando:', err);
       setError('Error al cargar las grabaciones: ' + (err.message || 'Error desconocido'));
@@ -707,6 +748,20 @@ export const GrabacionesHistorial: React.FC = () => {
 
                       {/* Badges */}
                       <div className="flex items-center gap-2 mt-3">
+                        {/* Badge de rol: Creador o Participante */}
+                        {grabacion.esCreador ? (
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                            isArcade ? 'bg-amber-500/20 text-amber-400' : 'bg-amber-500/20 text-amber-400'
+                          }`}>
+                            👑 Tu grabación
+                          </span>
+                        ) : grabacion.esParticipante ? (
+                          <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
+                            isArcade ? 'bg-cyan-500/20 text-cyan-400' : 'bg-cyan-500/20 text-cyan-400'
+                          }`}>
+                            👤 Participante
+                          </span>
+                        ) : null}
                         {tieneTranscripcion && (
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
                             isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-blue-500/20 text-blue-400'
@@ -714,14 +769,15 @@ export const GrabacionesHistorial: React.FC = () => {
                             📝 {grabacion.transcripciones!.length} segmentos
                           </span>
                         )}
-                        {tieneAnalisis && (
+                        {/* Análisis solo visible si es creador */}
+                        {tieneAnalisis && grabacion.esCreador && (
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
                             isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-purple-500/20 text-purple-400'
                           }`}>
                             🧠 Análisis disponible
                           </span>
                         )}
-                        {grabacion.resumenes_ai && grabacion.resumenes_ai.length > 0 && (
+                        {grabacion.resumenes_ai && grabacion.resumenes_ai.length > 0 && grabacion.esCreador && (
                           <span className={`px-2 py-1 rounded-lg text-[10px] font-bold ${
                             isArcade ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-emerald-500/20 text-emerald-400'
                           }`}>
@@ -733,7 +789,8 @@ export const GrabacionesHistorial: React.FC = () => {
 
                     {/* Acciones */}
                     <div className="flex flex-col gap-2">
-                      {tieneAnalisis && (
+                      {/* Botón Ver Análisis: SOLO para el creador */}
+                      {tieneAnalisis && grabacion.esCreador && (
                         <button
                           onClick={() => verAnalisis(grabacion)}
                           className={`px-4 py-2 rounded-xl font-bold text-sm transition-all ${
@@ -745,6 +802,7 @@ export const GrabacionesHistorial: React.FC = () => {
                           📊 Ver Análisis
                         </button>
                       )}
+                      {/* Botón Transcripción: para creador Y participantes */}
                       {tieneTranscripcion && (
                         <button
                           onClick={() => {
