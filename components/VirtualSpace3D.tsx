@@ -195,10 +195,18 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Video Bubble above avatar (Gather style) */}
-      {camOn && videoStream && showVideoBubble && (
+      {camOn && showVideoBubble && (
         <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
-          <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125">
-             <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
+          <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125 flex items-center justify-center">
+             {videoStream ? (
+               <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
+             ) : (
+               /* Placeholder cuando hay cámara pero no hay stream (usuario lejos) */
+               <div className="flex flex-col items-center justify-center text-white/60">
+                 <span className="text-lg">📹</span>
+                 <span className="text-[8px]">{name.split(' ')[0]}</span>
+               </div>
+             )}
           </div>
         </Html>
       )}
