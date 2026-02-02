@@ -227,49 +227,21 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
               </div>
             </div>
 
-            {/* Info sobre el flujo */}
+            {/* Info sobre el flujo - solo si hay evaluado seleccionado */}
             {evaluadosDisponibles.length > 0 && selectedEvaluado && (
-              <div className="bg-indigo-500/10 border border-indigo-500/20 rounded-xl p-4 mb-5">
+              <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-4">
                 <div className="flex items-start gap-3">
                   <span className="text-xl">📨</span>
                   <div>
-                    <h4 className="text-indigo-300 font-semibold text-sm mb-1">Solicitud de Consentimiento</h4>
-                    <p className="text-indigo-200/80 text-xs leading-relaxed">
-                      Se enviará una solicitud a <strong>{evaluadosDisponibles.find(u => u.id === selectedEvaluado)?.nombre}</strong> para que acepte ser grabado/a. 
-                      La grabación iniciará cuando acepte.
+                    <h4 className="text-green-300 font-semibold text-sm mb-1">Listo para enviar solicitud</h4>
+                    <p className="text-green-200/80 text-xs leading-relaxed">
+                      Al hacer clic en "Enviar Solicitud", <strong>{evaluadosDisponibles.find(u => u.id === selectedEvaluado)?.nombre}</strong> recibirá 
+                      una notificación en pantalla para aceptar o rechazar la grabación.
                     </p>
                   </div>
                 </div>
               </div>
             )}
-
-            {/* Checkbox de confirmación */}
-            <label className="flex items-start gap-4 cursor-pointer group p-4 rounded-xl bg-white/5 hover:bg-white/10 transition-all border border-transparent hover:border-white/10">
-              <div className="relative mt-0.5 flex-shrink-0">
-                <input
-                  type="checkbox"
-                  checked={disclaimerAccepted}
-                  onChange={(e) => setDisclaimerAccepted(e.target.checked)}
-                  className="sr-only"
-                />
-                <div className={`w-6 h-6 rounded-lg border-2 flex items-center justify-center transition-all duration-200 ${
-                  disclaimerAccepted 
-                    ? 'bg-green-500 border-green-500 scale-110' 
-                    : 'border-white/30 group-hover:border-white/50'
-                }`}>
-                  {disclaimerAccepted && (
-                    <svg className="w-4 h-4 text-white animate-scale-in" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                    </svg>
-                  )}
-                </div>
-              </div>
-              <span className="text-white/80 text-sm leading-relaxed">
-                Entiendo que {evaluadosDisponibles.length > 0 && selectedEvaluado 
-                  ? <><strong className="text-white">se solicitará consentimiento</strong> al participante seleccionado</>
-                  : <>el análisis conductual requiere <strong className="text-white">consentimiento</strong></>}
-              </span>
-            </label>
           </div>
 
           {/* Botones */}
@@ -282,23 +254,20 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
             </button>
             <button
               onClick={handleDisclaimerAccept}
-              disabled={!disclaimerAccepted || (evaluadosDisponibles.length > 0 && !selectedEvaluado) || isSendingConsent}
+              disabled={(evaluadosDisponibles.length > 0 && !selectedEvaluado) || isSendingConsent}
               className={`flex-1 px-4 py-3 rounded-xl text-white text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
-                disclaimerAccepted && (evaluadosDisponibles.length === 0 || selectedEvaluado)
-                  ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 shadow-lg shadow-indigo-500/25 cursor-pointer'
+                (evaluadosDisponibles.length === 0 || selectedEvaluado)
+                  ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 shadow-lg shadow-green-500/25 cursor-pointer'
                   : 'bg-white/10 cursor-not-allowed opacity-50'
               }`}
             >
               {isSendingConsent ? (
                 <span className="animate-spin">⏳</span>
               ) : (
-                <span className="relative flex h-3 w-3">
-                  <span className={`${disclaimerAccepted && selectedEvaluado ? 'animate-ping' : ''} absolute inline-flex h-full w-full rounded-full bg-white opacity-75`}></span>
-                  <span className="relative inline-flex rounded-full h-3 w-3 bg-white"></span>
-                </span>
+                <span className="text-lg">📨</span>
               )}
               {evaluadosDisponibles.length > 0 && selectedEvaluado 
-                ? 'Solicitar Consentimiento e Iniciar'
+                ? `Enviar Solicitud a ${evaluadosDisponibles.find(u => u.id === selectedEvaluado)?.nombre.split(' ')[0]}`
                 : 'Iniciar Grabación'}
             </button>
           </div>

@@ -47,7 +47,7 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
 
     const cargarSolicitudesPendientes = async () => {
       // Buscar notificaciones de consentimiento pendientes
-      const { data: notificaciones } = await supabase
+      const { data: notificaciones, error } = await supabase
         .from('notificaciones')
         .select('*')
         .eq('usuario_id', session.user.id)
@@ -56,9 +56,13 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
         .order('creado_en', { ascending: false })
         .limit(1);
 
+      console.log('🔔 Buscando solicitudes de consentimiento:', { notificaciones, error });
+
       if (notificaciones && notificaciones.length > 0) {
         const notif = notificaciones[0];
         const metadata = notif.metadata as any;
+        
+        console.log('📩 Notificación encontrada:', notif);
         
         // Verificar que la grabación aún necesita consentimiento
         const { data: grabacion } = await supabase
@@ -67,7 +71,10 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
           .eq('id', notif.entidad_id)
           .single();
 
-        if (grabacion && !grabacion.consentimiento_evaluado && grabacion.estado === 'grabando') {
+        console.log('📹 Estado de grabación:', grabacion);
+
+        // Mostrar si la grabación existe y no tiene consentimiento aún
+        if (grabacion && !grabacion.consentimiento_evaluado) {
           setSolicitud({
             grabacion_id: notif.entidad_id,
             tipo_grabacion: metadata?.tipo_grabacion || 'rrhh_entrevista',
@@ -76,6 +83,7 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
             espacio_id: notif.espacio_id,
             titulo: notif.titulo,
           });
+          console.log('✅ Mostrando modal de consentimiento');
         }
       }
     };
