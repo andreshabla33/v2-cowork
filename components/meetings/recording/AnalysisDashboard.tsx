@@ -95,126 +95,168 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
   }, [resultado]);
 
   return (
-    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[500] flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-zinc-900 rounded-2xl max-w-4xl w-full border border-white/10 shadow-2xl my-8">
-        {/* Header */}
-        <div className={`p-5 bg-gradient-to-r ${config.color} rounded-t-2xl`}>
+    <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-[500] flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-zinc-900 rounded-2xl max-w-3xl w-full border border-white/10 shadow-2xl max-h-[95vh] flex flex-col">
+        {/* Header - Compacto */}
+        <div className={`p-4 bg-gradient-to-r ${config.color} rounded-t-2xl flex-shrink-0`}>
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <span className="text-4xl">{config.icono}</span>
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{config.icono}</span>
               <div>
-                <h2 className="text-white font-bold text-xl">Análisis de {config.titulo}</h2>
-                <p className="text-white/80 text-sm">
-                  Duración: {formatDuration(resultado.duracion_segundos)} | 
-                  Confianza: {formatPercent(resultado.confianza_general)}
+                <h2 className="text-white font-bold text-lg">Análisis de {config.titulo}</h2>
+                <p className="text-white/80 text-xs">
+                  Duración: {formatDuration(resultado.duracion_segundos)} | Confianza: {formatPercent(resultado.confianza_general)}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white text-xl transition-colors"
+              className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center hover:bg-white/30 text-white text-lg transition-colors"
             >
               ✕
             </button>
           </div>
         </div>
 
-        {/* Estadísticas generales */}
-        {stats && (
-          <div className="p-5 border-b border-white/10">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <StatCard
-                icon="📊"
-                label="Engagement Promedio"
-                value={formatPercent(stats.avgEngagement)}
-                color={stats.avgEngagement > 0.6 ? 'green' : stats.avgEngagement > 0.4 ? 'yellow' : 'red'}
-              />
-              <StatCard
-                icon={EMOTION_ICONS[stats.dominantEmotion]}
-                label="Emoción Dominante"
-                value={stats.dominantEmotion}
-                subvalue={`${Math.round(stats.dominantEmotionPct)}% del tiempo`}
-              />
-              <StatCard
-                icon="⚡"
-                label="Microexpresiones"
-                value={String(stats.microexpresiones)}
-                subvalue="detectadas"
-              />
-              <StatCard
-                icon="🎯"
-                label="Frames Analizados"
-                value={String(stats.framesAnalizados)}
-                subvalue="5 FPS"
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Contenido específico por tipo */}
-        <div className="p-5 max-h-[50vh] overflow-y-auto">
-          {/* Solo mostrar contenido específico si hay datos completos de análisis */}
-          {resultado.analisis && resultado.analisis.resumen ? (
-            <>
-              {resultado.tipo_grabacion === 'rrhh' && (
-                <RRHHAnalysisContent analisis={resultado.analisis as AnalisisRRHH} />
-              )}
-              {resultado.tipo_grabacion === 'deals' && (
-                <DealsAnalysisContent analisis={resultado.analisis as AnalisisDeals} />
-              )}
-              {resultado.tipo_grabacion === 'equipo' && (
-                <EquipoAnalysisContent analisis={resultado.analisis as AnalisisEquipo} />
-              )}
-            </>
-          ) : (
-            <div className="bg-white/5 rounded-xl p-6 text-center">
-              <span className="text-4xl mb-4 block">📊</span>
-              <h4 className="text-white font-semibold mb-2">Análisis Básico</h4>
-              <p className="text-white/60 text-sm mb-4">
-                Los datos detallados de análisis conductual no están disponibles para esta grabación.
-                Se muestran las métricas generales basadas en el análisis facial.
-              </p>
-              {stats && (
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="bg-white/5 rounded-lg p-3">
-                    <p className="text-white/50 text-xs">Engagement Promedio</p>
-                    <p className="text-2xl font-bold text-white">{Math.round(stats.avgEngagement * 100)}%</p>
-                  </div>
-                  <div className="bg-white/5 rounded-lg p-3">
-                    <p className="text-white/50 text-xs">Emoción Predominante</p>
-                    <p className="text-2xl font-bold text-white">{EMOTION_ICONS[stats.dominantEmotion]} {stats.dominantEmotion}</p>
-                  </div>
-                </div>
-              )}
+        {/* Contenido scrollable */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Estadísticas generales - Compactas */}
+          {stats && (
+            <div className="p-4 border-b border-white/10">
+              <div className="grid grid-cols-4 gap-2">
+                <StatCardCompact
+                  icon="📊"
+                  label="Engagement"
+                  value={formatPercent(stats.avgEngagement)}
+                  color={stats.avgEngagement > 0.6 ? 'green' : stats.avgEngagement > 0.4 ? 'yellow' : 'red'}
+                />
+                <StatCardCompact
+                  icon={EMOTION_ICONS[stats.dominantEmotion]}
+                  label="Emoción"
+                  value={stats.dominantEmotion}
+                  subvalue={`${Math.round(stats.dominantEmotionPct)}%`}
+                />
+                <StatCardCompact
+                  icon="⚡"
+                  label="Micro"
+                  value={String(stats.microexpresiones)}
+                />
+                <StatCardCompact
+                  icon="🎯"
+                  label="Frames"
+                  value={String(stats.framesAnalizados)}
+                />
+              </div>
             </div>
           )}
+
+          {/* Cohesión y Participación - Siempre visible */}
+          {stats && (
+            <div className="p-4 border-b border-white/10">
+              <div className="bg-gradient-to-r from-purple-600/20 to-violet-600/20 rounded-xl p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-white/60 text-xs mb-1">Cohesión del Equipo</p>
+                    <p className="text-2xl font-bold text-white">
+                      {Math.round(stats.avgEngagement * 100)}%
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/60 text-xs mb-1">Participación</p>
+                    <p className={`text-lg font-semibold ${stats.avgEngagement > 0.5 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      {stats.avgEngagement > 0.5 ? 'Equilibrada' : 'Variable'}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Predicciones - Generadas desde stats */}
+          {stats && (
+            <div className="p-4 border-b border-white/10">
+              <h4 className="text-white font-semibold mb-3 flex items-center gap-2 text-sm">
+                <span>🎯</span> Predicciones
+              </h4>
+              <div className="grid grid-cols-3 gap-2">
+                <PredictionCardCompact
+                  title="Adopción de Ideas"
+                  probability={stats.avgEngagement}
+                  confidence={resultado.confianza_general}
+                  factor={stats.avgEngagement > 0.6 ? 'Equipo receptivo' : 'Requiere seguimiento'}
+                />
+                <PredictionCardCompact
+                  title="Necesidad de Seguimiento"
+                  probability={1 - stats.avgEngagement}
+                  confidence={resultado.confianza_general * 0.9}
+                  factor={stats.avgEngagement < 0.5 ? 'Atención dispersa' : 'Reunión fluida'}
+                />
+                <PredictionCardCompact
+                  title="Riesgo de Conflicto"
+                  probability={stats.dominantEmotion === 'angry' ? 0.7 : stats.dominantEmotion === 'neutral' ? 0.3 : 0.4}
+                  confidence={resultado.confianza_general * 0.8}
+                  factor={stats.dominantEmotion === 'angry' ? 'Tensión detectada' : 'Ambiente estable'}
+                  inverted
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Participación por usuario si hay datos */}
+          {resultado.analisis && (resultado.analisis as AnalisisEquipo).participacion?.length > 0 && (
+            <div className="p-4 border-b border-white/10">
+              <h4 className="text-white font-semibold mb-3 flex items-center gap-2 text-sm">
+                <span>👥</span> Participación
+              </h4>
+              <div className="space-y-2">
+                {(resultado.analisis as AnalisisEquipo).participacion.slice(0, 3).map((p, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-white/5 rounded-lg p-2">
+                    <span className="text-white text-xs font-medium w-24 truncate">{p.usuario_nombre}</span>
+                    <div className="flex-1 h-1.5 bg-white/10 rounded-full overflow-hidden">
+                      <div 
+                        className="h-full bg-indigo-500 rounded-full"
+                        style={{ width: `${p.engagement_promedio * 100}%` }}
+                      />
+                    </div>
+                    <span className="text-white/60 text-xs w-10 text-right">
+                      {Math.round(p.engagement_promedio * 100)}%
+                    </span>
+                    <div className="flex gap-1 text-[10px]">
+                      <span className="text-green-400">+{p.reacciones_positivas_recibidas}</span>
+                      <span className="text-red-400">-{p.reacciones_negativas_recibidas}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Timeline de emociones - Compacto */}
+          <div className="p-4">
+            <h4 className="text-white font-semibold mb-2 flex items-center gap-2 text-sm">
+              <span>📈</span> Timeline Emocional
+            </h4>
+            <EmotionTimeline frames={resultado.frames_faciales} duration={resultado.duracion_segundos} />
+          </div>
         </div>
 
-        {/* Timeline de emociones mini */}
-        <div className="p-5 border-t border-white/10">
-          <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
-            <span>📈</span> Timeline Emocional
-          </h4>
-          <EmotionTimeline frames={resultado.frames_faciales} duration={resultado.duracion_segundos} />
-        </div>
-
-        {/* Footer */}
-        <div className="p-5 border-t border-white/10 flex justify-between items-center">
-          <p className="text-white/50 text-xs">
-            Procesado: {new Date(resultado.procesado_en).toLocaleString()} | v{resultado.modelo_version}
+        {/* Footer - Compacto */}
+        <div className="p-3 border-t border-white/10 flex justify-between items-center flex-shrink-0">
+          <p className="text-white/40 text-[10px]">
+            {new Date(resultado.procesado_en).toLocaleString()} | v{resultado.modelo_version}
           </p>
-          <div className="flex gap-3">
+          <div className="flex gap-2">
             {onExport && (
               <button
                 onClick={onExport}
-                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm transition-colors flex items-center gap-2"
+                className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-white text-xs transition-colors flex items-center gap-1"
               >
                 <span>📥</span> Exportar
               </button>
             )}
             <button
               onClick={onClose}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-sm transition-colors"
+              className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 rounded-lg text-white text-xs transition-colors"
             >
               Cerrar
             </button>
@@ -250,6 +292,68 @@ const StatCard: React.FC<{
         {value}
       </p>
       {subvalue && <p className="text-white/50 text-xs mt-1">{subvalue}</p>}
+    </div>
+  );
+};
+
+const StatCardCompact: React.FC<{
+  icon: string;
+  label: string;
+  value: string;
+  subvalue?: string;
+  color?: 'green' | 'yellow' | 'red';
+}> = ({ icon, label, value, subvalue, color }) => {
+  const colorClasses = {
+    green: 'text-green-400',
+    yellow: 'text-yellow-400',
+    red: 'text-red-400',
+  };
+
+  return (
+    <div className="bg-white/5 rounded-lg p-2 text-center">
+      <div className="flex items-center justify-center gap-1 mb-1">
+        <span className="text-sm">{icon}</span>
+        <span className="text-white/50 text-[10px]">{label}</span>
+      </div>
+      <p className={`text-lg font-bold ${color ? colorClasses[color] : 'text-white'}`}>
+        {value}
+      </p>
+      {subvalue && <p className="text-white/40 text-[10px]">{subvalue}</p>}
+    </div>
+  );
+};
+
+const PredictionCardCompact: React.FC<{
+  title: string;
+  probability: number;
+  confidence: number;
+  factor: string;
+  inverted?: boolean;
+}> = ({ title, probability, confidence, factor, inverted }) => {
+  const color = inverted
+    ? probability < 0.3 ? 'green' : probability < 0.6 ? 'yellow' : 'red'
+    : probability > 0.6 ? 'green' : probability > 0.4 ? 'yellow' : 'red';
+  
+  const colorClasses = {
+    green: 'from-green-500/20 to-green-600/20 border-green-500/30',
+    yellow: 'from-yellow-500/20 to-yellow-600/20 border-yellow-500/30',
+    red: 'from-red-500/20 to-red-600/20 border-red-500/30',
+  };
+
+  const textColors = {
+    green: 'text-green-400',
+    yellow: 'text-yellow-400',
+    red: 'text-red-400',
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorClasses[color]} border rounded-lg p-2`}>
+      <p className="text-white/60 text-[10px] mb-0.5 truncate">{title}</p>
+      <p className={`text-xl font-bold ${textColors[color]}`}>
+        {Math.round(probability * 100)}%
+      </p>
+      <p className="text-white/40 text-[9px]">Confianza: {Math.round(confidence * 100)}%</p>
+      <p className="text-white/50 text-[9px] mt-1 truncate">• {factor}</p>
     </div>
   );
 };
