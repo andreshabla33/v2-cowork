@@ -1885,7 +1885,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           usuariosEnLlamada={usersInCall.map(u => ({ id: u.id, nombre: u.name }))}
           onRecordingStateChange={(recording) => {
             setIsRecording(recording);
+            if (!recording) setRecordingDuration(0); // Reset al detener
           }}
+          onDurationChange={(duration) => setRecordingDuration(duration)}
           onProcessingComplete={(resultado) => {
             console.log('✅ Análisis conductual completado:', resultado?.tipo_grabacion, resultado?.analisis);
           }}

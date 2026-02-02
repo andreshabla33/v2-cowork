@@ -39,6 +39,7 @@ interface RecordingManagerProps {
   usuariosEnLlamada?: UsuarioEnLlamada[]; // Usuarios en la llamada para seleccionar evaluado
   onRecordingStateChange?: (isRecording: boolean) => void;
   onProcessingComplete?: (resultado: ResultadoAnalisis | null) => void;
+  onDurationChange?: (duration: number) => void;
   headlessMode?: boolean;
   externalTrigger?: boolean;
   onExternalTriggerHandled?: () => void;
@@ -64,6 +65,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   headlessMode,
   externalTrigger,
   onProcessingComplete,
+  onDurationChange,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
@@ -245,6 +247,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       durationIntervalRef.current = setInterval(() => {
         const elapsed = Math.floor((Date.now() - startTimeRef.current) / 1000);
         updateState({ duration: elapsed });
+        onDurationChange?.(elapsed); // Notificar al padre
       }, 1000);
 
       updateState({ 
