@@ -91,9 +91,16 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
 
     cargarSolicitudesPendientes();
 
+    // Polling cada 5 segundos como fallback (por si realtime no funciona)
+    const pollingInterval = setInterval(() => {
+      if (!solicitud) {
+        cargarSolicitudesPendientes();
+      }
+    }, 5000);
+
     // Suscribirse a nuevas notificaciones en tiempo real
     const channel = supabase
-      .channel('consentimiento_notificaciones')
+      .channel(`consentimiento_${session.user.id}`)
       .on(
         'postgres_changes',
         {
@@ -132,9 +139,12 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Consentimiento realtime status:', status);
+      });
 
     return () => {
+      clearInterval(pollingInterval);
       supabase.removeChannel(channel);
     };
   }, [session?.user?.id]);
