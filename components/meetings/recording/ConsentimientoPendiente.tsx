@@ -97,12 +97,12 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
 
     cargarSolicitudesPendientes();
 
-    // Polling cada 5 segundos como fallback (por si realtime no funciona)
+    // Polling cada 30 segundos como fallback (realtime funciona, esto es solo backup)
     const pollingInterval = setInterval(() => {
       if (!solicitud) {
         cargarSolicitudesPendientes();
       }
-    }, 5000);
+    }, 30000);
 
     // Suscribirse a nuevas notificaciones en tiempo real
     const channel = supabase
