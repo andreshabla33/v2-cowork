@@ -396,8 +396,8 @@ export const ChessGame: React.FC<ChessGameProps> = ({
       }, (payload) => {
         console.log('🎮 Partida UPDATE recibido:', payload);
         const partida = payload.new as any;
-        // Solo procesar si el movimiento no es mío
-        if (partida.turno !== miColor && partida.fen_actual !== chess.fen()) {
+        // Procesar si ahora es MI turno (el oponente acaba de mover)
+        if (partida.turno === miColor && partida.fen_actual !== chess.fen()) {
           console.log('🎮 Procesando movimiento del oponente:', partida.ultimo_movimiento);
           chess.load(partida.fen_actual);
           setBoard(chess.board());
