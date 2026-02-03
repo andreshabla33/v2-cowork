@@ -10,7 +10,7 @@ export const ChatService = {
       const promises = recipientIds.map(async (recipientId) => {
         const groupId = await this.getOrCreateDirectChat(userId, recipientId, workspaceId);
         if (groupId) {
-          await supabase.from('chat_mensajes').insert({
+          await supabase.from('mensajes_chat').insert({
             grupo_id: groupId,
             usuario_id: userId,
             contenido: content,
@@ -51,7 +51,7 @@ export const ChatService = {
       // Sin embargo, para cumplir con el requerimiento, intentaré lo siguiente:
       // Buscar grupos donde esté el usuario actual
       const { data: userGroups } = await supabase
-        .from('miembros_chat_grupo')
+        .from('miembros_grupo')
         .select('grupo_id')
         .eq('usuario_id', userA);
         
@@ -62,11 +62,11 @@ export const ChatService = {
       if (groupIds.length > 0) {
         // Buscar cuál de estos grupos tiene al usuario B y es tipo directo
         const { data: commonGroup } = await supabase
-          .from('miembros_chat_grupo')
-          .select('grupo_id, chat_grupos!inner(tipo)')
+          .from('miembros_grupo')
+          .select('grupo_id, grupos_chat!inner(tipo)')
           .in('grupo_id', groupIds)
           .eq('usuario_id', userB)
-          .eq('chat_grupos.tipo', 'directo')
+          .eq('grupos_chat.tipo', 'directo')
           .limit(1)
           .single();
           
@@ -75,7 +75,7 @@ export const ChatService = {
 
       // Si no existe, crear el grupo
       const { data: newGroup, error: groupError } = await supabase
-        .from('chat_grupos')
+        .from('grupos_chat')
         .insert({
           espacio_id: workspaceId,
           nombre: 'Directo', // El nombre suele ser dinámico en frontend
@@ -91,7 +91,7 @@ export const ChatService = {
       }
 
       // Añadir miembros
-      await supabase.from('miembros_chat_grupo').insert([
+      await supabase.from('miembros_grupo').insert([
         { grupo_id: newGroup.id, usuario_id: userA },
         { grupo_id: newGroup.id, usuario_id: userB }
       ]);
