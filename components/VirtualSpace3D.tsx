@@ -15,6 +15,7 @@ import { ChatService } from '../services/chatService';
 import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 import { VideoWithBackground } from './VideoWithBackground';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from './BottomControlBar';
+// GameHub ahora se importa en WorkspaceLayout
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -1296,6 +1297,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
   // Estado para trigger externo de grabación
   const [recordingTrigger, setRecordingTrigger] = useState(false);
+  
+  // Estado para UI
   const [showEmojis, setShowEmojis] = useState(false);
   const [showChat, setShowChat] = useState(false);
   const [showStatusPicker, setShowStatusPicker] = useState(false);
@@ -2343,6 +2346,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           console.log(`📝 Consentimiento ${acepto ? 'aceptado' : 'rechazado'} para grabación:`, grabacionId);
         }}
       />
+      
+      {/* GameHub ahora se controla desde la barra superior en WorkspaceLayout */}
     </div>
   );
 };

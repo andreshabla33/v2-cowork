@@ -11,7 +11,7 @@ export const SettingSection: React.FC<SettingSectionProps> = ({ title, children 
       <h4 className="text-[10px] font-black uppercase tracking-widest text-zinc-500 mb-3">
         {title}
       </h4>
-      <div className="backdrop-blur-xl bg-white/[0.02] border border-white/[0.05] rounded-2xl px-4">
+      <div className="backdrop-blur-xl bg-white/[0.02] border border-white/[0.05] rounded-2xl px-5 overflow-hidden">
         {children}
       </div>
     </div>

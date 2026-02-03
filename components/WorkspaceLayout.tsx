@@ -11,6 +11,7 @@ import { GrabacionesHistorial } from './meetings/recording/GrabacionesHistorial'
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
 import { StatusSelector } from './StatusSelector';
+import { GameHub } from './games';
 import { SettingsModal } from './settings/SettingsModal';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
@@ -19,6 +20,7 @@ export const WorkspaceLayout: React.FC = () => {
   const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
   const [showViben, setShowViben] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showGameHub, setShowGameHub] = useState(false);
   const presenceChannelRef = useRef<any>(null);
 
   const onVibenToggle = () => setShowViben(prev => !prev);
@@ -308,6 +310,21 @@ export const WorkspaceLayout: React.FC = () => {
               ))}
             </div>
 
+            {/* BOTÓN MINI JUEGOS - Estilo glassmorphism */}
+            <button 
+              onClick={() => setShowGameHub(true)} 
+              className={`relative overflow-hidden flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-all font-bold text-[10px] tracking-wider group ${
+                theme === 'arcade' 
+                  ? 'bg-[#00ff41]/20 text-[#00ff41] border border-[#00ff41]/50 hover:bg-[#00ff41]/30' 
+                  : 'bg-white/[0.05] border border-white/[0.1] text-white/80 hover:bg-white/[0.1] hover:border-amber-500/50 hover:text-amber-400'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+              </svg>
+              <span>Juegos</span>
+            </button>
+
             {/* BOTÓN VIBEN AI - Estilo onboarding con gradiente */}
             <button 
               onClick={onVibenToggle} 
@@ -375,6 +392,9 @@ export const WorkspaceLayout: React.FC = () => {
             </div>
           </div>
         )}
+
+        {/* Game Hub Modal */}
+        <GameHub isOpen={showGameHub} onClose={() => setShowGameHub(false)} />
       </main>
 
       {/* Settings Modal */}

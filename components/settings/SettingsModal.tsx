@@ -1,4 +1,8 @@
 import React, { useState, useEffect } from 'react';
+import { 
+  Settings, Calendar, Layout, Mic, Video, Users2, Bell, Lock, Zap, 
+  Gamepad2, UserPlus, ShieldCheck, X 
+} from 'lucide-react';
 import { SettingsGeneral } from './sections/SettingsGeneral';
 import { SettingsCalendar } from './sections/SettingsCalendar';
 import { SettingsMiniMode } from './sections/SettingsMiniMode';
@@ -179,19 +183,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'general', label: 'General', icon: '⚙️', category: 'Preferencias' },
-    { id: 'calendar', label: 'Calendario', icon: '📅', category: 'Preferencias' },
-    { id: 'minimode', label: 'Mini Mode', icon: '🖼️', category: 'Preferencias' },
-    { id: 'audio', label: 'Audio', icon: '🎤', category: 'Preferencias' },
-    { id: 'video', label: 'Video', icon: '📹', category: 'Preferencias' },
-    { id: 'meetings', label: 'Reuniones', icon: '�', category: 'Preferencias' },
-    { id: 'notifications', label: 'Notificaciones', icon: '🔔', category: 'Preferencias' },
-    { id: 'privacy', label: 'Privacidad', icon: '🔒', category: 'Preferencias' },
-    { id: 'performance', label: 'Rendimiento', icon: '⚡', category: 'Preferencias' },
-    { id: 'space3d', label: 'Espacio 3D', icon: '🎮', category: 'Preferencias' },
-    { id: 'members', label: 'Miembros', icon: '👥', category: 'Espacio' },
-    { id: 'guests', label: 'Invitados', icon: '🎫', category: 'Espacio', adminOnly: true },
-    { id: 'security', label: 'Seguridad', icon: '🛡️', category: 'Espacio', adminOnly: true },
+    { id: 'general', label: 'General', Icon: Settings, category: 'Preferencias' },
+    { id: 'calendar', label: 'Calendario', Icon: Calendar, category: 'Preferencias' },
+    { id: 'minimode', label: 'Mini Mode', Icon: Layout, category: 'Preferencias' },
+    { id: 'audio', label: 'Audio', Icon: Mic, category: 'Preferencias' },
+    { id: 'video', label: 'Video', Icon: Video, category: 'Preferencias' },
+    { id: 'meetings', label: 'Reuniones', Icon: Users2, category: 'Preferencias' },
+    { id: 'notifications', label: 'Notificaciones', Icon: Bell, category: 'Preferencias' },
+    { id: 'privacy', label: 'Privacidad', Icon: Lock, category: 'Preferencias' },
+    { id: 'performance', label: 'Rendimiento', Icon: Zap, category: 'Preferencias' },
+    { id: 'space3d', label: 'Espacio 3D', Icon: Gamepad2, category: 'Preferencias' },
+    { id: 'members', label: 'Miembros', Icon: Users2, category: 'Espacio' },
+    { id: 'guests', label: 'Invitados', Icon: UserPlus, category: 'Espacio', adminOnly: true },
+    { id: 'security', label: 'Seguridad', Icon: ShieldCheck, category: 'Espacio', adminOnly: true },
   ];
 
   const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin);
@@ -218,10 +222,10 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
           
           {/* Navigation */}
-          <nav className="flex-1 p-3 overflow-y-auto">
+          <nav className="flex-1 px-2 py-3 overflow-y-auto">
             {categories.map(category => (
               <div key={category} className="mb-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 px-3 mb-2">
+                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 px-2 mb-2">
                   {category}
                 </p>
                 {filteredTabs
@@ -230,13 +234,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as SettingsTab)}
-                      className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                      className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
                         activeTab === tab.id
-                          ? 'bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 text-white border border-violet-500/30'
-                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.03]'
+                          ? 'bg-violet-600/20 text-white'
+                          : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
                       }`}
                     >
-                      <span className="text-base">{tab.icon}</span>
+                      <tab.Icon 
+                        className={`w-[18px] h-[18px] stroke-[1.5] transition-all duration-200 ${
+                          activeTab === tab.id 
+                            ? 'text-violet-400' 
+                            : 'text-zinc-500 group-hover:text-zinc-300'
+                        }`} 
+                      />
                       {tab.label}
                     </button>
                   ))}

@@ -26,15 +26,15 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
       <button
         onClick={() => !disabled && onChange(!checked)}
         disabled={disabled}
-        className={`relative w-11 h-6 rounded-full transition-all duration-200 ${
+        className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-all duration-200 ${
           checked 
             ? 'bg-gradient-to-r from-violet-600 to-fuchsia-600' 
             : 'bg-zinc-700'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
       >
         <span 
-          className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
-            checked ? 'translate-x-6' : 'translate-x-1'
+          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-md transition-transform duration-200 ${
+            checked ? 'translate-x-5' : 'translate-x-0'
           }`}
         />
       </button>
