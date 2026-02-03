@@ -1097,6 +1097,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerVideoTrackCountRef = useRef<Map<string, number>>(new Map()); // Rastrear video tracks por peer
   const webrtcChannelRef = useRef<any>(null);
+  const selectedCameraIdRef = useRef<string>(loadCameraSettings().selectedCameraId); // Cámara seleccionada por usuario
   const [localReactions, setLocalReactions] = useState<Array<{ id: string; emoji: string }>>([]);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
   const orbitControlsRef = useRef<any>(null);
@@ -1713,10 +1714,31 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
 
         if (shouldHaveStream) {
           if (!activeStreamRef.current) {
+            // Usar cámara seleccionada si está disponible
+            const cameraSettings = loadCameraSettings();
+            const videoConstraints: MediaTrackConstraints = { 
+              width: 640, 
+              height: 480 
+            };
+            if (cameraSettings.selectedCameraId) {
+              videoConstraints.deviceId = { exact: cameraSettings.selectedCameraId };
+              console.log('Using selected camera:', cameraSettings.selectedCameraId);
+            }
+            
             console.log('Requesting camera/mic access...');
             const newStream = await navigator.mediaDevices.getUserMedia({ 
-              video: { width: 640, height: 480 }, 
+              video: videoConstraints, 
               audio: true 
+            }).catch(async (err) => {
+              // Si falla con la cámara específica, intentar con cualquier cámara
+              if (cameraSettings.selectedCameraId) {
+                console.warn('Selected camera not available, using default:', err.message);
+                return navigator.mediaDevices.getUserMedia({ 
+                  video: { width: 640, height: 480 }, 
+                  audio: true 
+                });
+              }
+              throw err;
             });
             
             if (!mounted) {
