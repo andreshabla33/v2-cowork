@@ -493,3 +493,92 @@ await navigator.mediaDevices.getUserMedia({
 - Solo se oculta la vista local
 - Se muestra un indicador visual "Vista oculta"
 - Los otros usuarios ven el video normalmente
+
+---
+
+## 9. Efectos de Fondo (Background Effects)
+
+### Descripción
+Implementación de efectos de fondo en tiempo real usando MediaPipe Selfie Segmentation para separar la persona del fondo.
+
+### Tecnología Utilizada
+
+| Componente | Descripción |
+|------------|-------------|
+| **@mediapipe/selfie_segmentation** | ML model para segmentación de personas |
+| **Canvas API** | Composición de video + fondo |
+| **requestAnimationFrame** | Loop de procesamiento en tiempo real |
+
+### Archivos Creados
+
+**`hooks/useBackgroundEffect.ts`**
+- Hook reutilizable para aplicar efectos de fondo
+- Gestiona el ciclo de vida de MediaPipe
+- Retorna canvas ref y stream procesado
+
+**`components/VideoWithBackground.tsx`**
+- Componente de video con efectos de fondo
+- Muestra indicador de carga mientras inicializa
+- Fallback a video normal si falla
+
+### Tipos de Efectos
+
+```typescript
+type BackgroundEffectType = 'none' | 'blur' | 'image';
+```
+
+| Efecto | Descripción |
+|--------|-------------|
+| `none` | Sin efecto, video original |
+| `blur` | Desenfoque del fondo (blur gaussiano) |
+| `image` | Reemplazo del fondo con imagen personalizada |
+
+### Flujo de Procesamiento
+
+```
+1. Video Stream → MediaPipe Selfie Segmentation
+2. Segmentation Mask (persona vs fondo)
+3. Canvas Compositing:
+   - blur: Fondo con filter blur + persona sin blur
+   - image: Imagen de fondo + persona encima
+4. Canvas Stream → Display/Transmisión
+```
+
+### Uso en VirtualSpace3D
+
+```tsx
+{cameraSettings.backgroundEffect !== 'none' ? (
+  <VideoWithBackground
+    stream={stream}
+    effectType={cameraSettings.backgroundEffect}
+    backgroundImage={cameraSettings.backgroundImage}
+    blurAmount={12}
+    muted={true}
+  />
+) : (
+  <StableVideo stream={stream} muted={true} />
+)}
+```
+
+### Requisitos de Hardware
+
+| Requisito | Mínimo | Recomendado |
+|-----------|--------|-------------|
+| CPU | 4 cores | 6+ cores |
+| RAM | 8 GB | 16 GB |
+| GPU | Integrada | Dedicada |
+| Navegador | Chrome/Edge | Chrome |
+
+### Logs de Diagnóstico
+
+| Log | Significado |
+|-----|-------------|
+| `Background effect initialized: blur/image` | Efecto inicializado correctamente |
+| `Error initializing background effect` | Fallo al inicializar (hardware insuficiente) |
+
+### Notas de Rendimiento
+
+- El modelo `modelSelection: 1` (landscape) es más rápido que `0` (general)
+- `selfieMode: true` optimiza para cámaras frontales
+- El procesamiento se detiene automáticamente al cerrar el menú
+- Si el rendimiento es bajo, el efecto se desactiva automáticamente
