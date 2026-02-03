@@ -191,16 +191,8 @@ export const ChessGame: React.FC<ChessGameProps> = ({
 
   // ===================== SISTEMA DE INVITACIONES ONLINE =====================
 
-  // Cargar miembros del espacio cuando se selecciona modo online
-  useEffect(() => {
-    console.log('🎮 ChessGame Online Mode Check:', { gameMode, espacioId, currentUserId, miembrosCount: miembrosEspacio.length });
-    if (gameMode === 'online' && espacioId) {
-      loadMiembrosEspacio();
-    }
-  }, [gameMode, espacioId]);
-
   // Cargar miembros del espacio
-  const loadMiembrosEspacio = async () => {
+  const loadMiembrosEspacio = useCallback(async () => {
     if (!espacioId) {
       console.log('🎮 loadMiembrosEspacio: No espacioId provided');
       return;
@@ -209,36 +201,42 @@ export const ChessGame: React.FC<ChessGameProps> = ({
     setLoadingMiembros(true);
     try {
       // Primero obtener los usuario_id de los miembros del espacio
-      let membersQuery = supabase
+      const { data: membersData, error: membersError } = await supabase
         .from('miembros_espacio')
         .select('usuario_id')
         .eq('espacio_id', espacioId)
-        .eq('aceptado', true);
+        .eq('aceptado', true)
+        .neq('usuario_id', currentUserId);
       
-      if (currentUserId) {
-        membersQuery = membersQuery.neq('usuario_id', currentUserId);
+      console.log('🎮 loadMiembrosEspacio membersData:', { membersData, membersError });
+      
+      if (membersError) {
+        console.error('🎮 Error consultando miembros_espacio:', membersError);
+        throw membersError;
       }
-
-      const { data: membersData, error: membersError } = await membersQuery;
-      
-      if (membersError) throw membersError;
       
       if (!membersData || membersData.length === 0) {
         console.log('🎮 No hay otros miembros en el espacio');
         setMiembrosEspacio([]);
+        setLoadingMiembros(false);
         return;
       }
 
       // Obtener los datos de los usuarios
       const userIds = membersData.map(m => m.usuario_id);
+      console.log('🎮 loadMiembrosEspacio userIds:', userIds);
+      
       const { data: usersData, error: usersError } = await supabase
         .from('usuarios')
         .select('id, nombre, avatar_url, estado_disponibilidad')
         .in('id', userIds);
 
-      if (usersError) throw usersError;
-      
-      console.log('🎮 loadMiembrosEspacio result:', { usersData });
+      console.log('🎮 loadMiembrosEspacio usersData:', { usersData, usersError });
+
+      if (usersError) {
+        console.error('🎮 Error consultando usuarios:', usersError);
+        throw usersError;
+      }
 
       const miembros: MiembroEspacio[] = (usersData || []).map((u: any) => ({
         id: u.id,
@@ -247,13 +245,23 @@ export const ChessGame: React.FC<ChessGameProps> = ({
         estado_disponibilidad: u.estado_disponibilidad
       }));
 
+      console.log('🎮 loadMiembrosEspacio final miembros:', miembros);
       setMiembrosEspacio(miembros);
     } catch (error) {
-      console.error('Error cargando miembros:', error);
+      console.error('🎮 Error cargando miembros:', error);
+      setMiembrosEspacio([]);
     } finally {
       setLoadingMiembros(false);
     }
-  };
+  }, [espacioId, currentUserId]);
+
+  // Cargar miembros del espacio cuando se selecciona modo online
+  useEffect(() => {
+    console.log('🎮 ChessGame Online Mode Check:', { gameMode, espacioId, currentUserId });
+    if (gameMode === 'online' && espacioId && currentUserId) {
+      loadMiembrosEspacio();
+    }
+  }, [gameMode, espacioId, currentUserId, loadMiembrosEspacio]);
 
   // Enviar invitación a jugar
   const enviarInvitacion = async (miembro: MiembroEspacio) => {

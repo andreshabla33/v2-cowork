@@ -101,7 +101,7 @@ export const GameInvitationNotification: React.FC<GameInvitationNotificationProp
         jugador_negras_id: invitacion.configuracion.invitador_color === 'w' 
           ? userId 
           : invitacion.invitador_id,
-        estado: 'activa',
+        estado: 'jugando',
         turno: 'w',
         fen_actual: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
         tiempo_blancas: invitacion.configuracion.tiempo || 600,
