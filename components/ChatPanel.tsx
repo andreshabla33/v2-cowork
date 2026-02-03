@@ -393,8 +393,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       respuesta_a: activeThread || null
     };
     
-    const { error } = await supabase.from('mensajes_chat').insert(messageData);
-    if (error) setNuevoMensaje(content);
+    const { data, error } = await supabase.from('mensajes_chat').insert(messageData).select(`id, contenido, creado_en, usuario_id, tipo, respuesta_a, menciones, usuario:usuarios!mensajes_chat_usuario_id_fkey(id, nombre)`).single();
+    
+    if (error) {
+      console.error('Error enviando mensaje:', error);
+      setNuevoMensaje(content);
+    } else if (data) {
+      // Agregar mensaje localmente inmediatamente (no esperar realtime)
+      if (activeThread) {
+        setThreadMessages(prev => [...prev, data as any]);
+      } else {
+        setMensajes(prev => [...prev, data as any]);
+      }
+      scrollToBottom();
+    }
   };
 
   // Abrir hilo de un mensaje
