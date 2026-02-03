@@ -98,6 +98,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   showRecordingButton,
   currentStream,
   onCameraSettingsChange,
+  onAudioSettingsChange,
 }) => {
   const { currentUser, updateStatus } = useStore();
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
@@ -209,8 +210,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
     const newSettings = { ...audioSettings, ...partial };
     setAudioSettings(newSettings);
     saveAudioSettings(newSettings);
-    // Notificar cambio para aplicar en el stream
     console.log('🎤 Audio settings updated:', newSettings);
+    // Notificar al padre para aplicar cambios en el stream
+    onAudioSettingsChange?.(newSettings);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {

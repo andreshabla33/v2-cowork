@@ -2165,6 +2165,50 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           setCameraSettings(newSettings);
           saveCameraSettings(newSettings);
         }}
+        onAudioSettingsChange={async (newSettings) => {
+          setAudioSettings(newSettings);
+          saveAudioSettings(newSettings);
+          
+          // Aplicar cambios de micrófono en tiempo real si hay stream activo
+          if (activeStreamRef.current && newSettings.selectedMicrophoneId) {
+            try {
+              console.log('🎤 Applying new microphone:', newSettings.selectedMicrophoneId);
+              const newAudioStream = await navigator.mediaDevices.getUserMedia({
+                audio: {
+                  deviceId: { exact: newSettings.selectedMicrophoneId },
+                  noiseSuppression: newSettings.noiseReduction,
+                  echoCancellation: newSettings.echoCancellation,
+                  autoGainControl: newSettings.autoGainControl,
+                }
+              });
+              
+              const newAudioTrack = newAudioStream.getAudioTracks()[0];
+              const oldAudioTrack = activeStreamRef.current.getAudioTracks()[0];
+              
+              if (oldAudioTrack && newAudioTrack) {
+                // Reemplazar track en el stream local
+                activeStreamRef.current.removeTrack(oldAudioTrack);
+                activeStreamRef.current.addTrack(newAudioTrack);
+                oldAudioTrack.stop();
+                
+                // Reemplazar en todas las conexiones peer
+                peerConnectionsRef.current.forEach(async (pc, peerId) => {
+                  const audioSender = pc.getSenders().find(s => s.track?.kind === 'audio');
+                  if (audioSender) {
+                    await audioSender.replaceTrack(newAudioTrack);
+                    console.log('🎤 Replaced audio track for peer', peerId);
+                  }
+                });
+                
+                // Aplicar estado de mute actual
+                newAudioTrack.enabled = currentUser.isMicOn;
+                console.log('🎤 New microphone applied successfully');
+              }
+            } catch (err) {
+              console.error('Error applying new microphone:', err);
+            }
+          }
+        }}
       />
 
       {/* Input de Chat Flotante - Minimalista */}
