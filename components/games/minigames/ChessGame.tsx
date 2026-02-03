@@ -17,6 +17,9 @@ interface ChessGameProps {
   currentUserName?: string;
   sessionId?: string;
   espacioId?: string;
+  initialPartidaId?: string;
+  initialOpponent?: { id: string; name: string };
+  initialPlayerColor?: 'w' | 'b';
 }
 
 interface MiembroEspacio {
@@ -134,7 +137,10 @@ export const ChessGame: React.FC<ChessGameProps> = ({
   currentUserId = 'local-player',
   currentUserName = 'Jugador',
   sessionId,
-  espacioId
+  espacioId,
+  initialPartidaId,
+  initialOpponent,
+  initialPlayerColor = 'w'
 }) => {
   // Estado del juego
   const [chess] = useState(() => new Chess());
@@ -188,6 +194,20 @@ export const ChessGame: React.FC<ChessGameProps> = ({
   const [invitacionEnviada, setInvitacionEnviada] = useState<InvitacionJuego | null>(null);
   const [esperandoRespuesta, setEsperandoRespuesta] = useState(false);
   const [partidaOnlineId, setPartidaOnlineId] = useState<string | null>(null);
+
+  // ===================== INICIAR PARTIDA DESDE INVITACIÓN =====================
+  
+  // Si se proporcionan props iniciales, iniciar la partida directamente
+  useEffect(() => {
+    if (initialPartidaId && initialOpponent) {
+      console.log('🎮 ChessGame: Iniciando partida desde invitación:', { initialPartidaId, initialOpponent, initialPlayerColor });
+      setGameMode('online');
+      setOpponent(initialOpponent);
+      setPlayerColor(initialPlayerColor);
+      setBoardFlipped(initialPlayerColor === 'b');
+      iniciarPartidaOnline(initialPartidaId, initialPlayerColor);
+    }
+  }, [initialPartidaId, initialOpponent, initialPlayerColor]);
 
   // ===================== SISTEMA DE INVITACIONES ONLINE =====================
 

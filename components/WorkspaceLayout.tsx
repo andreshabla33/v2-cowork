@@ -410,6 +410,8 @@ export const WorkspaceLayout: React.FC = () => {
           espacioId={activeWorkspace?.id}
           currentUserId={session?.user?.id}
           currentUserName={currentUser?.name}
+          pendingInvitation={pendingGameInvitation}
+          onPendingInvitationHandled={() => setPendingGameInvitation(null)}
         />
 
         {/* Notificaciones de invitación a juegos */}

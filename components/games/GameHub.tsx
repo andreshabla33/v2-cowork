@@ -15,12 +15,28 @@ import { MysteryRoleplayGame } from './minigames/MysteryRoleplayGame';
 import { BuildingChallengeGame } from './minigames/BuildingChallengeGame';
 import { ChessGame } from './minigames/ChessGame';
 
+interface PendingGameInvitation {
+  invitacion: {
+    id: string;
+    juego: string;
+    invitador_id: string;
+    configuracion: {
+      tiempo: number;
+      invitador_nombre: string;
+      invitador_color: 'w' | 'b';
+    };
+  };
+  partidaId: string;
+}
+
 interface GameHubProps {
   isOpen: boolean;
   onClose: () => void;
   espacioId?: string;
   currentUserId?: string;
   currentUserName?: string;
+  pendingInvitation?: PendingGameInvitation | null;
+  onPendingInvitationHandled?: () => void;
 }
 
 interface GameInfo {
@@ -116,10 +132,28 @@ const GAMES: GameInfo[] = [
   },
 ];
 
-export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName }) => {
+export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName, pendingInvitation, onPendingInvitationHandled }) => {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'achievements'>('games');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
+  const [activePartidaId, setActivePartidaId] = useState<string | null>(null);
+  const [activeOpponent, setActiveOpponent] = useState<{ id: string; name: string } | null>(null);
+  const [activePlayerColor, setActivePlayerColor] = useState<'w' | 'b'>('w');
   const { leaderboard, achievements, playerStats, updateLeaderboard } = useGameStore();
+
+  // Manejar invitación pendiente cuando se abre el GameHub
+  React.useEffect(() => {
+    if (isOpen && pendingInvitation) {
+      console.log('🎮 GameHub: Iniciando partida desde invitación:', pendingInvitation);
+      const inv = pendingInvitation.invitacion;
+      // El que acepta juega con el color opuesto al invitador
+      const miColor = inv.configuracion.invitador_color === 'w' ? 'b' : 'w';
+      setActivePartidaId(pendingInvitation.partidaId);
+      setActiveOpponent({ id: inv.invitador_id, name: inv.configuracion.invitador_nombre });
+      setActivePlayerColor(miColor);
+      setSelectedGame('chess');
+      onPendingInvitationHandled?.();
+    }
+  }, [isOpen, pendingInvitation, onPendingInvitationHandled]);
 
   const getColorClasses = (color: string) => {
     const colors: Record<string, { bg: string; text: string; border: string }> = {
@@ -149,6 +183,9 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, cu
 
   const handleCloseGame = () => {
     setSelectedGame(null);
+    setActivePartidaId(null);
+    setActiveOpponent(null);
+    setActivePlayerColor('w');
   };
 
   const renderGame = () => {
@@ -159,7 +196,15 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, cu
       case 'speed-networking': return <SpeedNetworkingGame onClose={handleCloseGame} />;
       case 'mystery-roleplay': return <MysteryRoleplayGame onClose={handleCloseGame} />;
       case 'building-challenge': return <BuildingChallengeGame onClose={handleCloseGame} />;
-      case 'chess': return <ChessGame onClose={handleCloseGame} espacioId={espacioId} currentUserId={currentUserId} currentUserName={currentUserName} />;
+      case 'chess': return <ChessGame 
+          onClose={handleCloseGame} 
+          espacioId={espacioId} 
+          currentUserId={currentUserId} 
+          currentUserName={currentUserName}
+          initialPartidaId={activePartidaId || undefined}
+          initialOpponent={activeOpponent || undefined}
+          initialPlayerColor={activePlayerColor}
+        />;
       default: return null;
     }
   };
