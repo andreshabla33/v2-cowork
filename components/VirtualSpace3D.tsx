@@ -891,7 +891,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   muteAudio={muteRemoteAudio}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
                   {u.isCameraOn ? (
                     /* Usuario tiene cámara pero stream no disponible aún */
                     <div className="flex flex-col items-center">
@@ -903,9 +903,13 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                       <span className="text-[10px] text-white/50">Conectando...</span>
                     </div>
                   ) : (
-                    /* Usuario tiene cámara apagada */
-                    <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
-                      {u.name.charAt(0)}
+                    /* Usuario tiene cámara apagada - mostrar foto de perfil o inicial (igual que usuario local) */
+                    <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center bg-black/50 overflow-hidden">
+                      {u.avatar ? (
+                        <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-indigo-400 font-black text-2xl">{u.name.charAt(0)}</span>
+                      )}
                     </div>
                   )}
                 </div>
