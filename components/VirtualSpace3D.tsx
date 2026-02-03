@@ -1050,12 +1050,35 @@ interface VirtualSpace3DProps {
   theme?: string;
 }
 
-// ICE Servers para WebRTC
+// ICE Servers para WebRTC - Servidores STUN/TURN actualizados
 const ICE_SERVERS = [
+  // STUN servers (gratuitos, solo para descubrir IP pública)
   { urls: 'stun:stun.l.google.com:19302' },
   { urls: 'stun:stun1.l.google.com:19302' },
-  { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-  { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+  { urls: 'stun:stun2.l.google.com:19302' },
+  { urls: 'stun:stun3.l.google.com:19302' },
+  { urls: 'stun:stun4.l.google.com:19302' },
+  // TURN servers de Metered (gratuitos con límite)
+  { 
+    urls: 'turn:a.relay.metered.ca:80', 
+    username: 'e8dd65c92c8d8d9e5c5f5c8a', 
+    credential: 'kxLzJPjQ5+Oy5G6/' 
+  },
+  { 
+    urls: 'turn:a.relay.metered.ca:80?transport=tcp', 
+    username: 'e8dd65c92c8d8d9e5c5f5c8a', 
+    credential: 'kxLzJPjQ5+Oy5G6/' 
+  },
+  { 
+    urls: 'turn:a.relay.metered.ca:443', 
+    username: 'e8dd65c92c8d8d9e5c5f5c8a', 
+    credential: 'kxLzJPjQ5+Oy5G6/' 
+  },
+  { 
+    urls: 'turns:a.relay.metered.ca:443?transport=tcp', 
+    username: 'e8dd65c92c8d8d9e5c5f5c8a', 
+    credential: 'kxLzJPjQ5+Oy5G6/' 
+  },
 ];
 
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
