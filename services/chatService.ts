@@ -5,18 +5,26 @@ export const ChatService = {
   // Enviar mensaje a la base de datos
   async sendMessage(content: string, userId: string, workspaceId: string, recipientIds: string[]) {
     try {
+      console.log('💬 ChatService.sendMessage:', { content, userId, workspaceId, recipientIds });
+      
       // Para cada destinatario, buscamos o creamos un chat directo y guardamos el mensaje
-      // Esta es una implementación simplificada para cumplir con "guardar en cada mensaje directo"
       const promises = recipientIds.map(async (recipientId) => {
         const groupId = await this.getOrCreateDirectChat(userId, recipientId, workspaceId);
+        console.log('💬 Got groupId for recipient', recipientId, ':', groupId);
+        
         if (groupId) {
-          await supabase.from('mensajes_chat').insert({
+          const { data, error } = await supabase.from('mensajes_chat').insert({
             grupo_id: groupId,
             usuario_id: userId,
             contenido: content,
-            tipo: 'texto',
-            creado_en: new Date().toISOString() // Fallback si la DB no lo pone auto
-          });
+            tipo: 'texto'
+          }).select().single();
+          
+          if (error) {
+            console.error('💬 Error inserting message:', error);
+          } else {
+            console.log('💬 Message saved successfully:', data?.id);
+          }
         }
       });
 
@@ -31,37 +39,23 @@ export const ChatService = {
   // Obtener o crear un grupo de chat directo entre dos usuarios
   async getOrCreateDirectChat(userA: string, userB: string, workspaceId: string): Promise<string | null> {
     try {
-      // 1. Buscar si ya existe un grupo directo entre estos dos
-      // Nota: Esto requeriría una consulta compleja a miembros_grupo_chat o similar.
-      // Por simplicidad y robustez sin ver la DB, intentaremos llamar a una RPC si existiera,
-      // o haremos una búsqueda manual si podemos acceder a las tablas.
+      console.log('💬 getOrCreateDirectChat:', { userA, userB, workspaceId });
       
-      // Asumiendo que existe una tabla 'chat_grupos' y 'miembros_chat_grupo'
-      // Esta lógica es tentativa sin ver el esquema exacto.
-      
-      // Opción A: Buscar un grupo tipo 'directo' que tenga a ambos usuarios
-      // Esto es complejo de hacer en una sola query de supabase cliente sin RPC.
-      
-      // Simplificación: Vamos a insertar el mensaje sin grupo por ahora si no podemos resolver el grupo,
-      // o mejor, crear una función RPC simulada en el cliente (no ideal).
-      
-      // STRATEGY CHANGE: Dado que no puedo ver la DB, voy a simular el éxito de la persistencia 
-      // y dejar los TODOs claros o intentar una inserción genérica si existe una tabla de logs.
-      
-      // Sin embargo, para cumplir con el requerimiento, intentaré lo siguiente:
-      // Buscar grupos donde esté el usuario actual
-      const { data: userGroups } = await supabase
+      // Buscar grupos donde esté el usuario A
+      const { data: userGroups, error: userGroupsError } = await supabase
         .from('miembros_grupo')
         .select('grupo_id')
         .eq('usuario_id', userA);
+      
+      console.log('💬 User A groups:', userGroups, 'Error:', userGroupsError);
         
-      if (!userGroups) return null;
-      
-      const groupIds = userGroups.map(g => g.grupo_id);
-      
-      if (groupIds.length > 0) {
+      if (!userGroups || userGroups.length === 0) {
+        console.log('💬 No groups for user A, creating new...');
+      } else {
+        const groupIds = userGroups.map(g => g.grupo_id);
+        
         // Buscar cuál de estos grupos tiene al usuario B y es tipo directo
-        const { data: commonGroup } = await supabase
+        const { data: commonGroup, error: commonError } = await supabase
           .from('miembros_grupo')
           .select('grupo_id, grupos_chat!inner(tipo)')
           .in('grupo_id', groupIds)
@@ -69,16 +63,22 @@ export const ChatService = {
           .eq('grupos_chat.tipo', 'directo')
           .limit(1)
           .single();
+        
+        console.log('💬 Common group search:', commonGroup, 'Error:', commonError);
           
-        if (commonGroup) return commonGroup.grupo_id;
+        if (commonGroup) {
+          console.log('💬 Found existing direct chat:', commonGroup.grupo_id);
+          return commonGroup.grupo_id;
+        }
       }
 
       // Si no existe, crear el grupo
+      console.log('💬 Creating new direct chat group...');
       const { data: newGroup, error: groupError } = await supabase
         .from('grupos_chat')
         .insert({
           espacio_id: workspaceId,
-          nombre: 'Directo', // El nombre suele ser dinámico en frontend
+          nombre: 'Directo',
           tipo: 'directo',
           creado_por: userA
         })
@@ -86,20 +86,28 @@ export const ChatService = {
         .single();
 
       if (groupError || !newGroup) {
-        console.error('Error creating group:', groupError);
+        console.error('💬 Error creating group:', groupError);
         return null;
       }
+      
+      console.log('💬 New group created:', newGroup.id);
 
       // Añadir miembros
-      await supabase.from('miembros_grupo').insert([
+      const { error: membersError } = await supabase.from('miembros_grupo').insert([
         { grupo_id: newGroup.id, usuario_id: userA },
         { grupo_id: newGroup.id, usuario_id: userB }
       ]);
+      
+      if (membersError) {
+        console.error('💬 Error adding members:', membersError);
+      } else {
+        console.log('💬 Members added successfully');
+      }
 
       return newGroup.id;
 
     } catch (error) {
-      console.warn('Error in getOrCreateDirectChat (persistence skipped):', error);
+      console.error('💬 Error in getOrCreateDirectChat:', error);
       return null;
     }
   }
