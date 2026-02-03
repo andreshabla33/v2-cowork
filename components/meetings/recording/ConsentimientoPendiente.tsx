@@ -47,6 +47,8 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
 
     const cargarSolicitudesPendientes = async () => {
       // Buscar notificaciones de consentimiento pendientes
+      console.log('🔔 Buscando para usuario:', session.user.id);
+      
       const { data: notificaciones, error } = await supabase
         .from('notificaciones')
         .select('*')
@@ -56,7 +58,11 @@ export const ConsentimientoPendiente: React.FC<ConsentimientoPendienteProps> = (
         .order('creado_en', { ascending: false })
         .limit(1);
 
-      console.log('🔔 Buscando solicitudes de consentimiento:', { notificaciones, error });
+      console.log('🔔 Resultado búsqueda:', { 
+        encontradas: notificaciones?.length || 0, 
+        error: error?.message,
+        notificaciones 
+      });
 
       if (notificaciones && notificaciones.length > 0) {
         const notif = notificaciones[0];
