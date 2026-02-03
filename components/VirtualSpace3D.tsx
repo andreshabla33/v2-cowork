@@ -12,6 +12,7 @@ import { RecordingManager } from './meetings/recording/RecordingManager';
 import { ConsentimientoPendiente } from './meetings/recording/ConsentimientoPendiente';
 import { BottomControlBar } from './BottomControlBar';
 import { ChatService } from '../services/chatService';
+import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -661,7 +662,10 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
   const [useGridLayout, setUseGridLayout] = useState(false);
+  const [showCameraSettings, setShowCameraSettings] = useState(false);
+  const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
+  const cameraButtonRef = useRef<HTMLButtonElement>(null);
   
   // Detectar si el usuario local está hablando
   const isSpeakingLocal = speakingUsers.has(visitorId);
@@ -815,7 +819,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
               {currentReaction}
             </div>
           )}
-          <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn ? 'opacity-0' : 'opacity-100'} mirror`}>
+          <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn ? 'opacity-0' : 'opacity-100'} ${cameraSettings.mirrorVideo ? 'mirror' : ''}`}>
             <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />
           </div>
           {!camOn && (
@@ -826,17 +830,52 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           )}
           
-          {/* Controles simplificados (solo expandir) */}
+          {/* Controles simplificados (expandir + configuración) */}
           <div className="absolute bottom-3 right-3 flex justify-end items-center gap-1 transition-all duration-300 opacity-0 group-hover:opacity-100">
+            {/* Botón de configuración de cámara */}
+            <button 
+              ref={cameraButtonRef}
+              onClick={(e) => { e.stopPropagation(); setShowCameraSettings(!showCameraSettings); }}
+              className="w-7 h-7 rounded-full flex items-center justify-center bg-zinc-700/80 backdrop-blur-md border border-white/10 text-white hover:bg-zinc-600 transition-all shadow-lg"
+              title="Configuración de cámara"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+            </button>
             <button onClick={() => setExpandedId('local')} className="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 backdrop-blur-md border border-white/10 text-white hover:bg-indigo-500 transition-all shadow-lg">
               <IconExpand on={false}/>
             </button>
           </div>
+
+          {/* Menú de configuración de cámara */}
+          <CameraSettingsMenu
+            isOpen={showCameraSettings}
+            onClose={() => setShowCameraSettings(false)}
+            onSettingsChange={(newSettings) => {
+              setCameraSettings(newSettings);
+              saveCameraSettings(newSettings);
+            }}
+            currentStream={stream}
+          />
           
           {/* Nombre */}
           <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
             <span className="text-[10px] font-bold uppercase tracking-wide text-white">Tú</span>
           </div>
+
+          {/* Indicador de hide self view */}
+          {cameraSettings.hideSelfView && camOn && (
+            <div className="absolute inset-0 bg-zinc-900/90 flex items-center justify-center rounded-[28px]">
+              <div className="text-center">
+                <svg className="w-8 h-8 text-white/40 mx-auto mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                </svg>
+                <span className="text-[10px] text-white/40">Vista oculta</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Burbuja de screen share (separada) */}
