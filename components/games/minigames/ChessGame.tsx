@@ -193,25 +193,39 @@ export const ChessGame: React.FC<ChessGameProps> = ({
 
   // Cargar miembros del espacio cuando se selecciona modo online
   useEffect(() => {
-    if (gameMode === 'online' && espacioId && miembrosEspacio.length === 0) {
+    console.log('🎮 ChessGame Online Mode Check:', { gameMode, espacioId, currentUserId, miembrosCount: miembrosEspacio.length });
+    if (gameMode === 'online' && espacioId) {
       loadMiembrosEspacio();
     }
   }, [gameMode, espacioId]);
 
   // Cargar miembros del espacio
   const loadMiembrosEspacio = async () => {
-    if (!espacioId) return;
+    if (!espacioId) {
+      console.log('🎮 loadMiembrosEspacio: No espacioId provided');
+      return;
+    }
+    console.log('🎮 loadMiembrosEspacio: Loading members for espacio:', espacioId, 'excluding user:', currentUserId);
     setLoadingMiembros(true);
     try {
-      const { data, error } = await supabase
+      // Construir query - si no hay currentUserId, no filtrar por él
+      let query = supabase
         .from('miembros_espacio')
         .select(`
           usuario_id,
           usuario:usuarios(id, nombre, avatar_url, estado_disponibilidad)
         `)
         .eq('espacio_id', espacioId)
-        .eq('aceptado', true)
-        .neq('usuario_id', currentUserId);
+        .eq('aceptado', true);
+      
+      // Solo excluir al usuario actual si tenemos su ID
+      if (currentUserId) {
+        query = query.neq('usuario_id', currentUserId);
+      }
+
+      const { data, error } = await query;
+      
+      console.log('🎮 loadMiembrosEspacio result:', { data, error });
 
       if (error) throw error;
 
