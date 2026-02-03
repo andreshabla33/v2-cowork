@@ -13,6 +13,7 @@ import { ConsentimientoPendiente } from './meetings/recording/ConsentimientoPend
 import { BottomControlBar } from './BottomControlBar';
 import { ChatService } from '../services/chatService';
 import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
+import { VideoWithBackground } from './VideoWithBackground';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -820,7 +821,18 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           )}
           <div className={`relative w-full h-full overflow-hidden flex items-center justify-center transition-opacity ${!camOn ? 'opacity-0' : 'opacity-100'} ${cameraSettings.mirrorVideo ? 'mirror' : ''}`}>
-            <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />
+            {cameraSettings.backgroundEffect !== 'none' ? (
+              <VideoWithBackground
+                stream={stream}
+                effectType={cameraSettings.backgroundEffect}
+                backgroundImage={cameraSettings.backgroundImage}
+                blurAmount={12}
+                muted={true}
+                className="w-full h-full object-cover block"
+              />
+            ) : (
+              <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />
+            )}
           </div>
           {!camOn && (
             <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
