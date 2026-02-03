@@ -259,30 +259,57 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   </div>
                 </button>
 
-                {/* Background effects */}
-                <button
-                  onClick={() => {
-                    if (cameraSettings.backgroundEffect === 'none') {
-                      updateCameraSettings({ backgroundEffect: 'blur' });
-                    } else if (cameraSettings.backgroundEffect === 'blur') {
-                      fileInputRef.current?.click();
-                    } else {
-                      updateCameraSettings({ backgroundEffect: 'none', backgroundImage: null });
-                    }
-                  }}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <span>Efectos de fondo</span>
-                  </div>
-                  <span className="text-xs text-white/40">
-                    {cameraSettings.backgroundEffect === 'none' ? 'Ninguno' : 
-                     cameraSettings.backgroundEffect === 'blur' ? 'Blur' : 'Imagen'}
-                  </span>
-                </button>
+                {/* Background effects - Opciones separadas */}
+                <div className="space-y-1">
+                  <div className="text-xs font-medium text-white/50 px-3 pt-2">Efectos de fondo</div>
+                  
+                  {/* Ninguno */}
+                  <button
+                    onClick={() => updateCameraSettings({ backgroundEffect: 'none' })}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      cameraSettings.backgroundEffect === 'none' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    }`}
+                  >
+                    {cameraSettings.backgroundEffect === 'none' && (
+                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className={cameraSettings.backgroundEffect !== 'none' ? 'ml-7' : ''}>Ninguno</span>
+                  </button>
+                  
+                  {/* Blur */}
+                  <button
+                    onClick={() => updateCameraSettings({ backgroundEffect: 'blur' })}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      cameraSettings.backgroundEffect === 'blur' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    }`}
+                  >
+                    {cameraSettings.backgroundEffect === 'blur' && (
+                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className={cameraSettings.backgroundEffect !== 'blur' ? 'ml-7' : ''}>Desenfoque</span>
+                  </button>
+                  
+                  {/* Imagen */}
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      cameraSettings.backgroundEffect === 'image' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    }`}
+                  >
+                    {cameraSettings.backgroundEffect === 'image' && (
+                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className={cameraSettings.backgroundEffect !== 'image' ? 'ml-7' : ''}>
+                      {cameraSettings.backgroundImage ? 'Cambiar imagen...' : 'Subir imagen...'}
+                    </span>
+                  </button>
+                </div>
 
                 {/* Mirror video */}
                 <button
