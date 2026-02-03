@@ -1699,8 +1699,43 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           
           // Actualizar estado de tracks
           if (activeStreamRef.current) {
+            // Audio: solo habilitar/deshabilitar
             activeStreamRef.current.getAudioTracks().forEach(track => track.enabled = !!currentUser.isMicOn);
-            activeStreamRef.current.getVideoTracks().forEach(track => track.enabled = !!currentUser.isCameraOn);
+            
+            // Video: DETENER el track completamente si cámara OFF (libera hardware)
+            const videoTracks = activeStreamRef.current.getVideoTracks();
+            if (!currentUser.isCameraOn && videoTracks.length > 0) {
+              console.log('Camera OFF - stopping video track to release hardware');
+              videoTracks.forEach(track => {
+                track.stop();
+                activeStreamRef.current?.removeTrack(track);
+              });
+              // Notificar a los peers que el video track se removió
+              peerConnectionsRef.current.forEach((pc) => {
+                pc.getSenders().forEach(sender => {
+                  if (sender.track?.kind === 'video') {
+                    try { pc.removeTrack(sender); } catch (e) { /* ignore */ }
+                  }
+                });
+              });
+            } else if (currentUser.isCameraOn && videoTracks.length === 0 && activeStreamRef.current) {
+              // Cámara ON pero no hay video track - obtener nuevo stream de video
+              console.log('Camera ON - requesting new video track');
+              try {
+                const videoStream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                const newVideoTrack = videoStream.getVideoTracks()[0];
+                if (newVideoTrack && activeStreamRef.current) {
+                  activeStreamRef.current.addTrack(newVideoTrack);
+                  // Agregar a peers existentes
+                  peerConnectionsRef.current.forEach((pc) => {
+                    pc.addTrack(newVideoTrack, activeStreamRef.current!);
+                  });
+                  setStream(new MediaStream(activeStreamRef.current.getTracks()));
+                }
+              } catch (e) {
+                console.error('Error getting video track:', e);
+              }
+            }
           }
         } else {
           // No hay proximidad ni screen sharing - apagar cámara/mic
