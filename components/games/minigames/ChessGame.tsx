@@ -311,6 +311,7 @@ export const ChessGame: React.FC<ChessGameProps> = ({
       if (error) throw error;
 
       setInvitacionEnviada(invitacion);
+      console.log('🎮 Invitación creada:', invitacion.id);
 
       // Suscribirse a cambios en esta invitación
       const channel = supabase
@@ -321,14 +322,17 @@ export const ChessGame: React.FC<ChessGameProps> = ({
           table: 'invitaciones_juegos',
           filter: `id=eq.${invitacion.id}`
         }, (payload) => {
+          console.log('🎮 Invitación UPDATE recibido:', payload);
           const updated = payload.new as InvitacionJuego;
           if (updated.estado === 'aceptada' && updated.partida_id) {
+            console.log('🎮 Invitación ACEPTADA! Iniciando partida:', updated.partida_id);
             // Invitación aceptada - iniciar partida
             setPartidaOnlineId(updated.partida_id);
             setOpponent({ id: miembro.id, name: miembro.nombre });
             setEsperandoRespuesta(false);
-            iniciarPartidaOnline(updated.partida_id, 'w');
+            iniciarPartidaOnline(updated.partida_id, playerColor);
           } else if (updated.estado === 'rechazada') {
+            console.log('🎮 Invitación RECHAZADA');
             // Invitación rechazada
             setEsperandoRespuesta(false);
             setSelectedMiembro(null);
@@ -336,7 +340,9 @@ export const ChessGame: React.FC<ChessGameProps> = ({
             alert(`${miembro.nombre} rechazó la invitación`);
           }
         })
-        .subscribe();
+        .subscribe((status) => {
+          console.log('🎮 Canal invitación status:', status);
+        });
 
       // Timeout de 5 minutos
       setTimeout(() => {
@@ -373,9 +379,11 @@ export const ChessGame: React.FC<ChessGameProps> = ({
 
   // Iniciar partida online
   const iniciarPartidaOnline = async (partidaId: string, miColor: 'w' | 'b') => {
+    console.log('🎮 iniciarPartidaOnline:', { partidaId, miColor });
     setPlayerColor(miColor);
     setBoardFlipped(miColor === 'b');
     setPartidaOnlineId(partidaId);
+    setGameMode('online');
     
     // Suscribirse a cambios en la partida
     const channel = supabase
@@ -386,9 +394,11 @@ export const ChessGame: React.FC<ChessGameProps> = ({
         table: 'partidas_ajedrez',
         filter: `id=eq.${partidaId}`
       }, (payload) => {
+        console.log('🎮 Partida UPDATE recibido:', payload);
         const partida = payload.new as any;
         // Solo procesar si el movimiento no es mío
         if (partida.turno !== miColor && partida.fen_actual !== chess.fen()) {
+          console.log('🎮 Procesando movimiento del oponente:', partida.ultimo_movimiento);
           chess.load(partida.fen_actual);
           setBoard(chess.board());
           if (partida.ultimo_movimiento) {
@@ -396,40 +406,69 @@ export const ChessGame: React.FC<ChessGameProps> = ({
           }
           setWhiteTime(partida.tiempo_blancas);
           setBlackTime(partida.tiempo_negras);
+          setIsMyTurn(true);
           
           if (partida.estado === 'jaque_mate' || partida.estado === 'tablas' || partida.estado === 'abandono') {
             setGamePhase('finished');
           }
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('🎮 Canal partida status:', status);
+      });
 
     channelRef.current = channel;
-    startGame();
+    
+    // Iniciar el juego directamente (sin depender del estado opponent)
+    chess.reset();
+    setBoard(chess.board());
+    setGamePhase('playing');
+    setMoveHistory([]);
+    setCurrentMoveIndex(-1);
+    setCapturedByWhite([]);
+    setCapturedByBlack([]);
+    setWhiteTime(selectedTime || 999999);
+    setBlackTime(selectedTime || 999999);
+    setLastMove(null);
+    setIsMyTurn(miColor === 'w');
+    console.log('🎮 Partida iniciada! gamePhase: playing, miColor:', miColor);
   };
 
   // Sincronizar movimiento con Supabase
   const sincronizarMovimiento = async (move: Move) => {
-    if (!partidaOnlineId) return;
+    console.log('🎮 sincronizarMovimiento llamado:', { partidaOnlineId, move: move.san });
+    if (!partidaOnlineId) {
+      console.log('🎮 sincronizarMovimiento: No hay partidaOnlineId, abortando');
+      return;
+    }
 
     try {
       const nuevoTurno = chess.turn();
-      await supabase
+      const updateData = {
+        fen_actual: chess.fen(),
+        turno: nuevoTurno,
+        ultimo_movimiento: { from: move.from, to: move.to },
+        tiempo_blancas: whiteTime,
+        tiempo_negras: blackTime,
+        estado: chess.isCheckmate() ? 'jaque_mate' : 
+                chess.isCheck() ? 'jaque' : 
+                chess.isDraw() ? 'tablas' : 'jugando',
+        historial_movimientos: chess.history({ verbose: true })
+      };
+      console.log('🎮 Enviando UPDATE a partida:', partidaOnlineId, updateData);
+      
+      const { error } = await supabase
         .from('partidas_ajedrez')
-        .update({
-          fen_actual: chess.fen(),
-          turno: nuevoTurno,
-          ultimo_movimiento: { from: move.from, to: move.to },
-          tiempo_blancas: whiteTime,
-          tiempo_negras: blackTime,
-          estado: chess.isCheckmate() ? 'jaque_mate' : 
-                  chess.isCheck() ? 'jaque' : 
-                  chess.isDraw() ? 'tablas' : 'jugando',
-          historial_movimientos: chess.history({ verbose: true })
-        })
+        .update(updateData)
         .eq('id', partidaOnlineId);
+      
+      if (error) {
+        console.error('🎮 Error en UPDATE:', error);
+      } else {
+        console.log('🎮 UPDATE exitoso');
+      }
     } catch (error) {
-      console.error('Error sincronizando movimiento:', error);
+      console.error('🎮 Error sincronizando movimiento:', error);
     }
   };
 
