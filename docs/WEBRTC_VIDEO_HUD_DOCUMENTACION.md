@@ -582,3 +582,115 @@ type BackgroundEffectType = 'none' | 'blur' | 'image';
 - `selfieMode: true` optimiza para cámaras frontales
 - El procesamiento se detiene automáticamente al cerrar el menú
 - Si el rendimiento es bajo, el efecto se desactiva automáticamente
+
+---
+
+## 10. Transmisión de Efectos a Otros Usuarios
+
+### Descripción
+Los efectos de fondo (blur, imagen) y espejo se transmiten a otros usuarios via WebRTC usando `replaceTrack()`.
+
+### Flujo de Transmisión
+
+```
+1. Usuario activa efecto de fondo
+2. VideoWithBackground procesa video con MediaPipe
+3. Canvas genera stream procesado (captureStream)
+4. onProcessedStreamReady → setProcessedStream
+5. useEffect detecta cambio en processedStream
+6. replaceTrack() actualiza video en todas las conexiones peer
+7. Otros usuarios ven el video con efectos aplicados
+```
+
+### Código Clave
+
+```typescript
+// Actualizar conexiones WebRTC cuando cambie el stream procesado
+useEffect(() => {
+  if (!processedStream || cameraSettings.backgroundEffect === 'none') return;
+  
+  const videoTrack = processedStream.getVideoTracks()[0];
+  if (!videoTrack) return;
+
+  peerConnectionsRef.current.forEach(async (pc, peerId) => {
+    const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+    if (videoSender) {
+      await videoSender.replaceTrack(videoTrack);
+    }
+  });
+}, [processedStream, cameraSettings.backgroundEffect]);
+```
+
+### Efecto Espejo en Canvas
+
+El efecto espejo se aplica directamente en el canvas antes de dibujar:
+
+```typescript
+// En VideoWithBackground.tsx
+if (mirrorVideo) {
+  ctx.translate(canvas.width, 0);
+  ctx.scale(-1, 1);
+}
+```
+
+### Detección de Tracks Remotos
+
+La detección de cámara vs screen share usa el label del track (más confiable):
+
+```typescript
+const isScreenShareByLabel = trackLabel.includes('screen') || 
+   trackLabel.includes('display') ||
+   trackLabel.includes('window') ||
+   trackLabel.includes('monitor') ||
+   trackLabel.includes('entire') ||
+   trackLabel.includes('tab');
+```
+
+### Logs de Diagnóstico
+
+| Log | Significado |
+|-----|-------------|
+| `🎨 Updating peer connections with processed video` | Actualizando video con efectos |
+| `🎨 Replaced video track for peer [id]` | Track reemplazado exitosamente |
+| `🎨 Restoring original video track to peers` | Restaurando video original |
+| `Detected CAMERA from [id]` | Track de cámara detectado correctamente |
+| `Detected SCREEN SHARE from [id]` | Track de pantalla compartida detectado |
+
+---
+
+## 11. Resumen de Componentes
+
+| Componente | Archivo | Función |
+|------------|---------|---------|
+| **BottomControlBar** | `BottomControlBar.tsx` | Menú de configuración de cámara |
+| **VideoWithBackground** | `VideoWithBackground.tsx` | Procesamiento de efectos con MediaPipe |
+| **VideoHUD** | `VirtualSpace3D.tsx` | Visualización de video local y remoto |
+| **VirtualSpace3D** | `VirtualSpace3D.tsx` | Gestión de streams y WebRTC |
+
+### Estados Principales
+
+```typescript
+// En VirtualSpace3D
+const [stream, setStream] = useState<MediaStream | null>(null);
+const [processedStream, setProcessedStream] = useState<MediaStream | null>(null);
+const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
+
+// Stream efectivo para transmitir
+const effectiveStream = (cameraSettings.backgroundEffect !== 'none' && processedStream) 
+  ? processedStream 
+  : stream;
+```
+
+### Persistencia
+
+Configuración guardada en `localStorage` con clave `cowork_camera_settings`:
+
+```typescript
+interface CameraSettings {
+  selectedCameraId: string;
+  backgroundEffect: 'none' | 'blur' | 'image';
+  backgroundImage: string | null;
+  hideSelfView: boolean;
+  mirrorVideo: boolean;
+}
+```
