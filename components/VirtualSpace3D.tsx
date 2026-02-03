@@ -1514,14 +1514,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
   }, [activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate]);
 
-  // Limpiar conexiones cuando usuarios se alejan
+  // Limpiar conexiones cuando usuarios SALEN del espacio (no solo de proximidad)
   useEffect(() => {
-    const usersInCallIds = new Set(usersInCall.map(u => u.id));
+    const onlineUserIds = new Set(onlineUsers.map(u => u.id));
     
-    // Cerrar conexiones de usuarios que ya no están en proximidad
+    // Cerrar conexiones de usuarios que ya no están ONLINE (salieron del espacio)
     peerConnectionsRef.current.forEach((pc, peerId) => {
-      if (!usersInCallIds.has(peerId)) {
-        console.log('Closing connection with user who left proximity:', peerId);
+      if (!onlineUserIds.has(peerId)) {
+        console.log('Closing connection with user who left space:', peerId);
         pc.close();
         peerConnectionsRef.current.delete(peerId);
         peerVideoTrackCountRef.current.delete(peerId);
@@ -1529,24 +1529,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
       }
     });
-  }, [usersInCall]);
+  }, [onlineUsers]);
 
-  // Iniciar llamadas cuando hay usuarios cerca Y tenemos stream
+  // Iniciar llamadas con TODOS los usuarios online (no solo proximidad) - estilo Gather
   useEffect(() => {
-    if (!hasActiveCall || !session?.user?.id || !activeStreamRef.current) return;
+    if (!session?.user?.id || !activeStreamRef.current || onlineUsers.length === 0) return;
     
-    usersInCall.forEach(user => {
+    onlineUsers.forEach(user => {
+      if (user.id === session.user.id) return; // No conectar consigo mismo
+      
       // Usar hash numérico para comparación consistente
       const myIdHash = session.user.id.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
       const theirIdHash = user.id.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
       const shouldInitiate = myIdHash < theirIdHash || (myIdHash === theirIdHash && session.user.id < user.id);
       
       if (!peerConnectionsRef.current.has(user.id) && shouldInitiate) {
-        console.log('Initiating call to:', user.id, user.name);
+        console.log('Initiating call to (global):', user.id, user.name);
         initiateCall(user.id);
       }
     });
-  }, [usersInCall, hasActiveCall, initiateCall, session?.user?.id, stream]);
+  }, [onlineUsers, initiateCall, session?.user?.id, stream]);
 
   // Agregar screen share a conexiones existentes cuando se inicia
   useEffect(() => {
