@@ -638,6 +638,7 @@ interface VideoHUDProps {
   userDistances: Map<string, number>;
   muteRemoteAudio: boolean;
   cameraSettings: CameraSettings;
+  onProcessedStreamReady?: (stream: MediaStream) => void;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
@@ -659,6 +660,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   userDistances,
   muteRemoteAudio,
   cameraSettings,
+  onProcessedStreamReady,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -828,6 +830,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                 blurAmount={12}
                 muted={true}
                 className="w-full h-full object-cover block"
+                onProcessedStreamReady={onProcessedStreamReady}
               />
             ) : (
               <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />
@@ -1055,11 +1058,15 @@ const ICE_SERVERS = [
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
   
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
+
+  // Stream efectivo para transmitir (procesado si hay efectos, original si no)
+  const effectiveStream = (cameraSettings.backgroundEffect !== 'none' && processedStream) ? processedStream : stream;
 
   // Cargar cargo del usuario desde miembros_espacio
   useEffect(() => {
@@ -1879,6 +1886,52 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
   }, [currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, hasActiveCall]);
 
+  // Actualizar conexiones WebRTC cuando cambie el stream procesado (efectos de fondo)
+  useEffect(() => {
+    if (!processedStream || cameraSettings.backgroundEffect === 'none') return;
+    
+    const videoTrack = processedStream.getVideoTracks()[0];
+    if (!videoTrack) return;
+
+    console.log('🎨 Updating peer connections with processed video (background effect)');
+    
+    peerConnectionsRef.current.forEach(async (pc, peerId) => {
+      const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+      if (videoSender) {
+        try {
+          await videoSender.replaceTrack(videoTrack);
+          console.log('🎨 Replaced video track for peer', peerId);
+        } catch (err) {
+          console.error('Error replacing video track:', err);
+        }
+      }
+    });
+  }, [processedStream, cameraSettings.backgroundEffect]);
+
+  // Limpiar processed stream cuando se desactiva el efecto
+  useEffect(() => {
+    if (cameraSettings.backgroundEffect === 'none' && processedStream) {
+      setProcessedStream(null);
+      
+      // Restaurar video track original a los peers
+      const originalVideoTrack = stream?.getVideoTracks()[0];
+      if (originalVideoTrack) {
+        console.log('🎨 Restoring original video track to peers');
+        peerConnectionsRef.current.forEach(async (pc, peerId) => {
+          const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+          if (videoSender) {
+            try {
+              await videoSender.replaceTrack(originalVideoTrack);
+              console.log('🎨 Restored original video for peer', peerId);
+            } catch (err) {
+              console.error('Error restoring video track:', err);
+            }
+          }
+        });
+      }
+    }
+  }, [cameraSettings.backgroundEffect, stream]);
+
   // Manejar screen share
   const handleToggleScreenShare = async () => {
     if (!currentUser.isScreenSharing) {
@@ -2012,6 +2065,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           userDistances={userDistances}
           muteRemoteAudio={currentUser.status !== PresenceStatus.AVAILABLE}
           cameraSettings={cameraSettings}
+          onProcessedStreamReady={setProcessedStream}
         />
       )}
 
