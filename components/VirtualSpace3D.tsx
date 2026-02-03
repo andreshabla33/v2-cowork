@@ -198,7 +198,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       {camOn && showVideoBubble && (
         <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
           <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125 flex items-center justify-center">
-             {videoStream ? (
+             {videoStream && videoStream.getVideoTracks().length > 0 ? (
                <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
              ) : (
                /* Placeholder cuando hay cámara pero no hay stream (usuario lejos) */
@@ -884,7 +884,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   <span className="text-4xl animate-bounce">👋</span>
                 </div>
               )}
-              {remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState === 'live') ? (
+              {remoteStream && remoteStream.getVideoTracks().length > 0 ? (
                 <StableVideo 
                   stream={remoteStream} 
                   className="absolute inset-0 w-full h-full object-cover" 
