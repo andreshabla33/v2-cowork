@@ -1695,6 +1695,41 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             activeStreamRef.current = newStream;
             setStream(newStream);
             console.log('Camera/mic stream started');
+            
+            // IMPORTANTE: Agregar tracks a conexiones peer EXISTENTES y renegociar
+            if (peerConnectionsRef.current.size > 0) {
+              console.log('Adding new stream tracks to', peerConnectionsRef.current.size, 'existing peer connections');
+              peerConnectionsRef.current.forEach(async (pc, peerId) => {
+                // Verificar qué tracks ya tiene el peer
+                const senders = pc.getSenders();
+                const hasAudio = senders.some(s => s.track?.kind === 'audio');
+                const hasVideo = senders.some(s => s.track?.kind === 'video');
+                
+                newStream.getTracks().forEach(track => {
+                  const alreadyHas = (track.kind === 'audio' && hasAudio) || (track.kind === 'video' && hasVideo);
+                  if (!alreadyHas) {
+                    console.log('Adding', track.kind, 'track to peer', peerId);
+                    pc.addTrack(track, newStream);
+                  }
+                });
+                
+                // Renegociar para que el peer reciba los nuevos tracks
+                try {
+                  const offer = await pc.createOffer();
+                  await pc.setLocalDescription(offer);
+                  if (webrtcChannelRef.current) {
+                    console.log('Sending renegotiation offer to', peerId);
+                    webrtcChannelRef.current.send({
+                      type: 'broadcast',
+                      event: 'offer',
+                      payload: { offer, to: peerId, from: session?.user?.id }
+                    });
+                  }
+                } catch (err) {
+                  console.error('Error renegotiating with peer', peerId, err);
+                }
+              });
+            }
           }
           
           // Actualizar estado de tracks
