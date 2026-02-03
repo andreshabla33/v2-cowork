@@ -25,7 +25,7 @@ interface Avatar3DConfig {
 }
 
 // Estados de animación disponibles
-export type AnimationState = 'idle' | 'walk' | 'run' | 'cheer' | 'dance' | 'sit';
+export type AnimationState = 'idle' | 'walk' | 'run' | 'cheer' | 'dance' | 'sit' | 'wave' | 'jump' | 'victory';
 
 interface GLTFAvatarProps {
   avatarConfig?: Avatar3DConfig | null;
@@ -36,15 +36,24 @@ interface GLTFAvatarProps {
   scale?: number;
 }
 
+// URL base de Supabase Storage
+const STORAGE_BASE = 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars';
+
 // URLs de animaciones desde Supabase Storage
 const ANIMATION_URLS: Record<AnimationState, string> = {
-  idle: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Character_output.glb',
-  walk: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Animation_Walking_withSkin.glb',
-  run: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Animation_Running_withSkin.glb',
-  cheer: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Animation_Cheer_with_Both_Hands_withSkin.glb',
-  dance: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Animation_Hip_Hop_Dance_2_withSkin.glb',
-  sit: 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object/public/avatars/Meshy_AI_Animation_Stand_to_Sit_Transition_M_withSkin.glb',
+  idle: `${STORAGE_BASE}/Meshy_AI_Animation_Short_Breathe_and_Look_Around_withSkin.glb`,
+  walk: `${STORAGE_BASE}/Meshy_AI_Animation_Walking_withSkin.glb`,
+  run: `${STORAGE_BASE}/Meshy_AI_Animation_Running_withSkin.glb`,
+  cheer: `${STORAGE_BASE}/Meshy_AI_Animation_Cheer_with_Both_Hands_withSkin.glb`,
+  dance: `${STORAGE_BASE}/Meshy_AI_Animation_Hip_Hop_Dance_2_withSkin.glb`,
+  sit: `${STORAGE_BASE}/Meshy_AI_Animation_Stand_to_Sit_Transition_M_withSkin.glb`,
+  wave: `${STORAGE_BASE}/Meshy_AI_Animation_Agree_Gesture_withSkin.glb`,
+  jump: `${STORAGE_BASE}/Meshy_AI_Animation_Happy_jump_f_withSkin.glb`,
+  victory: `${STORAGE_BASE}/Meshy_AI_Animation_Victory_Cheer_withSkin.glb`,
 };
+
+// URL del modelo base (sin animación)
+const BASE_MODEL_URL = `${STORAGE_BASE}/Meshy_AI_Character_output.glb`;
 
 // Animaciones que hacen loop
 const LOOP_ANIMATIONS: AnimationState[] = ['idle', 'walk', 'run', 'dance'];
@@ -82,12 +91,15 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
   const cheerGltf = useGLTF(ANIMATION_URLS.cheer);
   const danceGltf = useGLTF(ANIMATION_URLS.dance);
   const sitGltf = useGLTF(ANIMATION_URLS.sit);
+  const waveGltf = useGLTF(ANIMATION_URLS.wave);
+  const jumpGltf = useGLTF(ANIMATION_URLS.jump);
+  const victoryGltf = useGLTF(ANIMATION_URLS.victory);
   
   // Combinar todas las animaciones con nombres únicos
   const allAnimations = useMemo(() => {
     const anims: THREE.AnimationClip[] = [];
     
-    // Agregar animación base como idle
+    // Agregar animación base como idle (ahora viene con animación de respirar)
     if (baseAnimations.length > 0) {
       const idleAnim = baseAnimations[0].clone();
       idleAnim.name = 'idle';
@@ -129,8 +141,29 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
       anims.push(sitAnim);
     }
     
+    // Agregar wave
+    if (waveGltf.animations.length > 0) {
+      const waveAnim = waveGltf.animations[0].clone();
+      waveAnim.name = 'wave';
+      anims.push(waveAnim);
+    }
+    
+    // Agregar jump
+    if (jumpGltf.animations.length > 0) {
+      const jumpAnim = jumpGltf.animations[0].clone();
+      jumpAnim.name = 'jump';
+      anims.push(jumpAnim);
+    }
+    
+    // Agregar victory
+    if (victoryGltf.animations.length > 0) {
+      const victoryAnim = victoryGltf.animations[0].clone();
+      victoryAnim.name = 'victory';
+      anims.push(victoryAnim);
+    }
+    
     return anims;
-  }, [baseAnimations, walkGltf.animations, runGltf.animations, cheerGltf.animations, danceGltf.animations, sitGltf.animations]);
+  }, [baseAnimations, walkGltf.animations, runGltf.animations, cheerGltf.animations, danceGltf.animations, sitGltf.animations, waveGltf.animations, jumpGltf.animations, victoryGltf.animations]);
   
   // Configurar animaciones usando el ref del grupo raíz
   const { actions } = useAnimations(allAnimations, groupRef);
