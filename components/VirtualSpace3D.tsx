@@ -884,17 +884,30 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   <span className="text-4xl animate-bounce">👋</span>
                 </div>
               )}
-              {remoteStream ? (
+              {remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState === 'live') ? (
                 <StableVideo 
                   stream={remoteStream} 
                   className="absolute inset-0 w-full h-full object-cover" 
                   muteAudio={muteRemoteAudio}
                 />
               ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
-                    {u.name.charAt(0)}
-                  </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-zinc-800 to-zinc-900">
+                  {u.isCameraOn ? (
+                    /* Usuario tiene cámara pero stream no disponible aún */
+                    <div className="flex flex-col items-center">
+                      <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center mb-1 animate-pulse">
+                        <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <span className="text-[10px] text-white/50">Conectando...</span>
+                    </div>
+                  ) : (
+                    /* Usuario tiene cámara apagada */
+                    <div className="w-14 h-14 rounded-full border border-white/10 flex items-center justify-center text-white font-black text-2xl bg-black/40">
+                      {u.name.charAt(0)}
+                    </div>
+                  )}
                 </div>
               )}
               {/* Reacción remota recibida */}
