@@ -1422,30 +1422,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       const remoteStream = event.streams[0];
       const trackLabel = event.track.label.toLowerCase();
       
-      // Detectar si es screen share por label
+      // Detectar si es screen share por label (más confiable que contador)
       const isScreenShareByLabel = trackLabel.includes('screen') || 
          trackLabel.includes('display') ||
          trackLabel.includes('window') ||
-         trackLabel.includes('monitor');
+         trackLabel.includes('monitor') ||
+         trackLabel.includes('entire') ||
+         trackLabel.includes('tab');
       
       if (event.track.kind === 'video') {
-        // Incrementar contador de video tracks para este peer
-        const currentCount = (peerVideoTrackCountRef.current.get(peerId) || 0) + 1;
-        peerVideoTrackCountRef.current.set(peerId, currentCount);
-        
-        // El segundo video track es screen share (o si tiene label de screen)
-        const isScreenShare = isScreenShareByLabel || currentCount > 1;
-        
-        if (isScreenShare) {
-          console.log('Detected SCREEN SHARE from', peerId, '(track #' + currentCount + ')');
+        // Usar detección por label como método principal
+        if (isScreenShareByLabel) {
+          console.log('Detected SCREEN SHARE from', peerId, '(by label)');
           setRemoteScreenStreams(prev => {
             const newMap = new Map(prev);
             newMap.set(peerId, remoteStream);
             return newMap;
           });
         } else {
-          // Es cámara normal (primer video track)
-          console.log('Detected CAMERA from', peerId, '(track #' + currentCount + ')');
+          // Es cámara normal
+          console.log('Detected CAMERA from', peerId);
           setRemoteStreams(prev => {
             const newMap = new Map(prev);
             newMap.set(peerId, remoteStream);
