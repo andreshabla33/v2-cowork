@@ -208,35 +208,44 @@ export const ChessGame: React.FC<ChessGameProps> = ({
     console.log('🎮 loadMiembrosEspacio: Loading members for espacio:', espacioId, 'excluding user:', currentUserId);
     setLoadingMiembros(true);
     try {
-      // Construir query - si no hay currentUserId, no filtrar por él
-      let query = supabase
+      // Primero obtener los usuario_id de los miembros del espacio
+      let membersQuery = supabase
         .from('miembros_espacio')
-        .select(`
-          usuario_id,
-          usuario:usuarios(id, nombre, avatar_url, estado_disponibilidad)
-        `)
+        .select('usuario_id')
         .eq('espacio_id', espacioId)
         .eq('aceptado', true);
       
-      // Solo excluir al usuario actual si tenemos su ID
       if (currentUserId) {
-        query = query.neq('usuario_id', currentUserId);
+        membersQuery = membersQuery.neq('usuario_id', currentUserId);
       }
 
-      const { data, error } = await query;
+      const { data: membersData, error: membersError } = await membersQuery;
       
-      console.log('🎮 loadMiembrosEspacio result:', { data, error });
+      if (membersError) throw membersError;
+      
+      if (!membersData || membersData.length === 0) {
+        console.log('🎮 No hay otros miembros en el espacio');
+        setMiembrosEspacio([]);
+        return;
+      }
 
-      if (error) throw error;
+      // Obtener los datos de los usuarios
+      const userIds = membersData.map(m => m.usuario_id);
+      const { data: usersData, error: usersError } = await supabase
+        .from('usuarios')
+        .select('id, nombre, avatar_url, estado_disponibilidad')
+        .in('id', userIds);
 
-      const miembros: MiembroEspacio[] = (data || [])
-        .filter((m: any) => m.usuario)
-        .map((m: any) => ({
-          id: m.usuario.id,
-          nombre: m.usuario.nombre,
-          avatar_url: m.usuario.avatar_url,
-          estado_disponibilidad: m.usuario.estado_disponibilidad
-        }));
+      if (usersError) throw usersError;
+      
+      console.log('🎮 loadMiembrosEspacio result:', { usersData });
+
+      const miembros: MiembroEspacio[] = (usersData || []).map((u: any) => ({
+        id: u.id,
+        nombre: u.nombre,
+        avatar_url: u.avatar_url,
+        estado_disponibilidad: u.estado_disponibilidad
+      }));
 
       setMiembrosEspacio(miembros);
     } catch (error) {
