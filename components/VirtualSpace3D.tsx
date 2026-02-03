@@ -831,6 +831,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                 muted={true}
                 className="w-full h-full object-cover block"
                 onProcessedStreamReady={onProcessedStreamReady}
+                mirrorVideo={cameraSettings.mirrorVideo}
               />
             ) : (
               <StableVideo stream={stream} muted={true} className="w-full h-full object-cover block" />

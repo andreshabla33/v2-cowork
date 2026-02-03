@@ -11,6 +11,7 @@ interface VideoWithBackgroundProps {
   muted?: boolean;
   className?: string;
   onProcessedStreamReady?: (stream: MediaStream) => void;
+  mirrorVideo?: boolean;
 }
 
 export const VideoWithBackground = memo(({
@@ -21,6 +22,7 @@ export const VideoWithBackground = memo(({
   muted = false,
   className = '',
   onProcessedStreamReady,
+  mirrorVideo = false,
 }: VideoWithBackgroundProps) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -98,6 +100,12 @@ export const VideoWithBackground = memo(({
           ctx.save();
           ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+          // Aplicar transformación de espejo si está habilitado
+          if (mirrorVideo) {
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+          }
+
           if (effectType === 'blur') {
             // Fondo con blur
             ctx.filter = `blur(${blurAmount}px)`;
@@ -115,6 +123,11 @@ export const VideoWithBackground = memo(({
             ctx.globalCompositeOperation = 'source-in';
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
             ctx.globalCompositeOperation = 'destination-over';
+            // La imagen de fondo no debe espejarse
+            if (mirrorVideo) {
+              ctx.scale(-1, 1);
+              ctx.translate(-canvas.width, 0);
+            }
             ctx.drawImage(backgroundImageRef.current, 0, 0, canvas.width, canvas.height);
           } else {
             ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
@@ -183,7 +196,7 @@ export const VideoWithBackground = memo(({
       }
       setIsInitialized(false);
     };
-  }, [stream, effectType, blurAmount, onProcessedStreamReady]);
+  }, [stream, effectType, blurAmount, onProcessedStreamReady, mirrorVideo]);
 
   // Actualizar video source
   useEffect(() => {
