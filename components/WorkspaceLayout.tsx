@@ -113,46 +113,60 @@ export const WorkspaceLayout: React.FC = () => {
 
   if (!activeWorkspace) return null;
 
+  // ============== GLASSMORPHISM 2026 - Sistema de estilos unificado ==============
+  // Inspirado en el onboarding para coherencia visual
+  const glassBase = 'backdrop-blur-xl';
+  const glassPanel = 'bg-white/[0.03] border-white/[0.08]';
+  const glassHover = 'hover:bg-white/[0.06] hover:border-violet-500/30';
+  const gradientPrimary = 'from-violet-600 via-fuchsia-600 to-cyan-500';
+  const gradientText = 'text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white';
+  const glowViolet = 'shadow-[0_0_20px_rgba(139,92,246,0.3)]';
+  const glowCyan = 'shadow-[0_0_20px_rgba(34,211,238,0.3)]';
+
   const themeStyles = {
     dark: {
-      bg: 'bg-[#1a1d21]',
+      bg: 'bg-[#0a0a0f]',
       text: 'text-zinc-100',
-      globalNav: 'bg-[#3f0e40]',
-      sidebar: 'bg-[#19171d]',
-      border: 'border-white/5',
-      header: 'bg-[#1a1d21]',
-      accent: 'bg-indigo-600',
-      btn: 'bg-indigo-600 hover:bg-indigo-500 text-white'
+      globalNav: `${glassBase} bg-black/60 border-r border-white/[0.05]`,
+      sidebar: `${glassBase} bg-black/40 border-white/[0.05]`,
+      border: 'border-white/[0.08]',
+      header: `${glassBase} bg-black/40`,
+      accent: 'bg-violet-600',
+      btn: `bg-gradient-to-r ${gradientPrimary} hover:opacity-90 text-white font-bold ${glowViolet}`,
+      btnSecondary: `${glassBase} bg-white/[0.05] border border-white/[0.1] hover:border-violet-500/50 text-white`
     },
     light: {
-      bg: 'bg-white',
+      bg: 'bg-slate-50',
       text: 'text-zinc-900',
-      globalNav: 'bg-zinc-200',
-      sidebar: 'bg-zinc-100',
-      border: 'border-zinc-300',
-      header: 'bg-white',
-      accent: 'bg-indigo-600',
-      btn: 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-lg'
+      globalNav: 'bg-white/80 backdrop-blur-xl border-r border-zinc-200',
+      sidebar: 'bg-white/60 backdrop-blur-xl border-zinc-200',
+      border: 'border-zinc-200',
+      header: 'bg-white/80 backdrop-blur-xl',
+      accent: 'bg-violet-600',
+      btn: `bg-gradient-to-r ${gradientPrimary} hover:opacity-90 text-white font-bold shadow-lg`,
+      btnSecondary: 'bg-white border border-zinc-200 hover:border-violet-500/50 text-zinc-700'
     },
     space: {
       bg: 'bg-[#020617]',
       text: 'text-indigo-100',
-      globalNav: 'bg-[#0f172a]',
-      sidebar: 'bg-[#1e1b4b]',
-      border: 'border-indigo-500/30',
-      header: 'bg-[#020617]',
-      accent: 'bg-cyan-600',
-      btn: 'bg-cyan-500 hover:bg-cyan-400 text-black font-black shadow-[0_0_20px_rgba(34,211,238,0.4)]'
+      globalNav: `${glassBase} bg-indigo-950/60 border-r border-indigo-500/20`,
+      sidebar: `${glassBase} bg-indigo-950/40 border-indigo-500/20`,
+      border: 'border-indigo-500/20',
+      header: `${glassBase} bg-indigo-950/40`,
+      accent: 'bg-cyan-500',
+      btn: `bg-gradient-to-r from-cyan-500 via-blue-500 to-violet-500 hover:opacity-90 text-white font-bold ${glowCyan}`,
+      btnSecondary: `${glassBase} bg-indigo-500/10 border border-indigo-500/30 hover:border-cyan-500/50 text-indigo-100`
     },
     arcade: {
       bg: 'bg-black',
       text: 'text-[#00ff41]',
-      globalNav: 'bg-black',
-      sidebar: 'bg-black',
-      border: 'border-[#00ff41]/60',
-      header: 'bg-black',
+      globalNav: 'bg-black border-r border-[#00ff41]/40',
+      sidebar: 'bg-black/90 border-[#00ff41]/30',
+      border: 'border-[#00ff41]/40',
+      header: 'bg-black/90',
       accent: 'bg-[#00ff41]',
-      btn: 'bg-[#00ff41] hover:bg-white text-black font-black uppercase tracking-tighter shadow-[0_0_15px_#00ff41]'
+      btn: 'bg-[#00ff41] hover:bg-[#00ff41]/80 text-black font-black uppercase tracking-tighter shadow-[0_0_20px_#00ff41]',
+      btnSecondary: 'bg-black border-2 border-[#00ff41]/60 hover:border-[#00ff41] text-[#00ff41]'
     }
   };
 
@@ -224,25 +238,49 @@ export const WorkspaceLayout: React.FC = () => {
 
       {/* Main Content */}
       <main className={`flex-1 relative h-full flex flex-col min-w-0 ${s.bg}`}>
-        <header className={`h-16 border-b ${s.border} flex items-center px-8 justify-between shrink-0 ${s.header} z-50 shadow-sm`}>
+        <header className={`h-16 border-b ${s.border} flex items-center px-8 justify-between shrink-0 ${s.header} z-50`}>
           <div className="flex items-center gap-4">
-             <h2 className={`text-xs font-black uppercase tracking-[0.2em] ${theme === 'arcade' ? 'text-[#00ff41] animate-pulse' : 'opacity-80'}`}>
-               {activeSubTab === 'space' ? '🌎 Spatial World' : activeSubTab.toUpperCase()}
-             </h2>
+             {/* Título con efecto gradient text estilo onboarding */}
+             <div className="flex items-center gap-3">
+               <div className={`w-2 h-2 rounded-full ${theme === 'arcade' ? 'bg-[#00ff41] animate-pulse' : 'bg-gradient-to-r from-violet-500 to-cyan-500'}`} />
+               <h2 className={`text-xs font-black uppercase tracking-[0.2em] ${
+                 theme === 'arcade' 
+                   ? 'text-[#00ff41] animate-pulse' 
+                   : theme === 'light'
+                     ? 'text-zinc-700'
+                     : 'text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white'
+               }`}>
+                 {activeSubTab === 'space' ? 'Spatial World' : activeSubTab.toUpperCase()}
+               </h2>
+             </div>
           </div>
           
-          <div className="flex items-center gap-6">
+          <div className="flex items-center gap-4">
             {/* SELECTOR DE ESTADO */}
             <StatusSelector />
             
-            {/* SELECTOR DE TEMAS */}
-            <div className={`flex items-center gap-2 p-1 rounded-[20px] border ${s.border} bg-black/20 shadow-inner`}>
-              <span className="text-[9px] font-black uppercase tracking-widest opacity-30 px-3 hidden lg:block">Estilo</span>
+            {/* SELECTOR DE TEMAS - Glassmorphism */}
+            <div className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-xl ${
+              theme === 'arcade' 
+                ? 'border-[#00ff41]/40 bg-black/60' 
+                : theme === 'light'
+                  ? 'border-zinc-200 bg-white/60'
+                  : 'border-white/[0.08] bg-white/[0.03]'
+            }`}>
+              <span className={`text-[8px] font-black uppercase tracking-widest px-2 hidden lg:block ${
+                theme === 'light' ? 'text-zinc-400' : 'opacity-40'
+              }`}>Estilo</span>
               {themes.map(t => (
                 <button 
                   key={t.id} 
                   onClick={() => setTheme(t.id)} 
-                  className={`w-9 h-9 rounded-2xl flex items-center justify-center text-lg transition-all transform active:scale-90 ${theme === t.id ? 'bg-white/20 shadow-2xl scale-110 border border-white/20' : 'opacity-20 hover:opacity-100 hover:bg-white/5'}`}
+                  className={`w-8 h-8 rounded-xl flex items-center justify-center text-base transition-all transform active:scale-90 ${
+                    theme === t.id 
+                      ? theme === 'arcade'
+                        ? 'bg-[#00ff41] shadow-[0_0_15px_#00ff41] scale-105'
+                        : 'bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 shadow-lg scale-105 border border-violet-500/30'
+                      : 'opacity-30 hover:opacity-100 hover:bg-white/[0.05]'
+                  }`}
                   title={t.label}
                 >
                   {t.icon}
@@ -250,9 +288,23 @@ export const WorkspaceLayout: React.FC = () => {
               ))}
             </div>
 
-            <button onClick={onVibenToggle} className={`flex items-center gap-3 px-7 py-2.5 rounded-full transition-all border-2 font-black uppercase text-[10px] tracking-[0.1em] group shadow-2xl ${theme === 'arcade' ? 'bg-[#00ff41] border-[#00ff41] text-black shadow-[0_0_20px_#00ff41]' : 'bg-indigo-600 border-indigo-600 text-white hover:bg-indigo-500'}`}>
-              <span className={`w-2 h-2 rounded-full animate-ping ${theme === 'arcade' ? 'bg-black' : 'bg-white'}`}></span>
-              Viben AI
+            {/* BOTÓN VIBEN AI - Estilo onboarding con gradiente */}
+            <button 
+              onClick={onVibenToggle} 
+              className={`relative overflow-hidden flex items-center gap-2.5 px-5 py-2.5 rounded-2xl transition-all font-black uppercase text-[10px] tracking-wider group ${
+                theme === 'arcade' 
+                  ? 'bg-[#00ff41] text-black shadow-[0_0_25px_#00ff41] hover:shadow-[0_0_35px_#00ff41]' 
+                  : 'bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white shadow-[0_0_20px_rgba(139,92,246,0.4)] hover:shadow-[0_0_30px_rgba(139,92,246,0.5)]'
+              }`}
+            >
+              {/* Hover overlay estilo onboarding */}
+              <span className={`absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 ${
+                theme === 'arcade' ? 'bg-white/20' : 'bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400'
+              }`} />
+              <span className="relative flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full animate-pulse ${theme === 'arcade' ? 'bg-black' : 'bg-white'}`} />
+                Viben AI
+              </span>
             </button>
           </div>
         </header>
