@@ -637,6 +637,7 @@ interface VideoHUDProps {
   speakingUsers: Set<string>;
   userDistances: Map<string, number>;
   muteRemoteAudio: boolean;
+  cameraSettings: CameraSettings;
 }
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
@@ -657,16 +658,14 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
   speakingUsers,
   userDistances,
   muteRemoteAudio,
+  cameraSettings,
 }) => {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [zoomLevel, setZoomLevel] = useState(1);
   const [panPosition, setPanPosition] = useState({ x: 0, y: 0 });
   const [waveAnimation, setWaveAnimation] = useState<string | null>(null);
   const [useGridLayout, setUseGridLayout] = useState(false);
-  const [showCameraSettings, setShowCameraSettings] = useState(false);
-  const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
   const expandedVideoRef = useRef<HTMLVideoElement>(null);
-  const cameraButtonRef = useRef<HTMLButtonElement>(null);
   
   // Detectar si el usuario local está hablando
   const isSpeakingLocal = speakingUsers.has(visitorId);
@@ -1058,6 +1057,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
+  
+  // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
+  const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
 
   // Cargar cargo del usuario desde miembros_espacio
   useEffect(() => {
@@ -2009,6 +2011,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
           speakingUsers={speakingUsers}
           userDistances={userDistances}
           muteRemoteAudio={currentUser.status !== PresenceStatus.AVAILABLE}
+          cameraSettings={cameraSettings}
         />
       )}
 
