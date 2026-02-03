@@ -694,3 +694,115 @@ interface CameraSettings {
   mirrorVideo: boolean;
 }
 ```
+
+---
+
+## 12. Configuración de Audio (Estilo Gather 2026)
+
+### Descripción
+Menú de configuración de audio integrado en el botón de micrófono, similar a Gather. Permite seleccionar dispositivos de entrada/salida y configurar procesamiento de audio.
+
+### Características
+
+| Función | Descripción |
+|---------|-------------|
+| **Selección de micrófono** | Elegir entre múltiples micrófonos conectados |
+| **Selección de altavoz** | Elegir dispositivo de salida (si el navegador lo soporta) |
+| **Reducción de ruido** | Filtrar ruidos de fondo con WebRTC noiseSuppression |
+| **Cancelación de eco** | Eliminar eco con WebRTC echoCancellation |
+| **Control de ganancia** | Ajustar automáticamente el volumen con autoGainControl |
+
+### Interface AudioSettings
+
+```typescript
+interface AudioSettings {
+  selectedMicrophoneId: string;  // ID del micrófono seleccionado
+  selectedSpeakerId: string;      // ID del altavoz seleccionado
+  noiseReduction: boolean;        // Reducción de ruido activa
+  echoCancellation: boolean;      // Cancelación de eco activa
+  autoGainControl: boolean;       // Control automático de ganancia
+}
+```
+
+### Persistencia
+
+Configuración guardada en `localStorage` con clave `cowork_audio_settings`.
+
+### Uso en getUserMedia
+
+```typescript
+const audioConstraints: MediaTrackConstraints = {
+  noiseSuppression: audioSettings.noiseReduction,
+  echoCancellation: audioSettings.echoCancellation,
+  autoGainControl: audioSettings.autoGainControl,
+};
+if (audioSettings.selectedMicrophoneId) {
+  audioConstraints.deviceId = { exact: audioSettings.selectedMicrophoneId };
+}
+
+const stream = await navigator.mediaDevices.getUserMedia({
+  video: videoConstraints,
+  audio: audioConstraints
+});
+```
+
+### Logs de Diagnóstico
+
+| Log | Significado |
+|-----|-------------|
+| `🎤 Audio constraints: {...}` | Configuración de audio aplicada |
+| `Using selected microphone: [id]` | Micrófono específico seleccionado |
+| `🎤 Audio settings updated: {...}` | Configuración guardada |
+
+---
+
+## 13. Audio Estable con Page Visibility API
+
+### Problema
+Cuando el usuario navega a otra pestaña o ventana, el navegador puede throttlear o pausar el audio de WebRTC, causando cortes en la comunicación.
+
+### Solución
+Usar Page Visibility API + AudioContext keepalive para mantener el hilo de audio activo.
+
+### Implementación
+
+```typescript
+useEffect(() => {
+  let audioContext: AudioContext | null = null;
+  let silentSource: AudioBufferSourceNode | null = null;
+
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      // Crear AudioContext silencioso para mantener audio activo
+      audioContext = new AudioContext();
+      const buffer = audioContext.createBuffer(1, 1, 22050);
+      silentSource = audioContext.createBufferSource();
+      silentSource.buffer = buffer;
+      silentSource.connect(audioContext.destination);
+      silentSource.loop = true;
+      silentSource.start();
+    } else {
+      // Limpiar cuando vuelve a ser visible
+      silentSource?.stop();
+      audioContext?.close();
+    }
+  };
+
+  document.addEventListener('visibilitychange', handleVisibilityChange);
+  return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+}, []);
+```
+
+### Logs de Diagnóstico
+
+| Log | Significado |
+|-----|-------------|
+| `🔊 Page hidden - activating audio keepalive` | Usuario salió de la pestaña, activando keepalive |
+| `🔊 Page visible - deactivating audio keepalive` | Usuario volvió, desactivando keepalive |
+
+### Mejores Prácticas 2026
+
+1. **WebRTC Audio Constraints**: Siempre usar `noiseSuppression`, `echoCancellation` y `autoGainControl`
+2. **Page Visibility API**: Implementar keepalive para audio estable en background
+3. **Persistencia**: Guardar preferencias del usuario en localStorage
+4. **Fallback**: Si el dispositivo seleccionado no está disponible, usar el default
