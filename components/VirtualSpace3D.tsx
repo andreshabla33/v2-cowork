@@ -884,34 +884,36 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                   <span className="text-4xl animate-bounce">👋</span>
                 </div>
               )}
-              {remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+              {/* Prioridad: 1) Cámara OFF = foto, 2) Cámara ON + stream = video, 3) Cámara ON sin stream = conectando */}
+              {!u.isCameraOn ? (
+                /* Usuario tiene cámara apagada - mostrar foto de perfil o inicial */
+                <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
+                  <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center bg-black/50 overflow-hidden">
+                    {u.avatar ? (
+                      <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <span className="text-indigo-400 font-black text-2xl">{u.name.charAt(0)}</span>
+                    )}
+                  </div>
+                </div>
+              ) : remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+                /* Usuario tiene cámara ON y hay stream disponible */
                 <StableVideo 
                   stream={remoteStream} 
                   className="absolute inset-0 w-full h-full object-cover" 
                   muteAudio={muteRemoteAudio}
                 />
               ) : (
+                /* Usuario tiene cámara ON pero stream no disponible aún */
                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-                  {u.isCameraOn ? (
-                    /* Usuario tiene cámara pero stream no disponible aún */
-                    <div className="flex flex-col items-center">
-                      <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center mb-1 animate-pulse">
-                        <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                        </svg>
-                      </div>
-                      <span className="text-[10px] text-white/50">Conectando...</span>
+                  <div className="flex flex-col items-center">
+                    <div className="w-12 h-12 rounded-full bg-indigo-500/20 flex items-center justify-center mb-1 animate-pulse">
+                      <svg className="w-6 h-6 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                      </svg>
                     </div>
-                  ) : (
-                    /* Usuario tiene cámara apagada - mostrar foto de perfil o inicial (igual que usuario local) */
-                    <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center bg-black/50 overflow-hidden">
-                      {u.avatar ? (
-                        <img src={u.avatar} alt={u.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <span className="text-indigo-400 font-black text-2xl">{u.name.charAt(0)}</span>
-                      )}
-                    </div>
-                  )}
+                    <span className="text-[10px] text-white/50">Conectando...</span>
+                  </div>
                 </div>
               )}
               {/* Reacción remota recibida */}
