@@ -11,7 +11,7 @@ import { GrabacionesHistorial } from './meetings/recording/GrabacionesHistorial'
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
 import { StatusSelector } from './StatusSelector';
-import { GameHub } from './games';
+import { GameHub, GameInvitationNotification } from './games';
 import { SettingsModal } from './settings/SettingsModal';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
@@ -21,7 +21,14 @@ export const WorkspaceLayout: React.FC = () => {
   const [showViben, setShowViben] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGameHub, setShowGameHub] = useState(false);
+  const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
   const presenceChannelRef = useRef<any>(null);
+
+  // Handler para cuando se acepta una invitación de juego
+  const handleGameInvitationAccepted = (invitacion: any, partidaId: string) => {
+    setPendingGameInvitation({ invitacion, partidaId });
+    setShowGameHub(true);
+  };
 
   const onVibenToggle = () => setShowViben(prev => !prev);
   const isAdmin = userRoleInActiveWorkspace === 'super_admin' || userRoleInActiveWorkspace === 'admin';
@@ -394,7 +401,25 @@ export const WorkspaceLayout: React.FC = () => {
         )}
 
         {/* Game Hub Modal */}
-        <GameHub isOpen={showGameHub} onClose={() => setShowGameHub(false)} />
+        <GameHub 
+          isOpen={showGameHub} 
+          onClose={() => {
+            setShowGameHub(false);
+            setPendingGameInvitation(null);
+          }}
+          espacioId={activeWorkspace?.id}
+          currentUserId={session?.user?.id}
+          currentUserName={currentUser?.name}
+        />
+
+        {/* Notificaciones de invitación a juegos */}
+        {activeWorkspace?.id && session?.user?.id && (
+          <GameInvitationNotification
+            userId={session.user.id}
+            espacioId={activeWorkspace.id}
+            onAccept={handleGameInvitationAccepted}
+          />
+        )}
       </main>
 
       {/* Settings Modal */}

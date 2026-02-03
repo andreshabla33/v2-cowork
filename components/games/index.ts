@@ -3,6 +3,7 @@
 // Componentes principales
 export { GameHub } from './GameHub';
 export { GamePortalUI } from './GamePortals';
+export { GameInvitationNotification } from './GameInvitationNotification';
 
 // Mini juegos individuales
 export { EscapeRoomGame } from './minigames/EscapeRoomGame';

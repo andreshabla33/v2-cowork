@@ -16,6 +16,23 @@ interface ChessGameProps {
   currentUserId?: string;
   currentUserName?: string;
   sessionId?: string;
+  espacioId?: string;
+}
+
+interface MiembroEspacio {
+  id: string;
+  nombre: string;
+  avatar_url?: string;
+  estado_disponibilidad?: string;
+}
+
+interface InvitacionJuego {
+  id: string;
+  invitador_id: string;
+  invitado_id: string;
+  estado: string;
+  configuracion: any;
+  partida_id?: string;
 }
 
 // Valores de piezas para IA y puntuación
@@ -116,7 +133,8 @@ export const ChessGame: React.FC<ChessGameProps> = ({
   onClose, 
   currentUserId = 'local-player',
   currentUserName = 'Jugador',
-  sessionId
+  sessionId,
+  espacioId
 }) => {
   // Estado del juego
   const [chess] = useState(() => new Chess());
@@ -162,6 +180,207 @@ export const ChessGame: React.FC<ChessGameProps> = ({
   
   // Supabase channel
   const channelRef = useRef<any>(null);
+  
+  // Online mode states
+  const [miembrosEspacio, setMiembrosEspacio] = useState<MiembroEspacio[]>([]);
+  const [loadingMiembros, setLoadingMiembros] = useState(false);
+  const [selectedMiembro, setSelectedMiembro] = useState<MiembroEspacio | null>(null);
+  const [invitacionEnviada, setInvitacionEnviada] = useState<InvitacionJuego | null>(null);
+  const [esperandoRespuesta, setEsperandoRespuesta] = useState(false);
+  const [partidaOnlineId, setPartidaOnlineId] = useState<string | null>(null);
+
+  // ===================== SISTEMA DE INVITACIONES ONLINE =====================
+
+  // Cargar miembros del espacio cuando se selecciona modo online
+  useEffect(() => {
+    if (gameMode === 'online' && espacioId && miembrosEspacio.length === 0) {
+      loadMiembrosEspacio();
+    }
+  }, [gameMode, espacioId]);
+
+  // Cargar miembros del espacio
+  const loadMiembrosEspacio = async () => {
+    if (!espacioId) return;
+    setLoadingMiembros(true);
+    try {
+      const { data, error } = await supabase
+        .from('miembros_espacio')
+        .select(`
+          usuario_id,
+          usuario:usuarios(id, nombre, avatar_url, estado_disponibilidad)
+        `)
+        .eq('espacio_id', espacioId)
+        .eq('aceptado', true)
+        .neq('usuario_id', currentUserId);
+
+      if (error) throw error;
+
+      const miembros: MiembroEspacio[] = (data || [])
+        .filter((m: any) => m.usuario)
+        .map((m: any) => ({
+          id: m.usuario.id,
+          nombre: m.usuario.nombre,
+          avatar_url: m.usuario.avatar_url,
+          estado_disponibilidad: m.usuario.estado_disponibilidad
+        }));
+
+      setMiembrosEspacio(miembros);
+    } catch (error) {
+      console.error('Error cargando miembros:', error);
+    } finally {
+      setLoadingMiembros(false);
+    }
+  };
+
+  // Enviar invitación a jugar
+  const enviarInvitacion = async (miembro: MiembroEspacio) => {
+    if (!espacioId || !currentUserId) return;
+    
+    setSelectedMiembro(miembro);
+    setEsperandoRespuesta(true);
+
+    try {
+      // Crear la invitación
+      const { data: invitacion, error } = await supabase
+        .from('invitaciones_juegos')
+        .insert({
+          juego: 'ajedrez',
+          invitador_id: currentUserId,
+          invitado_id: miembro.id,
+          espacio_id: espacioId,
+          configuracion: {
+            tiempo: selectedTime,
+            invitador_nombre: currentUserName,
+            invitador_color: playerColor
+          }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setInvitacionEnviada(invitacion);
+
+      // Suscribirse a cambios en esta invitación
+      const channel = supabase
+        .channel(`invitacion-${invitacion.id}`)
+        .on('postgres_changes', {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'invitaciones_juegos',
+          filter: `id=eq.${invitacion.id}`
+        }, (payload) => {
+          const updated = payload.new as InvitacionJuego;
+          if (updated.estado === 'aceptada' && updated.partida_id) {
+            // Invitación aceptada - iniciar partida
+            setPartidaOnlineId(updated.partida_id);
+            setOpponent({ id: miembro.id, name: miembro.nombre });
+            setEsperandoRespuesta(false);
+            iniciarPartidaOnline(updated.partida_id, 'w');
+          } else if (updated.estado === 'rechazada') {
+            // Invitación rechazada
+            setEsperandoRespuesta(false);
+            setSelectedMiembro(null);
+            setInvitacionEnviada(null);
+            alert(`${miembro.nombre} rechazó la invitación`);
+          }
+        })
+        .subscribe();
+
+      // Timeout de 5 minutos
+      setTimeout(() => {
+        if (esperandoRespuesta) {
+          supabase.removeChannel(channel);
+          cancelarInvitacion();
+        }
+      }, 300000);
+
+    } catch (error) {
+      console.error('Error enviando invitación:', error);
+      setEsperandoRespuesta(false);
+      setSelectedMiembro(null);
+    }
+  };
+
+  // Cancelar invitación
+  const cancelarInvitacion = async () => {
+    if (!invitacionEnviada) return;
+
+    try {
+      await supabase
+        .from('invitaciones_juegos')
+        .update({ estado: 'cancelada' })
+        .eq('id', invitacionEnviada.id);
+    } catch (error) {
+      console.error('Error cancelando invitación:', error);
+    }
+
+    setEsperandoRespuesta(false);
+    setSelectedMiembro(null);
+    setInvitacionEnviada(null);
+  };
+
+  // Iniciar partida online
+  const iniciarPartidaOnline = async (partidaId: string, miColor: 'w' | 'b') => {
+    setPlayerColor(miColor);
+    setBoardFlipped(miColor === 'b');
+    setPartidaOnlineId(partidaId);
+    
+    // Suscribirse a cambios en la partida
+    const channel = supabase
+      .channel(`partida-ajedrez-${partidaId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'partidas_ajedrez',
+        filter: `id=eq.${partidaId}`
+      }, (payload) => {
+        const partida = payload.new as any;
+        // Solo procesar si el movimiento no es mío
+        if (partida.turno !== miColor && partida.fen_actual !== chess.fen()) {
+          chess.load(partida.fen_actual);
+          setBoard(chess.board());
+          if (partida.ultimo_movimiento) {
+            setLastMove(partida.ultimo_movimiento);
+          }
+          setWhiteTime(partida.tiempo_blancas);
+          setBlackTime(partida.tiempo_negras);
+          
+          if (partida.estado === 'jaque_mate' || partida.estado === 'tablas' || partida.estado === 'abandono') {
+            setGamePhase('finished');
+          }
+        }
+      })
+      .subscribe();
+
+    channelRef.current = channel;
+    startGame();
+  };
+
+  // Sincronizar movimiento con Supabase
+  const sincronizarMovimiento = async (move: Move) => {
+    if (!partidaOnlineId) return;
+
+    try {
+      const nuevoTurno = chess.turn();
+      await supabase
+        .from('partidas_ajedrez')
+        .update({
+          fen_actual: chess.fen(),
+          turno: nuevoTurno,
+          ultimo_movimiento: { from: move.from, to: move.to },
+          tiempo_blancas: whiteTime,
+          tiempo_negras: blackTime,
+          estado: chess.isCheckmate() ? 'jaque_mate' : 
+                  chess.isCheck() ? 'jaque' : 
+                  chess.isDraw() ? 'tablas' : 'jugando',
+          historial_movimientos: chess.history({ verbose: true })
+        })
+        .eq('id', partidaOnlineId);
+    } catch (error) {
+      console.error('Error sincronizando movimiento:', error);
+    }
+  };
 
   // ===================== IA DEL AJEDREZ =====================
   
@@ -459,8 +678,13 @@ export const ChessGame: React.FC<ChessGameProps> = ({
         if (move) {
           animateMove(selectedSquare, square, move);
           
-          // Enviar movimiento al oponente
-          if (channelRef.current) {
+          // Sincronizar con Supabase si es partida online
+          if (partidaOnlineId && gameMode === 'online') {
+            sincronizarMovimiento(move);
+          }
+          
+          // Enviar movimiento al oponente via broadcast (para modo sesión)
+          if (channelRef.current && !partidaOnlineId) {
             channelRef.current.send({
               type: 'broadcast',
               event: 'move',
@@ -891,7 +1115,88 @@ export const ChessGame: React.FC<ChessGameProps> = ({
                       </motion.div>
                     )}
 
+                    {/* Selector de oponente online */}
+                    {gameMode === 'online' && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        className="space-y-3"
+                      >
+                        <label className="text-sm font-medium text-white/80 flex items-center gap-2">
+                          <Users className="w-4 h-4" /> Invitar a jugar
+                        </label>
+                        
+                        {!espacioId ? (
+                          <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-sm">
+                            Debes estar en un espacio de trabajo para jugar online
+                          </div>
+                        ) : esperandoRespuesta ? (
+                          <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                <motion.div
+                                  animate={{ rotate: 360 }}
+                                  transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                                >
+                                  <Zap className="w-5 h-5 text-amber-400" />
+                                </motion.div>
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-white font-medium">Esperando a {selectedMiembro?.nombre}...</p>
+                                <p className="text-white/50 text-xs">La invitación expira en 5 minutos</p>
+                              </div>
+                              <button
+                                onClick={cancelarInvitacion}
+                                className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white/70"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : loadingMiembros ? (
+                          <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-center">
+                            Cargando miembros...
+                          </div>
+                        ) : miembrosEspacio.length === 0 ? (
+                          <div className="p-4 rounded-xl bg-white/5 border border-white/10 text-white/50 text-center text-sm">
+                            No hay otros miembros en el espacio
+                          </div>
+                        ) : (
+                          <div className="space-y-2 max-h-48 overflow-y-auto">
+                            {miembrosEspacio.map((miembro) => (
+                              <button
+                                key={miembro.id}
+                                onClick={() => enviarInvitacion(miembro)}
+                                className="w-full p-3 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-amber-500/30 transition-all flex items-center gap-3"
+                              >
+                                <div className="relative">
+                                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center text-white font-bold">
+                                    {miembro.nombre?.charAt(0).toUpperCase()}
+                                  </div>
+                                  <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-slate-800 ${
+                                    miembro.estado_disponibilidad === 'available' ? 'bg-emerald-500' :
+                                    miembro.estado_disponibilidad === 'busy' ? 'bg-red-500' :
+                                    miembro.estado_disponibilidad === 'away' ? 'bg-amber-500' : 'bg-slate-500'
+                                  }`} />
+                                </div>
+                                <div className="flex-1 text-left">
+                                  <p className="text-white font-medium">{miembro.nombre}</p>
+                                  <p className="text-white/40 text-xs capitalize">
+                                    {miembro.estado_disponibilidad === 'available' ? 'Disponible' :
+                                     miembro.estado_disponibilidad === 'busy' ? 'Ocupado' :
+                                     miembro.estado_disponibilidad === 'away' ? 'Ausente' : 'Desconectado'}
+                                  </p>
+                                </div>
+                                <Swords className="w-5 h-5 text-amber-400" />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </motion.div>
+                    )}
+
                     {/* Tiempo de partida */}
+                    {gameMode !== 'online' && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-white/80 flex items-center gap-2">
                         <Timer className="w-4 h-4" /> Tiempo de partida
@@ -913,8 +1218,10 @@ export const ChessGame: React.FC<ChessGameProps> = ({
                         ))}
                       </div>
                     </div>
+                    )}
 
-                    {/* Color del jugador */}
+                    {/* Color del jugador (solo para modos no online) */}
+                    {gameMode !== 'online' && (
                     <div className="space-y-3">
                       <label className="text-sm font-medium text-white/80 flex items-center gap-2">
                         <User className="w-4 h-4" /> Jugar con
@@ -944,20 +1251,20 @@ export const ChessGame: React.FC<ChessGameProps> = ({
                         </button>
                       </div>
                     </div>
+                    )}
 
-                    {/* Botón de inicio */}
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={startGame}
-                      disabled={gameMode === 'online' && !opponent}
-                      className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl hover:from-amber-400 hover:to-orange-500 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3 shadow-xl"
-                    >
-                      <Play className="w-6 h-6" />
-                      {gameMode === 'computer' ? 'Jugar vs Mónica' : 
-                       gameMode === 'online' ? (opponent ? 'Iniciar Partida' : 'Esperando oponente...') :
-                       'Jugar Local'}
-                    </motion.button>
+                    {/* Botón de inicio (no visible en modo online - la partida inicia cuando aceptan) */}
+                    {gameMode !== 'online' && (
+                      <motion.button
+                        whileHover={{ scale: 1.02 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={startGame}
+                        className="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 text-white font-bold rounded-2xl hover:from-amber-400 hover:to-orange-500 transition-all flex items-center justify-center gap-3 shadow-xl"
+                      >
+                        <Play className="w-6 h-6" />
+                        {gameMode === 'computer' ? 'Jugar vs Mónica' : 'Jugar Local'}
+                      </motion.button>
+                    )}
                   </div>
                 </motion.div>
               )}

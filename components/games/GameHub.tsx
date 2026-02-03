@@ -18,6 +18,9 @@ import { ChessGame } from './minigames/ChessGame';
 interface GameHubProps {
   isOpen: boolean;
   onClose: () => void;
+  espacioId?: string;
+  currentUserId?: string;
+  currentUserName?: string;
 }
 
 interface GameInfo {
@@ -113,7 +116,7 @@ const GAMES: GameInfo[] = [
   },
 ];
 
-export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose }) => {
+export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName }) => {
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'achievements'>('games');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const { leaderboard, achievements, playerStats, updateLeaderboard } = useGameStore();
@@ -156,7 +159,7 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose }) => {
       case 'speed-networking': return <SpeedNetworkingGame onClose={handleCloseGame} />;
       case 'mystery-roleplay': return <MysteryRoleplayGame onClose={handleCloseGame} />;
       case 'building-challenge': return <BuildingChallengeGame onClose={handleCloseGame} />;
-      case 'chess': return <ChessGame onClose={handleCloseGame} />;
+      case 'chess': return <ChessGame onClose={handleCloseGame} espacioId={espacioId} currentUserId={currentUserId} currentUserName={currentUserName} />;
       default: return null;
     }
   };
