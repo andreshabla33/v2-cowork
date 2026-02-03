@@ -1527,19 +1527,41 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     };
   }, [activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate]);
 
-  // Limpiar conexiones cuando usuarios SALEN del espacio (no solo de proximidad)
+  // Ref para tracking de usuarios que deben ser desconectados (con debounce)
+  const pendingDisconnectsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Limpiar conexiones cuando usuarios SALEN del espacio (con debounce de 3s para evitar cierres prematuros)
   useEffect(() => {
     const onlineUserIds = new Set(onlineUsers.map(u => u.id));
     
-    // Cerrar conexiones de usuarios que ya no están ONLINE (salieron del espacio)
+    // Cancelar desconexiones pendientes para usuarios que volvieron a aparecer
+    onlineUserIds.forEach(userId => {
+      const timeout = pendingDisconnectsRef.current.get(userId);
+      if (timeout) {
+        clearTimeout(timeout);
+        pendingDisconnectsRef.current.delete(userId);
+        console.log('Cancelled pending disconnect for user who came back:', userId);
+      }
+    });
+    
+    // Programar desconexiones para usuarios que ya no están ONLINE
     peerConnectionsRef.current.forEach((pc, peerId) => {
-      if (!onlineUserIds.has(peerId)) {
-        console.log('Closing connection with user who left space:', peerId);
-        pc.close();
-        peerConnectionsRef.current.delete(peerId);
-        peerVideoTrackCountRef.current.delete(peerId);
-        setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
-        setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+      if (!onlineUserIds.has(peerId) && !pendingDisconnectsRef.current.has(peerId)) {
+        console.log('Scheduling disconnect for user (3s delay):', peerId);
+        const timeout = setTimeout(() => {
+          // Verificar de nuevo si el usuario sigue sin estar online
+          const stillMissing = !onlineUsers.some(u => u.id === peerId);
+          if (stillMissing && peerConnectionsRef.current.has(peerId)) {
+            console.log('Closing connection with user who left space:', peerId);
+            pc.close();
+            peerConnectionsRef.current.delete(peerId);
+            peerVideoTrackCountRef.current.delete(peerId);
+            setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+            setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+          }
+          pendingDisconnectsRef.current.delete(peerId);
+        }, 3000);
+        pendingDisconnectsRef.current.set(peerId, timeout);
       }
     });
   }, [onlineUsers]);
