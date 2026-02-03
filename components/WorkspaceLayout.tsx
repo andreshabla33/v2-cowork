@@ -11,15 +11,18 @@ import { GrabacionesHistorial } from './meetings/recording/GrabacionesHistorial'
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
 import { StatusSelector } from './StatusSelector';
+import { SettingsModal } from './settings/SettingsModal';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
 
 export const WorkspaceLayout: React.FC = () => {
-  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat } = useStore();
+  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
   const [showViben, setShowViben] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const presenceChannelRef = useRef<any>(null);
 
   const onVibenToggle = () => setShowViben(prev => !prev);
+  const isAdmin = userRoleInActiveWorkspace === 'super_admin' || userRoleInActiveWorkspace === 'admin';
 
   useEffect(() => {
     if (!activeWorkspace) setView('dashboard');
@@ -220,7 +223,24 @@ export const WorkspaceLayout: React.FC = () => {
           ))}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-6 items-center">
+        <div className="mt-auto flex flex-col gap-4 items-center pb-4">
+          {/* Botón de Configuración */}
+          <button
+            onClick={() => setShowSettings(true)}
+            className={`p-3 rounded-2xl transition-all ${
+              theme === 'arcade' 
+                ? 'text-[#00ff41] hover:bg-[#00ff41]/20' 
+                : 'text-zinc-400 hover:text-white hover:bg-white/10'
+            }`}
+            title="Configuración"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+          </button>
+          
+          {/* Avatar del usuario */}
           <div 
             onClick={() => setActiveSubTab('avatar')}
             className={`w-11 h-11 rounded-2xl overflow-hidden cursor-pointer hover:ring-4 transition-all relative group ${theme === 'arcade' ? 'ring-[#00ff41]' : 'ring-white/50'}`}
@@ -356,6 +376,16 @@ export const WorkspaceLayout: React.FC = () => {
           </div>
         )}
       </main>
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        workspaceId={activeWorkspace?.id || ''}
+        isAdmin={isAdmin}
+        currentTheme={theme}
+        onThemeChange={(newTheme) => setTheme(newTheme as any)}
+      />
     </div>
   );
 };
