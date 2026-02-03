@@ -393,3 +393,103 @@ Usuario B recibe la renegociación:
 1. `handleOffer()` - Agregar tracks locales faltantes en renegociaciones
 2. `manageStream()` - Agregar tracks a peers existentes al crear nuevo stream
 3. `manageStream()` - Forzar renegociación después de agregar tracks
+
+---
+
+## 8. Menú de Configuración de Cámara
+
+### Descripción
+Menú de configuración estilo Gather que permite al usuario personalizar su experiencia de video.
+
+### Funcionalidades Implementadas
+
+| Función | Descripción |
+|---------|-------------|
+| **Selector de cámara** | Lista todas las cámaras disponibles del dispositivo |
+| **Hide self view** | Oculta la vista propia mientras sigue transmitiendo |
+| **Espejo de video** | Voltea horizontalmente el video (mirror) |
+| **Efectos de fondo** | Ninguno, desenfoque (blur), imagen personalizada |
+| **Persistencia** | Configuración guardada en localStorage |
+
+### Archivos Creados/Modificados
+
+**Nuevo archivo: `components/CameraSettingsMenu.tsx`**
+- Componente de menú de configuración de cámara
+- Funciones de utilidad: `loadCameraSettings()`, `saveCameraSettings()`
+- Interfaz `CameraSettings` exportada
+
+**Modificado: `components/VirtualSpace3D.tsx`**
+- Importación del componente `CameraSettingsMenu`
+- Estados: `showCameraSettings`, `cameraSettings`
+- Botón de configuración (⚙️) en la burbuja local del HUD
+- Clase `mirror` condicional según `cameraSettings.mirrorVideo`
+- Indicador visual cuando "hide self view" está activo
+- `manageStream()` usa `selectedCameraId` del localStorage
+
+### Estructura de CameraSettings
+
+```typescript
+interface CameraSettings {
+  selectedCameraId: string;      // ID del dispositivo de cámara
+  backgroundEffect: 'none' | 'blur' | 'image';
+  backgroundImage: string | null; // Base64 de imagen subida
+  hideSelfView: boolean;         // Ocultar vista propia
+  mirrorVideo: boolean;          // Espejo de video (default: true)
+}
+```
+
+### Persistencia
+
+```typescript
+// Guardar configuración
+localStorage.setItem('cowork_camera_settings', JSON.stringify(settings));
+
+// Cargar configuración
+const settings = JSON.parse(localStorage.getItem('cowork_camera_settings'));
+```
+
+### Uso de Cámara Seleccionada
+
+```tsx
+// En manageStream()
+const cameraSettings = loadCameraSettings();
+const videoConstraints: MediaTrackConstraints = { 
+  width: 640, 
+  height: 480 
+};
+if (cameraSettings.selectedCameraId) {
+  videoConstraints.deviceId = { exact: cameraSettings.selectedCameraId };
+}
+
+// Con fallback si la cámara no está disponible
+await navigator.mediaDevices.getUserMedia({ 
+  video: videoConstraints, 
+  audio: true 
+}).catch(async (err) => {
+  // Si falla, usar cámara por defecto
+  return navigator.mediaDevices.getUserMedia({ 
+    video: { width: 640, height: 480 }, 
+    audio: true 
+  });
+});
+```
+
+### Logs de Diagnóstico
+
+| Log | Significado |
+|-----|-------------|
+| `Using selected camera: XXX` | Usando cámara específica del usuario |
+| `Selected camera not available, using default` | Fallback a cámara por defecto |
+
+### Acceso al Menú
+
+1. Pasar el mouse sobre la burbuja de video local (HUD grande)
+2. Click en el botón de engranaje (⚙️)
+3. El menú aparece encima de la burbuja
+
+### Comportamiento de "Hide Self View"
+
+- La cámara **sigue transmitiendo** a otros usuarios
+- Solo se oculta la vista local
+- Se muestra un indicador visual "Vista oculta"
+- Los otros usuarios ven el video normalmente
