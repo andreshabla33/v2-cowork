@@ -100,43 +100,110 @@ El HUD grande mostraba solo la inicial del nombre cuando el stream de video no e
 **Archivo:** `components/VirtualSpace3D.tsx`
 
 ```tsx
-{remoteStream && remoteStream.getVideoTracks().some(t => t.enabled && t.readyState === 'live') ? (
+// Prioridad: 1) Cámara OFF = foto, 2) Cámara ON + stream = video, 3) Cámara ON sin stream = conectando
+{!u.isCameraOn ? (
+  // Usuario tiene cámara apagada - mostrar foto o inicial (SIEMPRE)
+  <div className="w-14 h-14 rounded-full border border-indigo-500/30 bg-black/50">
+    {u.avatar ? <img src={u.avatar} /> : <span>{u.name.charAt(0)}</span>}
+  </div>
+) : remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+  // Usuario tiene cámara ON y hay stream disponible
   <StableVideo stream={remoteStream} ... />
 ) : (
-  <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
-    {u.isCameraOn ? (
-      // Usuario tiene cámara pero stream no disponible aún
-      <div className="flex flex-col items-center">
-        <div className="w-12 h-12 rounded-full bg-indigo-500/20 animate-pulse">
-          <svg>icono de cámara</svg>
-        </div>
-        <span>Conectando...</span>
-      </div>
-    ) : (
-      // Usuario tiene cámara apagada - mostrar foto o inicial
-      <div className="w-14 h-14 rounded-full border border-indigo-500/30 bg-black/50">
-        {u.avatar ? (
-          <img src={u.avatar} alt={u.name} />
-        ) : (
-          <span className="text-indigo-400">{u.name.charAt(0)}</span>
-        )}
-      </div>
-    )}
+  // Usuario tiene cámara ON pero stream no disponible aún
+  <div className="flex flex-col items-center">
+    <div className="w-12 h-12 rounded-full bg-indigo-500/20 animate-pulse">
+      <svg>icono de cámara</svg>
+    </div>
+    <span>Conectando...</span>
   </div>
 )}
 ```
 
-### Estados Visuales
-| Estado | Visualización |
-|--------|---------------|
-| Cámara ON + Stream activo | Video real del usuario |
-| Cámara ON + Sin stream | Icono de cámara animado + "Conectando..." |
-| Cámara OFF + Con foto | Foto de perfil circular con borde indigo |
-| Cámara OFF + Sin foto | Inicial del nombre en color indigo |
+### Estados Visuales (Prioridad de Evaluación)
+| Prioridad | Condición | Visualización |
+|-----------|-----------|---------------|
+| 1 | Cámara OFF | Foto de perfil o inicial (borde indigo) |
+| 2 | Cámara ON + Stream | Video real del usuario |
+| 3 | Cámara ON + Sin stream | Icono animado + "Conectando..." |
 
 ---
 
-## 4. Consistencia Visual Usuario Local vs Remoto
+## 4. Control de Hardware de Cámara
+
+### Problema Original
+Cuando el usuario apagaba la cámara desde el botón (HUD o minimalista), el track de video solo se deshabilitaba (`track.enabled = false`) pero NO se detenía. Esto causaba que:
+- El LED de la cámara siguiera encendido
+- El hardware de la cámara continuara capturando video
+- El navegador mostrara el indicador de cámara activa
+
+### Solución Implementada
+**Archivo:** `components/VirtualSpace3D.tsx`
+
+```tsx
+// Video: DETENER el track completamente si cámara OFF (libera hardware)
+const videoTracks = activeStreamRef.current.getVideoTracks();
+if (!currentUser.isCameraOn && videoTracks.length > 0) {
+  console.log('Camera OFF - stopping video track to release hardware');
+  videoTracks.forEach(track => {
+    track.stop();  // Libera el hardware
+    activeStreamRef.current?.removeTrack(track);
+  });
+  // Notificar a los peers que el video track se removió
+  peerConnectionsRef.current.forEach((pc) => {
+    pc.getSenders().forEach(sender => {
+      if (sender.track?.kind === 'video') {
+        try { pc.removeTrack(sender); } catch (e) { /* ignore */ }
+      }
+    });
+  });
+} else if (currentUser.isCameraOn && videoTracks.length === 0) {
+  // Cámara ON pero no hay video track - obtener nuevo stream de video
+  console.log('Camera ON - requesting new video track');
+  const videoStream = await navigator.mediaDevices.getUserMedia({ video: {...} });
+  const newVideoTrack = videoStream.getVideoTracks()[0];
+  activeStreamRef.current.addTrack(newVideoTrack);
+  // Agregar a peers existentes
+  peerConnectionsRef.current.forEach((pc) => {
+    pc.addTrack(newVideoTrack, activeStreamRef.current!);
+  });
+}
+```
+
+### Comportamiento
+| Acción | Antes | Ahora |
+|--------|-------|-------|
+| Apagar cámara | `track.enabled = false` (LED sigue ON) | `track.stop()` (LED se apaga) |
+| Encender cámara | Habilitar track existente | Solicitar nuevo track de video |
+| Hardware | Siempre capturando | Solo cuando cámara ON |
+
+### Logs de Diagnóstico
+- `Camera OFF - stopping video track to release hardware` - Track detenido
+- `Camera ON - requesting new video track` - Solicitando nuevo acceso
+
+---
+
+## 5. Estado Inicial de Cámara
+
+### Configuración por Defecto
+**Archivo:** `store/useStore.ts`
+
+```tsx
+currentUser: {
+  // ...
+  isMicOn: false,      // Micrófono apagado por defecto
+  isCameraOn: false,   // Cámara apagada por defecto
+  isScreenSharing: false,
+}
+```
+
+Las cámaras están **apagadas por defecto** al entrar al espacio. Solo se encienden cuando:
+1. El usuario hace clic en el botón de cámara
+2. El usuario entra en proximidad con otro usuario (si tiene cámara habilitada)
+
+---
+
+## 6. Consistencia Visual Usuario Local vs Remoto
 
 ### Problema Original
 El estilo visual del usuario local con cámara apagada era diferente al de los usuarios remotos.
@@ -154,8 +221,13 @@ Ambos ahora usan el mismo estilo:
 1. **`components/VirtualSpace3D.tsx`**
    - Lógica de conexiones WebRTC globales
    - Debounce en cierre de conexiones
-   - Visualización de estados en HUD grande
+   - Visualización de estados en HUD grande (prioridad cámara OFF > stream)
    - Consistencia visual entre usuario local y remotos
+   - Control de hardware de cámara (stop/start tracks)
+   - Agregar tracks en renegociaciones WebRTC
+
+2. **`store/useStore.ts`**
+   - Estado inicial de cámara y micrófono (apagados por defecto)
 
 ---
 
@@ -172,3 +244,13 @@ Para verificar el correcto funcionamiento:
    - Usuario con cámara OFF: debe mostrar foto de perfil o inicial con estilo indigo
 
 4. **Consistencia visual:** El estilo del círculo del usuario local debe ser idéntico al de los remotos cuando tienen cámara OFF.
+
+5. **Hardware de cámara:**
+   - Apagar cámara → LED de cámara debe apagarse inmediatamente
+   - Consola debe mostrar: `Camera OFF - stopping video track to release hardware`
+   - Encender cámara → Solicita nuevo permiso de video
+   - Consola debe mostrar: `Camera ON - requesting new video track`
+
+6. **Estado inicial:**
+   - Al cargar la página, cámara debe estar OFF por defecto
+   - Las burbujas minimalistas no deben mostrar video hasta que el usuario encienda la cámara
