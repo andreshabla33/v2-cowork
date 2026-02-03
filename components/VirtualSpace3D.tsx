@@ -842,35 +842,12 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
           )}
           
-          {/* Controles simplificados (expandir + configuración) */}
+          {/* Control de expandir */}
           <div className="absolute bottom-3 right-3 flex justify-end items-center gap-1 transition-all duration-300 opacity-0 group-hover:opacity-100">
-            {/* Botón de configuración de cámara */}
-            <button 
-              ref={cameraButtonRef}
-              onClick={(e) => { e.stopPropagation(); setShowCameraSettings(!showCameraSettings); }}
-              className="w-7 h-7 rounded-full flex items-center justify-center bg-zinc-700/80 backdrop-blur-md border border-white/10 text-white hover:bg-zinc-600 transition-all shadow-lg"
-              title="Configuración de cámara"
-            >
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-            </button>
             <button onClick={() => setExpandedId('local')} className="w-7 h-7 rounded-full flex items-center justify-center bg-indigo-600 backdrop-blur-md border border-white/10 text-white hover:bg-indigo-500 transition-all shadow-lg">
               <IconExpand on={false}/>
             </button>
           </div>
-
-          {/* Menú de configuración de cámara */}
-          <CameraSettingsMenu
-            isOpen={showCameraSettings}
-            onClose={() => setShowCameraSettings(false)}
-            onSettingsChange={(newSettings) => {
-              setCameraSettings(newSettings);
-              saveCameraSettings(newSettings);
-            }}
-            currentStream={stream}
-          />
           
           {/* Nombre */}
           <div className="absolute top-3 left-3 bg-black/80 backdrop-blur-md px-2 py-1 rounded-lg border border-white/10">
@@ -2056,6 +2033,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         avatarConfig={currentUser.avatarConfig!}
         showShareButton={usersInCall.length > 0}
         showRecordingButton={usersInCall.length > 0}
+        currentStream={stream}
+        onCameraSettingsChange={(newSettings) => {
+          setCameraSettings(newSettings);
+          saveCameraSettings(newSettings);
+        }}
       />
 
       {/* Input de Chat Flotante - Minimalista */}

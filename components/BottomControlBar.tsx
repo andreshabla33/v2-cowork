@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
 import { AvatarPreview } from './Navbar';
 import { AvatarConfig, PresenceStatus } from '../types';
+import { loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 
 interface BottomControlBarProps {
   onToggleMic: () => void;
@@ -23,6 +24,8 @@ interface BottomControlBarProps {
   avatarConfig: AvatarConfig;
   showShareButton: boolean;
   showRecordingButton: boolean;
+  currentStream?: MediaStream | null;
+  onCameraSettingsChange?: (settings: CameraSettings) => void;
 }
 
 // Configuración de estados con iconos y colores (estilo 2026)
@@ -53,12 +56,80 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   avatarConfig,
   showShareButton,
   showRecordingButton,
+  currentStream,
+  onCameraSettingsChange,
 }) => {
   const { currentUser, updateStatus } = useStore();
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
   
   const currentStatus = currentUser.status || PresenceStatus.AVAILABLE;
   const statusConfig = STATUS_CONFIG[currentStatus];
+
+  // Estado para el menú de configuración de cámara
+  const [showCameraMenu, setShowCameraMenu] = useState(false);
+  const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
+  const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const cameraMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Cargar lista de cámaras
+  useEffect(() => {
+    const loadCameras = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const videoDevices = devices.filter(d => d.kind === 'videoinput');
+        setCameras(videoDevices);
+        
+        if (!cameraSettings.selectedCameraId && videoDevices.length > 0) {
+          const currentTrack = currentStream?.getVideoTracks()[0];
+          const currentDeviceId = currentTrack?.getSettings().deviceId;
+          if (currentDeviceId) {
+            updateCameraSettings({ selectedCameraId: currentDeviceId });
+          }
+        }
+      } catch (err) {
+        console.error('Error loading cameras:', err);
+      }
+    };
+    
+    if (showCameraMenu) {
+      loadCameras();
+    }
+  }, [showCameraMenu, currentStream]);
+
+  // Cerrar menú al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (cameraMenuRef.current && !cameraMenuRef.current.contains(e.target as Node)) {
+        setShowCameraMenu(false);
+      }
+    };
+    if (showCameraMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showCameraMenu]);
+
+  const updateCameraSettings = (partial: Partial<CameraSettings>) => {
+    const newSettings = { ...cameraSettings, ...partial };
+    setCameraSettings(newSettings);
+    saveCameraSettings(newSettings);
+    onCameraSettingsChange?.(newSettings);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        updateCameraSettings({ 
+          backgroundEffect: 'image',
+          backgroundImage: event.target?.result as string 
+        });
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   return (
     <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2" onClick={(e) => e.stopPropagation()}>
@@ -117,15 +188,129 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           tooltip={isMicOn ? "Silenciar" : "Activar micrófono"}
         />
 
-        {/* Cámara */}
-        <ControlButton 
-          onClick={onToggleCam} 
-          isActive={isCamOn} 
-          activeColor="bg-zinc-700 text-white" 
-          inactiveColor="bg-red-500/90 text-white animate-pulse-slow"
-          icon={<IconCam on={isCamOn} />}
-          tooltip={isCamOn ? "Apagar cámara" : "Activar cámara"}
-        />
+        {/* Cámara con dropdown */}
+        <div className="relative" ref={cameraMenuRef}>
+          <div className="flex items-center">
+            <button
+              onClick={onToggleCam}
+              className={`w-9 h-9 rounded-l-xl flex items-center justify-center transition-all duration-300 ${
+                isCamOn ? 'bg-zinc-700 text-white' : 'bg-red-500/90 text-white animate-pulse-slow'
+              }`}
+              title={isCamOn ? "Apagar cámara" : "Activar cámara"}
+            >
+              <IconCam on={isCamOn} />
+            </button>
+            <button
+              onClick={() => setShowCameraMenu(!showCameraMenu)}
+              className={`w-5 h-9 rounded-r-xl flex items-center justify-center transition-all duration-300 border-l border-white/10 ${
+                isCamOn ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-red-500/90 text-white hover:bg-red-600'
+              }`}
+              title="Configuración de cámara"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Menú de configuración de cámara estilo Gather */}
+          {showCameraMenu && (
+            <div className="absolute bottom-full left-0 mb-2 w-64 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+              {/* Selector de cámara */}
+              <div className="p-3 border-b border-white/5">
+                <div className="text-xs font-medium text-white/50 mb-2">Seleccionar cámara</div>
+                {cameras.map((camera) => (
+                  <button
+                    key={camera.deviceId}
+                    onClick={() => updateCameraSettings({ selectedCameraId: camera.deviceId })}
+                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                      cameraSettings.selectedCameraId === camera.deviceId
+                        ? 'bg-indigo-500/20 text-white'
+                        : 'text-white/70 hover:bg-white/5 hover:text-white'
+                    }`}
+                  >
+                    {cameraSettings.selectedCameraId === camera.deviceId && (
+                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                      </svg>
+                    )}
+                    <span className={cameraSettings.selectedCameraId !== camera.deviceId ? 'ml-6' : ''}>
+                      {camera.label || `Cámara ${cameras.indexOf(camera) + 1}`}
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              {/* Opciones */}
+              <div className="p-2">
+                {/* Hide self view */}
+                <button
+                  onClick={() => updateCameraSettings({ hideSelfView: !cameraSettings.hideSelfView })}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                    </svg>
+                    <span>Ocultar mi vista</span>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.hideSelfView ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cameraSettings.hideSelfView ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+
+                {/* Background effects */}
+                <button
+                  onClick={() => {
+                    if (cameraSettings.backgroundEffect === 'none') {
+                      updateCameraSettings({ backgroundEffect: 'blur' });
+                    } else if (cameraSettings.backgroundEffect === 'blur') {
+                      fileInputRef.current?.click();
+                    } else {
+                      updateCameraSettings({ backgroundEffect: 'none', backgroundImage: null });
+                    }
+                  }}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span>Efectos de fondo</span>
+                  </div>
+                  <span className="text-xs text-white/40">
+                    {cameraSettings.backgroundEffect === 'none' ? 'Ninguno' : 
+                     cameraSettings.backgroundEffect === 'blur' ? 'Blur' : 'Imagen'}
+                  </span>
+                </button>
+
+                {/* Mirror video */}
+                <button
+                  onClick={() => updateCameraSettings({ mirrorVideo: !cameraSettings.mirrorVideo })}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                    </svg>
+                    <span>Espejo de video</span>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.mirrorVideo ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cameraSettings.mirrorVideo ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+              </div>
+
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+            </div>
+          )}
+        </div>
 
         {showShareButton && (
           <>
