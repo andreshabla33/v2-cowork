@@ -41,7 +41,26 @@ export const ChatService = {
     try {
       console.log('💬 getOrCreateDirectChat:', { userA, userB, workspaceId });
       
-      // Buscar grupos donde esté el usuario A
+      // MÉTODO 1: Buscar por nombre del grupo (ChatPanel usa nombre con IDs)
+      // El nombre puede ser "userA|userB" o "userB|userA"
+      const namePattern1 = `${userA}|${userB}`;
+      const namePattern2 = `${userB}|${userA}`;
+      
+      const { data: groupByName } = await supabase
+        .from('grupos_chat')
+        .select('id')
+        .eq('tipo', 'directo')
+        .eq('espacio_id', workspaceId)
+        .or(`nombre.eq.${namePattern1},nombre.eq.${namePattern2}`)
+        .limit(1)
+        .single();
+      
+      if (groupByName) {
+        console.log('💬 Found existing direct chat by name:', groupByName.id);
+        return groupByName.id;
+      }
+      
+      // MÉTODO 2: Buscar por miembros (respaldo)
       const { data: userGroups, error: userGroupsError } = await supabase
         .from('miembros_grupo')
         .select('grupo_id')
@@ -49,9 +68,7 @@ export const ChatService = {
       
       console.log('💬 User A groups:', userGroups, 'Error:', userGroupsError);
         
-      if (!userGroups || userGroups.length === 0) {
-        console.log('💬 No groups for user A, creating new...');
-      } else {
+      if (userGroups && userGroups.length > 0) {
         const groupIds = userGroups.map(g => g.grupo_id);
         
         // Buscar cuál de estos grupos tiene al usuario B y es tipo directo
@@ -67,7 +84,7 @@ export const ChatService = {
         console.log('💬 Common group search:', commonGroup, 'Error:', commonError);
           
         if (commonGroup) {
-          console.log('💬 Found existing direct chat:', commonGroup.grupo_id);
+          console.log('💬 Found existing direct chat by members:', commonGroup.grupo_id);
           return commonGroup.grupo_id;
         }
       }
