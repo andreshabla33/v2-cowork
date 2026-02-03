@@ -1950,13 +1950,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     }
   }, [cameraSettings.backgroundEffect, stream]);
 
-  // ============== AUDIO ESTABILIDAD - Page Visibility API ==============
-  // Mantiene el audio estable cuando el usuario navega a otra pestaña/ventana
+  // ============== AUDIO/VIDEO ESTABILIDAD - Page Visibility API ==============
+  // Mantiene el audio estable y cambia a video original cuando la página está oculta
   useEffect(() => {
     let audioContext: AudioContext | null = null;
     let silentSource: AudioBufferSourceNode | null = null;
+    let wasUsingProcessedStream = false;
 
-    const handleVisibilityChange = () => {
+    const handleVisibilityChange = async () => {
       if (document.hidden) {
         // Página oculta: crear AudioContext para mantener audio activo
         console.log('🔊 Page hidden - activating audio keepalive');
@@ -1971,20 +1972,56 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         } catch (e) {
           console.warn('Could not create audio keepalive:', e);
         }
+
+        // VIDEO: Cambiar al stream original para evitar congelamiento del canvas
+        if (processedStream && stream && cameraSettings.backgroundEffect !== 'none') {
+          wasUsingProcessedStream = true;
+          const originalVideoTrack = stream.getVideoTracks()[0];
+          if (originalVideoTrack) {
+            console.log('📹 Page hidden - switching to original video (avoiding canvas freeze)');
+            peerConnectionsRef.current.forEach(async (pc, peerId) => {
+              const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+              if (videoSender) {
+                try {
+                  await videoSender.replaceTrack(originalVideoTrack);
+                  console.log('📹 Switched to original video for peer', peerId);
+                } catch (err) {
+                  console.error('Error switching video:', err);
+                }
+              }
+            });
+          }
+        }
       } else {
         // Página visible: limpiar AudioContext
         console.log('🔊 Page visible - deactivating audio keepalive');
         if (silentSource) {
-          try {
-            silentSource.stop();
-          } catch (e) {}
+          try { silentSource.stop(); } catch (e) {}
           silentSource = null;
         }
         if (audioContext) {
-          try {
-            audioContext.close();
-          } catch (e) {}
+          try { audioContext.close(); } catch (e) {}
           audioContext = null;
+        }
+
+        // VIDEO: Restaurar stream procesado si estaba activo
+        if (wasUsingProcessedStream && processedStream) {
+          const processedVideoTrack = processedStream.getVideoTracks()[0];
+          if (processedVideoTrack) {
+            console.log('📹 Page visible - restoring processed video');
+            peerConnectionsRef.current.forEach(async (pc, peerId) => {
+              const videoSender = pc.getSenders().find(s => s.track?.kind === 'video');
+              if (videoSender) {
+                try {
+                  await videoSender.replaceTrack(processedVideoTrack);
+                  console.log('📹 Restored processed video for peer', peerId);
+                } catch (err) {
+                  console.error('Error restoring video:', err);
+                }
+              }
+            });
+          }
+          wasUsingProcessedStream = false;
         }
       }
     };
@@ -2000,7 +2037,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
         try { audioContext.close(); } catch (e) {}
       }
     };
-  }, []);
+  }, [processedStream, stream, cameraSettings.backgroundEffect]);
 
   // Manejar screen share
   const handleToggleScreenShare = async () => {
