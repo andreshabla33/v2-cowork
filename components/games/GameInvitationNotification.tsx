@@ -89,26 +89,38 @@ export const GameInvitationNotification: React.FC<GameInvitationNotificationProp
 
   // Aceptar invitación
   const aceptarInvitacion = async (invitacion: InvitacionJuego) => {
+    console.log('🎮 Aceptando invitación:', invitacion);
     try {
       // Crear la partida de ajedrez
       const miColor = invitacion.configuracion.invitador_color === 'w' ? 'b' : 'w';
       
+      const partidaData = {
+        jugador_blancas_id: invitacion.configuracion.invitador_color === 'w' 
+          ? invitacion.invitador_id 
+          : userId,
+        jugador_negras_id: invitacion.configuracion.invitador_color === 'w' 
+          ? userId 
+          : invitacion.invitador_id,
+        estado: 'activa',
+        turno: 'w',
+        fen_actual: 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+        tiempo_blancas: invitacion.configuracion.tiempo || 600,
+        tiempo_negras: invitacion.configuracion.tiempo || 600,
+        fecha_inicio: new Date().toISOString(),
+        historial_movimientos: [],
+        piezas_capturadas_blancas: [],
+        piezas_capturadas_negras: []
+      };
+      
+      console.log('🎮 Creando partida con datos:', partidaData);
+      
       const { data: partida, error: errorPartida } = await supabase
         .from('partidas_ajedrez')
-        .insert({
-          jugador_blancas_id: invitacion.configuracion.invitador_color === 'w' 
-            ? invitacion.invitador_id 
-            : userId,
-          jugador_negras_id: invitacion.configuracion.invitador_color === 'w' 
-            ? userId 
-            : invitacion.invitador_id,
-          estado: 'jugando',
-          tiempo_blancas: invitacion.configuracion.tiempo || 600,
-          tiempo_negras: invitacion.configuracion.tiempo || 600,
-          fecha_inicio: new Date().toISOString()
-        })
+        .insert(partidaData)
         .select()
         .single();
+
+      console.log('🎮 Resultado crear partida:', { partida, errorPartida });
 
       if (errorPartida) throw errorPartida;
 
