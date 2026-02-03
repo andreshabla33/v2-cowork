@@ -14,6 +14,7 @@ import { BottomControlBar } from './BottomControlBar';
 import { ChatService } from '../services/chatService';
 import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 import { VideoWithBackground } from './VideoWithBackground';
+import { loadAudioSettings, saveAudioSettings, type AudioSettings } from './BottomControlBar';
 
 // Constantes
 const MOVE_SPEED = 4;
@@ -1065,6 +1066,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
   
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
+  
+  // Estado de configuración de audio
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(loadAudioSettings);
 
   // Stream efectivo para transmitir (procesado si hay efectos, original si no)
   const effectiveStream = (cameraSettings.backgroundEffect !== 'none' && processedStream) ? processedStream : stream;
@@ -1720,17 +1724,34 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
               console.log('Using selected camera:', cameraSettings.selectedCameraId);
             }
             
+            // Configuración de audio con reducción de ruido y cancelación de eco
+            const currentAudioSettings = loadAudioSettings();
+            const audioConstraints: MediaTrackConstraints = {
+              noiseSuppression: currentAudioSettings.noiseReduction,
+              echoCancellation: currentAudioSettings.echoCancellation,
+              autoGainControl: currentAudioSettings.autoGainControl,
+            };
+            if (currentAudioSettings.selectedMicrophoneId) {
+              audioConstraints.deviceId = { exact: currentAudioSettings.selectedMicrophoneId };
+              console.log('Using selected microphone:', currentAudioSettings.selectedMicrophoneId);
+            }
+            console.log('🎤 Audio constraints:', audioConstraints);
+            
             console.log('Requesting camera/mic access...');
             const newStream = await navigator.mediaDevices.getUserMedia({ 
               video: videoConstraints, 
-              audio: true 
+              audio: audioConstraints 
             }).catch(async (err) => {
-              // Si falla con la cámara específica, intentar con cualquier cámara
-              if (cameraSettings.selectedCameraId) {
-                console.warn('Selected camera not available, using default:', err.message);
+              // Si falla con dispositivos específicos, intentar con defaults
+              if (cameraSettings.selectedCameraId || currentAudioSettings.selectedMicrophoneId) {
+                console.warn('Selected device not available, using default:', err.message);
                 return navigator.mediaDevices.getUserMedia({ 
                   video: { width: 640, height: 480 }, 
-                  audio: true 
+                  audio: {
+                    noiseSuppression: currentAudioSettings.noiseReduction,
+                    echoCancellation: currentAudioSettings.echoCancellation,
+                    autoGainControl: currentAudioSettings.autoGainControl,
+                  }
                 });
               }
               throw err;
@@ -1928,6 +1949,58 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
       }
     }
   }, [cameraSettings.backgroundEffect, stream]);
+
+  // ============== AUDIO ESTABILIDAD - Page Visibility API ==============
+  // Mantiene el audio estable cuando el usuario navega a otra pestaña/ventana
+  useEffect(() => {
+    let audioContext: AudioContext | null = null;
+    let silentSource: AudioBufferSourceNode | null = null;
+
+    const handleVisibilityChange = () => {
+      if (document.hidden) {
+        // Página oculta: crear AudioContext para mantener audio activo
+        console.log('🔊 Page hidden - activating audio keepalive');
+        try {
+          audioContext = new AudioContext();
+          const buffer = audioContext.createBuffer(1, 1, 22050);
+          silentSource = audioContext.createBufferSource();
+          silentSource.buffer = buffer;
+          silentSource.connect(audioContext.destination);
+          silentSource.loop = true;
+          silentSource.start();
+        } catch (e) {
+          console.warn('Could not create audio keepalive:', e);
+        }
+      } else {
+        // Página visible: limpiar AudioContext
+        console.log('🔊 Page visible - deactivating audio keepalive');
+        if (silentSource) {
+          try {
+            silentSource.stop();
+          } catch (e) {}
+          silentSource = null;
+        }
+        if (audioContext) {
+          try {
+            audioContext.close();
+          } catch (e) {}
+          audioContext = null;
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if (silentSource) {
+        try { silentSource.stop(); } catch (e) {}
+      }
+      if (audioContext) {
+        try { audioContext.close(); } catch (e) {}
+      }
+    };
+  }, []);
 
   // Manejar screen share
   const handleToggleScreenShare = async () => {

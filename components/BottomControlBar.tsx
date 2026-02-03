@@ -4,6 +4,45 @@ import { AvatarPreview } from './Navbar';
 import { AvatarConfig, PresenceStatus } from '../types';
 import { loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 
+// ============== AUDIO SETTINGS ==============
+export interface AudioSettings {
+  selectedMicrophoneId: string;
+  selectedSpeakerId: string;
+  noiseReduction: boolean;
+  echoCancellation: boolean;
+  autoGainControl: boolean;
+}
+
+const AUDIO_STORAGE_KEY = 'cowork_audio_settings';
+
+const defaultAudioSettings: AudioSettings = {
+  selectedMicrophoneId: '',
+  selectedSpeakerId: '',
+  noiseReduction: true,
+  echoCancellation: true,
+  autoGainControl: true,
+};
+
+export const loadAudioSettings = (): AudioSettings => {
+  try {
+    const saved = localStorage.getItem(AUDIO_STORAGE_KEY);
+    if (saved) {
+      return { ...defaultAudioSettings, ...JSON.parse(saved) };
+    }
+  } catch (e) {
+    console.error('Error loading audio settings:', e);
+  }
+  return defaultAudioSettings;
+};
+
+export const saveAudioSettings = (settings: AudioSettings) => {
+  try {
+    localStorage.setItem(AUDIO_STORAGE_KEY, JSON.stringify(settings));
+  } catch (e) {
+    console.error('Error saving audio settings:', e);
+  }
+};
+
 interface BottomControlBarProps {
   onToggleMic: () => void;
   onToggleCam: () => void;
@@ -14,6 +53,7 @@ interface BottomControlBarProps {
   isMicOn: boolean;
   isCamOn: boolean;
   isSharing: boolean;
+  onAudioSettingsChange?: (settings: AudioSettings) => void;
   isRecording: boolean;
   recordingDuration?: number;
   showEmojis: boolean;
@@ -72,6 +112,54 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   const cameraMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Estado para el menú de configuración de audio
+  const [showAudioMenu, setShowAudioMenu] = useState(false);
+  const [audioSettings, setAudioSettings] = useState<AudioSettings>(loadAudioSettings);
+  const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
+  const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
+  const audioMenuRef = useRef<HTMLDivElement>(null);
+
+  // Cargar lista de dispositivos de audio
+  useEffect(() => {
+    const loadAudioDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const audioInputs = devices.filter(d => d.kind === 'audioinput');
+        const audioOutputs = devices.filter(d => d.kind === 'audiooutput');
+        setMicrophones(audioInputs);
+        setSpeakers(audioOutputs);
+        
+        // Auto-seleccionar dispositivo actual si no hay selección
+        if (!audioSettings.selectedMicrophoneId && audioInputs.length > 0) {
+          const currentTrack = currentStream?.getAudioTracks()[0];
+          const currentDeviceId = currentTrack?.getSettings().deviceId;
+          if (currentDeviceId) {
+            updateAudioSettings({ selectedMicrophoneId: currentDeviceId });
+          }
+        }
+      } catch (err) {
+        console.error('Error loading audio devices:', err);
+      }
+    };
+    
+    if (showAudioMenu) {
+      loadAudioDevices();
+    }
+  }, [showAudioMenu, currentStream]);
+
+  // Cerrar menú de audio al hacer clic fuera
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (audioMenuRef.current && !audioMenuRef.current.contains(e.target as Node)) {
+        setShowAudioMenu(false);
+      }
+    };
+    if (showAudioMenu) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showAudioMenu]);
+
   // Cargar lista de cámaras
   useEffect(() => {
     const loadCameras = async () => {
@@ -115,6 +203,14 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
     setCameraSettings(newSettings);
     saveCameraSettings(newSettings);
     onCameraSettingsChange?.(newSettings);
+  };
+
+  const updateAudioSettings = (partial: Partial<AudioSettings>) => {
+    const newSettings = { ...audioSettings, ...partial };
+    setAudioSettings(newSettings);
+    saveAudioSettings(newSettings);
+    // Notificar cambio para aplicar en el stream
+    console.log('🎤 Audio settings updated:', newSettings);
   };
 
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -178,15 +274,144 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           )}
         </div>
 
-        {/* Micrófono */}
-        <ControlButton 
-          onClick={onToggleMic} 
-          isActive={isMicOn} 
-          activeColor="bg-zinc-700 text-white" 
-          inactiveColor="bg-red-500/90 text-white animate-pulse-slow"
-          icon={<IconMic on={isMicOn} />}
-          tooltip={isMicOn ? "Silenciar" : "Activar micrófono"}
-        />
+        {/* Micrófono con dropdown - Estilo Gather 2026 */}
+        <div className="relative" ref={audioMenuRef}>
+          <div className="flex items-center">
+            <button
+              onClick={onToggleMic}
+              className={`w-9 h-9 rounded-l-xl flex items-center justify-center transition-all duration-300 ${
+                isMicOn ? 'bg-zinc-700 text-white' : 'bg-red-500/90 text-white animate-pulse-slow'
+              }`}
+              title={isMicOn ? "Silenciar" : "Activar micrófono"}
+            >
+              <IconMic on={isMicOn} />
+            </button>
+            <button
+              onClick={() => setShowAudioMenu(!showAudioMenu)}
+              className={`w-5 h-9 rounded-r-xl flex items-center justify-center transition-all duration-300 border-l border-white/10 ${
+                isMicOn ? 'bg-zinc-700 text-white hover:bg-zinc-600' : 'bg-red-500/90 text-white hover:bg-red-600'
+              }`}
+              title="Configuración de audio"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
+
+          {/* Menú de configuración de audio estilo Gather */}
+          {showAudioMenu && (
+            <div className="absolute bottom-full left-0 mb-2 w-72 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+              <div className="p-3 space-y-3">
+                {/* Selección de micrófono */}
+                <div>
+                  <div className="text-xs font-medium text-white/50 px-1 mb-2">Seleccionar micrófono</div>
+                  {microphones.map((mic) => (
+                    <button
+                      key={mic.deviceId}
+                      onClick={() => updateAudioSettings({ selectedMicrophoneId: mic.deviceId })}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        audioSettings.selectedMicrophoneId === mic.deviceId 
+                          ? 'bg-indigo-500/20 text-white' 
+                          : 'text-white/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {audioSettings.selectedMicrophoneId === mic.deviceId && (
+                        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                      <span className={`truncate ${audioSettings.selectedMicrophoneId !== mic.deviceId ? 'ml-7' : ''}`}>
+                        {mic.label || `Micrófono ${mic.deviceId.slice(0, 8)}`}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="border-t border-white/10" />
+
+                {/* Selección de altavoz */}
+                <div>
+                  <div className="text-xs font-medium text-white/50 px-1 mb-2">Seleccionar altavoz</div>
+                  {speakers.length > 0 ? speakers.map((speaker) => (
+                    <button
+                      key={speaker.deviceId}
+                      onClick={() => updateAudioSettings({ selectedSpeakerId: speaker.deviceId })}
+                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                        audioSettings.selectedSpeakerId === speaker.deviceId 
+                          ? 'bg-indigo-500/20 text-white' 
+                          : 'text-white/70 hover:bg-white/5'
+                      }`}
+                    >
+                      {audioSettings.selectedSpeakerId === speaker.deviceId && (
+                        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                        </svg>
+                      )}
+                      <span className={`truncate ${audioSettings.selectedSpeakerId !== speaker.deviceId ? 'ml-7' : ''}`}>
+                        {speaker.label || `Altavoz ${speaker.deviceId.slice(0, 8)}`}
+                      </span>
+                    </button>
+                  )) : (
+                    <div className="text-xs text-white/40 px-3 py-2">
+                      Tu navegador no soporta selección de altavoces
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-t border-white/10" />
+
+                {/* Reducción de ruido */}
+                <button
+                  onClick={() => updateAudioSettings({ noiseReduction: !audioSettings.noiseReduction })}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+                    </svg>
+                    <span>Reducción de ruido</span>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.noiseReduction ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.noiseReduction ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+
+                {/* Echo Cancellation */}
+                <button
+                  onClick={() => updateAudioSettings({ echoCancellation: !audioSettings.echoCancellation })}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                    <span>Cancelación de eco</span>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.echoCancellation ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.echoCancellation ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+
+                {/* Auto Gain Control */}
+                <button
+                  onClick={() => updateAudioSettings({ autoGainControl: !audioSettings.autoGainControl })}
+                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                    </svg>
+                    <span>Control automático de ganancia</span>
+                  </div>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.autoGainControl ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                    <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.autoGainControl ? 'translate-x-4' : 'translate-x-0.5'}`} />
+                  </div>
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Cámara con dropdown */}
         <div className="relative" ref={cameraMenuRef}>
