@@ -1457,6 +1457,21 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
     
     if (!pc) {
       pc = createPeerConnection(fromId);
+    } else {
+      // Si es renegociación, verificar que los tracks locales estén agregados
+      const senders = pc.getSenders();
+      const hasVideoSender = senders.some(s => s.track?.kind === 'video');
+      const hasAudioSender = senders.some(s => s.track?.kind === 'audio');
+      
+      if (activeStreamRef.current && (!hasVideoSender || !hasAudioSender)) {
+        console.log('Adding local tracks to existing connection for renegotiation with', fromId);
+        activeStreamRef.current.getTracks().forEach(track => {
+          const existingSender = senders.find(s => s.track?.kind === track.kind);
+          if (!existingSender) {
+            pc!.addTrack(track, activeStreamRef.current!);
+          }
+        });
+      }
     }
     
     await pc.setRemoteDescription(new RTCSessionDescription(offer));
