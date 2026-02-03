@@ -254,3 +254,142 @@ Para verificar el correcto funcionamiento:
 6. **Estado inicial:**
    - Al cargar la página, cámara debe estar OFF por defecto
    - Las burbujas minimalistas no deben mostrar video hasta que el usuario encienda la cámara
+
+7. **Reconexión tras alejarse/acercarse:**
+   - Al alejarse y volver, el video del otro usuario debe aparecer en el HUD grande
+   - Consola debe mostrar: `Adding new stream tracks to X existing peer connections`
+   - Consola debe mostrar: `Sending renegotiation offer to XXX`
+
+---
+
+## 7. Reconexión WebRTC al Entrar/Salir de Proximidad
+
+### Problema Original
+Cuando un usuario salía de proximidad y volvía a entrar, el video del otro usuario NO aparecía en el HUD grande. Requería recargar la página para que funcionara.
+
+### Diagnóstico
+Analizando los logs de consola se identificaron varios problemas en cadena:
+
+#### Problema 1: Tracks locales no se agregaban en renegociaciones
+Cuando un usuario recibía una oferta (`handleOffer`) y ya tenía una conexión existente, NO agregaba sus tracks locales.
+
+**Síntoma en consola:**
+```
+New connection established with XXX
+Connection state: connected
+// PERO no aparecía "Detected CAMERA from XXX"
+```
+
+**Solución:**
+```tsx
+const handleOffer = useCallback(async (offer, fromId) => {
+  let pc = peerConnectionsRef.current.get(fromId);
+  
+  if (!pc) {
+    pc = createPeerConnection(fromId);
+  } else {
+    // NUEVO: Verificar y agregar tracks faltantes en renegociaciones
+    const senders = pc.getSenders();
+    const hasVideoSender = senders.some(s => s.track?.kind === 'video');
+    const hasAudioSender = senders.some(s => s.track?.kind === 'audio');
+    
+    if (activeStreamRef.current && (!hasVideoSender || !hasAudioSender)) {
+      console.log('Adding local tracks to existing connection for renegotiation');
+      activeStreamRef.current.getTracks().forEach(track => {
+        if (!senders.find(s => s.track?.kind === track.kind)) {
+          pc.addTrack(track, activeStreamRef.current!);
+        }
+      });
+    }
+  }
+  // ... resto del código
+});
+```
+
+#### Problema 2: Nuevo stream local no se enviaba a peers existentes
+Cuando el usuario volvía a entrar en proximidad, se creaba un nuevo stream local pero NO se agregaba a las conexiones peer existentes.
+
+**Síntoma en consola:**
+```
+Camera/mic stream started
+// PERO el otro usuario no recibía "Detected CAMERA from XXX"
+```
+
+**Solución:**
+```tsx
+// Después de crear el nuevo stream
+activeStreamRef.current = newStream;
+setStream(newStream);
+console.log('Camera/mic stream started');
+
+// NUEVO: Agregar tracks a conexiones EXISTENTES y renegociar
+if (peerConnectionsRef.current.size > 0) {
+  console.log('Adding new stream tracks to', peerConnectionsRef.current.size, 'existing peer connections');
+  
+  peerConnectionsRef.current.forEach(async (pc, peerId) => {
+    const senders = pc.getSenders();
+    const hasAudio = senders.some(s => s.track?.kind === 'audio');
+    const hasVideo = senders.some(s => s.track?.kind === 'video');
+    
+    newStream.getTracks().forEach(track => {
+      const alreadyHas = (track.kind === 'audio' && hasAudio) || (track.kind === 'video' && hasVideo);
+      if (!alreadyHas) {
+        console.log('Adding', track.kind, 'track to peer', peerId);
+        pc.addTrack(track, newStream);
+      }
+    });
+    
+    // IMPORTANTE: Renegociar para que el peer reciba los nuevos tracks
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    webrtcChannelRef.current.send({
+      type: 'broadcast',
+      event: 'offer',
+      payload: { offer, to: peerId, from: session?.user?.id }
+    });
+    console.log('Sending renegotiation offer to', peerId);
+  });
+}
+```
+
+### Flujo Correcto Después del Fix
+
+```
+Usuario A sale de proximidad:
+  → "PROXIMITY EXIT"
+  → "Stopping camera/mic - no active call"
+  → Tracks locales se detienen
+
+Usuario A vuelve a entrar:
+  → "PROXIMITY ENTER"
+  → "Requesting camera/mic access..."
+  → "Camera/mic stream started"
+  → "Adding new stream tracks to 1 existing peer connections"
+  → "Adding audio track to peer XXX"
+  → "Adding video track to peer XXX"
+  → "Sending renegotiation offer to XXX"
+
+Usuario B recibe la renegociación:
+  → "Renegotiation completed with XXX"
+  → "Received remote track from XXX kind: video"
+  → "Detected CAMERA from XXX"
+  → Video aparece en HUD grande ✅
+```
+
+### Logs de Diagnóstico para Debugging
+
+| Log | Significado | Estado |
+|-----|-------------|--------|
+| `Adding new stream tracks to X existing peer connections` | Inicio de agregado de tracks | ✅ Normal |
+| `Adding audio/video track to peer XXX` | Track agregado exitosamente | ✅ Normal |
+| `Sending renegotiation offer to XXX` | Oferta de renegociación enviada | ✅ Normal |
+| `Renegotiation completed with XXX` | Renegociación aceptada | ✅ Normal |
+| `Detected CAMERA from XXX` | Track de video recibido | ✅ Normal |
+| `Adding local tracks to existing connection for renegotiation` | Tracks agregados en handleOffer | ✅ Normal |
+
+### Resumen de Archivos Modificados
+
+**`components/VirtualSpace3D.tsx`:**
+1. `handleOffer()` - Agregar tracks locales faltantes en renegociaciones
+2. `manageStream()` - Agregar tracks a peers existentes al crear nuevo stream
+3. `manageStream()` - Forzar renegociación después de agregar tracks
