@@ -38,8 +38,34 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     hora_inicio: '',
     hora_fin: '',
     participantes: [] as string[],
-    recordatorio_minutos: 15
+    recordatorio_minutos: 15,
+    tipo_reunion: 'equipo' as 'equipo' | 'deal' | 'entrevista'
   });
+
+  // Configuración de tipos de reunión
+  const TIPOS_REUNION = {
+    equipo: {
+      label: 'Equipo',
+      icon: '👥',
+      color: 'from-blue-500 to-cyan-500',
+      bgActive: 'bg-blue-500/20 border-blue-500/50',
+      description: 'Reunión interna del equipo'
+    },
+    deal: {
+      label: 'Cliente',
+      icon: '💼',
+      color: 'from-emerald-500 to-teal-500',
+      bgActive: 'bg-emerald-500/20 border-emerald-500/50',
+      description: 'Reunión con cliente o prospecto'
+    },
+    entrevista: {
+      label: 'Candidato',
+      icon: '🎯',
+      color: 'from-purple-500 to-pink-500',
+      bgActive: 'bg-purple-500/20 border-purple-500/50',
+      description: 'Entrevista con candidato'
+    }
+  };
 
   const loadMeetings = useCallback(async () => {
     if (!activeWorkspace?.id) return;
@@ -164,8 +190,16 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       }
     }
 
+    // Mapear tipo de reunión a tipo de sala
+    const tipoSalaMap: Record<string, 'general' | 'deal' | 'entrevista'> = {
+      'equipo': 'general',
+      'deal': 'deal',
+      'entrevista': 'entrevista'
+    };
+    const tipoSala = tipoSalaMap[newMeeting.tipo_reunion] || 'general';
+
     // Crear reunión en Supabase
-    console.log('📝 Insertando en reuniones_programadas...');
+    console.log('📝 Insertando en reuniones_programadas...', { tipo_reunion: newMeeting.tipo_reunion });
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -177,7 +211,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         creado_por: currentUser.id,
         recordatorio_minutos: newMeeting.recordatorio_minutos,
         meeting_link: meetingLink,
-        google_event_id: googleEventId
+        google_event_id: googleEventId,
+        tipo_reunion: newMeeting.tipo_reunion
       })
       .select()
       .single();
@@ -192,19 +227,20 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
     if (meeting) {
       // Crear sala de videollamada asociada
-      console.log('🎥 Creando sala de videollamada...');
+      console.log('🎥 Creando sala de videollamada...', { tipo: tipoSala });
       const { data: sala, error: salaError } = await supabase
         .from('salas_reunion')
         .insert({
           nombre: newMeeting.titulo.trim(),
           espacio_id: activeWorkspace.id,
           creador_id: currentUser.id,
-          tipo: 'general',
+          tipo: tipoSala,
           configuracion: {
             sala_espera: true,
             permitir_grabacion: true,
             max_participantes: 50,
             reunion_id: meeting.id,
+            tipo_reunion: newMeeting.tipo_reunion,
             es_programada: true
           }
         })
@@ -247,7 +283,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       hora_inicio: '',
       hora_fin: '',
       participantes: [],
-      recordatorio_minutos: 15
+      recordatorio_minutos: 15,
+      tipo_reunion: 'equipo'
     });
   };
 
@@ -831,6 +868,44 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                   placeholder="Ej: Daily Standup..."
                   className={`w-full ${s.input} border rounded-lg px-3 py-2 lg:py-1.5 text-sm lg:text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all`}
                 />
+              </div>
+
+              {/* Selector de Tipo de Reunión - Estilo 2026 */}
+              <div>
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Tipo de Reunión</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {(Object.keys(TIPOS_REUNION) as Array<keyof typeof TIPOS_REUNION>).map((tipo) => {
+                    const config = TIPOS_REUNION[tipo];
+                    const isSelected = newMeeting.tipo_reunion === tipo;
+                    return (
+                      <button
+                        key={tipo}
+                        type="button"
+                        onClick={() => setNewMeeting({ ...newMeeting, tipo_reunion: tipo })}
+                        className={`relative flex flex-col items-center gap-1 p-2.5 lg:p-2 rounded-xl border transition-all duration-200 ${
+                          isSelected
+                            ? `${config.bgActive} border`
+                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
+                        }`}
+                      >
+                        <span className="text-xl lg:text-lg">{config.icon}</span>
+                        <span className={`text-[10px] lg:text-[9px] font-bold ${isSelected ? 'opacity-100' : 'opacity-70'}`}>
+                          {config.label}
+                        </span>
+                        {isSelected && (
+                          <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br ${config.color} flex items-center justify-center`}>
+                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                            </svg>
+                          </div>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[9px] opacity-40 mt-1 text-center">
+                  {TIPOS_REUNION[newMeeting.tipo_reunion].description}
+                </p>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
