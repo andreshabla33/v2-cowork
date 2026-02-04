@@ -43,7 +43,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
         setLoading(true);
         
         if (tokenInvitacion) {
-          // Buscar por token de invitación
+          // Buscar por token de invitación (query simplificada sin relación usuarios)
           const { data: invitacion, error: invError } = await supabase
             .from('invitaciones_reunion')
             .select(`
@@ -53,36 +53,51 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
                 nombre,
                 tipo,
                 configuracion,
-                creador:usuarios!salas_reunion_creador_id_fkey(nombre)
+                creador_id
               )
             `)
             .eq('token_unico', tokenInvitacion)
+            .eq('usado', false)
             .single();
 
           if (invError || !invitacion) {
+            console.error('Error buscando invitación:', invError);
             throw new Error('Invitación no válida o expirada');
           }
 
           setNombre(invitacion.nombre || '');
           setEmail(invitacion.email || '');
           const salaData = invitacion.sala as any;
+          
+          // Obtener nombre del creador por separado (evita problemas de RLS)
+          let organizadorNombre = 'Organizador';
+          if (salaData?.creador_id) {
+            const { data: creador } = await supabase
+              .from('usuarios')
+              .select('nombre')
+              .eq('id', salaData.creador_id)
+              .single();
+            organizadorNombre = creador?.nombre || 'Organizador';
+          }
+          
           setSalaInfo({
             nombre: salaData?.nombre || 'Reunión',
             tipo: salaData?.tipo || 'general',
-            organizador: salaData?.creador?.[0]?.nombre || salaData?.creador?.nombre || 'Organizador',
+            organizador: organizadorNombre,
             configuracion: salaData?.configuracion || { sala_espera: true },
           });
         } else if (codigoSala) {
-          // Buscar por código de sala
+          // Buscar por código de sala (query simplificada)
           const { data: sala, error: salaError } = await supabase
             .from('salas_reunion')
             .select(`
               nombre,
               tipo,
               configuracion,
-              creador:usuarios!salas_reunion_creador_id_fkey(nombre)
+              creador_id
             `)
             .eq('codigo_acceso', codigoSala)
+            .eq('activa', true)
             .single();
 
           if (salaError || !sala) {
@@ -90,10 +105,22 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
           }
 
           const salaTyped = sala as any;
+          
+          // Obtener nombre del creador por separado
+          let organizadorNombre = 'Organizador';
+          if (salaTyped.creador_id) {
+            const { data: creador } = await supabase
+              .from('usuarios')
+              .select('nombre')
+              .eq('id', salaTyped.creador_id)
+              .single();
+            organizadorNombre = creador?.nombre || 'Organizador';
+          }
+          
           setSalaInfo({
             nombre: salaTyped.nombre || 'Reunión',
             tipo: salaTyped.tipo || 'general',
-            organizador: salaTyped.creador?.[0]?.nombre || salaTyped.creador?.nombre || 'Organizador',
+            organizador: organizadorNombre,
             configuracion: salaTyped.configuracion || { sala_espera: true },
           });
         }
