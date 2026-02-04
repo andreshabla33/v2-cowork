@@ -8,6 +8,7 @@ import { Dashboard } from './components/Dashboard';
 import { WorkspaceLayout } from './components/WorkspaceLayout';
 import { CargoSelector } from './components/onboarding/CargoSelector';
 import { OnboardingCreador } from './components/onboarding/OnboardingCreador';
+import { MeetingLobby, MeetingRoom } from './components/meetings/videocall';
 import type { CargoLaboral } from './components/onboarding/CargoSelector';
 
 const App: React.FC = () => {
@@ -31,6 +32,50 @@ const App: React.FC = () => {
 
     return () => subscription.unsubscribe();
   }, []);
+
+  // Detectar si es una invitación de videollamada (URL: /join/TOKEN)
+  const [meetingToken, setMeetingToken] = useState<string | null>(null);
+  const [inMeeting, setInMeeting] = useState(false);
+  const [meetingNombre, setMeetingNombre] = useState('');
+
+  useEffect(() => {
+    const path = window.location.pathname;
+    if (path.startsWith('/join/')) {
+      const token = path.replace('/join/', '');
+      if (token) {
+        setMeetingToken(token);
+      }
+    }
+  }, []);
+
+  // Si hay token de videollamada, mostrar lobby o sala (no requiere sesión)
+  if (meetingToken && !inMeeting) {
+    return (
+      <MeetingLobby
+        tokenInvitacion={meetingToken}
+        onJoin={(token, nombre) => {
+          setMeetingNombre(nombre);
+          setInMeeting(true);
+        }}
+        onError={(error) => console.error('Error en lobby:', error)}
+      />
+    );
+  }
+
+  if (meetingToken && inMeeting) {
+    return (
+      <MeetingRoom
+        salaId=""
+        tokenInvitacion={meetingToken}
+        nombreInvitado={meetingNombre}
+        onLeave={() => {
+          setInMeeting(false);
+          setMeetingToken(null);
+          window.history.pushState({}, '', '/');
+        }}
+      />
+    );
+  }
 
   // Si no hay sesión, siempre pantalla de login (excepto si estamos procesando invitación)
   if (!session && view !== 'invitation') {
