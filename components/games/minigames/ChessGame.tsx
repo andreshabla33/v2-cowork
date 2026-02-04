@@ -1044,53 +1044,53 @@ export const ChessGame: React.FC<ChessGameProps> = ({
 
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
+      initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-xl"
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:p-3 bg-black/80 backdrop-blur-xl"
     >
-      <div className="relative w-full max-w-5xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-3xl overflow-hidden border border-white/10 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-black/30">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
-              <Crown className="w-6 h-6 text-white" />
+      <div className="relative w-full max-w-4xl lg:max-w-3xl md:max-w-2xl bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 rounded-2xl lg:rounded-xl overflow-hidden border border-white/10 shadow-2xl max-h-[90vh] lg:max-h-[85vh] flex flex-col">
+        {/* Header - Compacto */}
+        <div className="flex items-center justify-between px-4 lg:px-3 py-3 lg:py-2 border-b border-white/10 bg-black/30">
+          <div className="flex items-center gap-2.5 lg:gap-2">
+            <div className="w-9 h-9 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg bg-gradient-to-br from-amber-500 to-orange-600 flex items-center justify-center shadow-lg">
+              <Crown className="w-5 h-5 lg:w-4 lg:h-4 text-white" />
             </div>
             <div>
-              <h2 className="text-xl font-bold text-white">Ajedrez</h2>
-              <p className="text-sm text-white/60">
+              <h2 className="text-lg lg:text-base font-bold text-white">Ajedrez</h2>
+              <p className="text-xs lg:text-[10px] text-white/60">
                 {gamePhase === 'setup' ? 'Esperando...' : 
-                 gamePhase === 'playing' ? (isMyTurn ? 'Tu turno' : 'Turno del oponente') :
+                 gamePhase === 'playing' ? (isMyTurn ? 'Tu turno' : 'Turno oponente') :
                  'Partida terminada'}
               </p>
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 lg:gap-1">
             <button
               onClick={() => setSoundEnabled(!soundEnabled)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+              className="p-1.5 lg:p-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors"
             >
-              {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              {soundEnabled ? <Volume2 className="w-4 h-4 lg:w-3.5 lg:h-3.5" /> : <VolumeX className="w-4 h-4 lg:w-3.5 lg:h-3.5" />}
             </button>
             <button
               onClick={() => setShowChat(!showChat)}
-              className="p-2 rounded-xl bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors relative"
+              className="p-1.5 lg:p-1 rounded-lg bg-white/5 hover:bg-white/10 text-white/70 hover:text-white transition-colors relative"
             >
-              <MessageCircle className="w-5 h-5" />
+              <MessageCircle className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
             </button>
             <button
               onClick={onClose}
-              className="p-2 rounded-xl bg-white/5 hover:bg-red-500/20 text-white/70 hover:text-red-400 transition-colors"
+              className="p-1.5 lg:p-1 rounded-lg bg-white/5 hover:bg-red-500/20 text-white/70 hover:text-red-400 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
             </button>
           </div>
         </div>
 
-        <div className="flex">
+        <div className="flex flex-1 overflow-hidden">
           {/* Panel izquierdo - Tablero */}
-          <div className="flex-1 p-6">
+          <div className="flex-1 p-4 lg:p-3 overflow-auto">
             {/* Jugador negro (arriba) */}
             <div className="flex items-center justify-between mb-3 px-2">
               <div className="flex items-center gap-3">

@@ -189,67 +189,67 @@ export const TaskBoard: React.FC = () => {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-zinc-900 border border-zinc-800 rounded-3xl p-8 w-full max-w-xl shadow-2xl overflow-y-auto max-h-[90vh]">
-            <h3 className="text-2xl font-black tracking-tight mb-6 italic uppercase">Nueva Tarea Avanzada</h3>
-            <form onSubmit={handleCreateTask} className="space-y-6">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 lg:p-3 bg-black/70 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-zinc-900 border border-zinc-800 rounded-2xl lg:rounded-xl p-6 lg:p-5 md:p-4 w-full max-w-md lg:max-w-sm shadow-2xl overflow-y-auto max-h-[85vh] lg:max-h-[80vh]">
+            <h3 className="text-xl lg:text-lg font-black tracking-tight mb-4 lg:mb-3 italic uppercase">Nueva Tarea</h3>
+            <form onSubmit={handleCreateTask} className="space-y-4 lg:space-y-3">
               <div>
-                <label className="text-[10px] uppercase font-black tracking-widest opacity-40 block mb-2">Título</label>
+                <label className="text-[9px] lg:text-[8px] uppercase font-black tracking-widest opacity-40 block mb-1.5">Título</label>
                 <input 
                   autoFocus required type="text" value={newTask.title}
                   onChange={e => setNewTask({...newTask, title: e.target.value})}
                   placeholder="Nombre de la tarea..."
-                  className="w-full bg-black/20 border border-zinc-800 rounded-xl px-4 py-3 focus:ring-1 focus:ring-indigo-500 outline-none text-white"
+                  className="w-full bg-black/20 border border-zinc-800 rounded-xl lg:rounded-lg px-4 lg:px-3 py-2.5 lg:py-2 text-sm lg:text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-white"
                 />
               </div>
               <div>
-                <label className="text-[10px] uppercase font-black tracking-widest opacity-40 block mb-2">Descripción</label>
+                <label className="text-[9px] lg:text-[8px] uppercase font-black tracking-widest opacity-40 block mb-1.5">Descripción</label>
                 <textarea 
                   value={newTask.description}
                   onChange={e => setNewTask({...newTask, description: e.target.value})}
                   placeholder="Detalles..." rows={2}
-                  className="w-full bg-black/20 border border-zinc-800 rounded-xl px-4 py-3 focus:ring-1 focus:ring-indigo-500 outline-none resize-none text-white"
+                  className="w-full bg-black/20 border border-zinc-800 rounded-xl lg:rounded-lg px-4 lg:px-3 py-2.5 lg:py-2 text-sm lg:text-xs focus:ring-1 focus:ring-indigo-500 outline-none resize-none text-white"
                 />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-2 gap-3 lg:gap-2">
                 <div>
-                  <label className="text-[10px] uppercase font-black tracking-widest opacity-40 block mb-2">Fecha de Inicio</label>
+                  <label className="text-[9px] lg:text-[8px] uppercase font-black tracking-widest opacity-40 block mb-1.5">Fecha Inicio</label>
                   <input 
                     type="date" value={newTask.startDate}
                     onChange={e => setNewTask({...newTask, startDate: e.target.value})}
-                    className="w-full bg-black/20 border border-zinc-800 rounded-xl px-4 py-3 focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-300"
+                    className="w-full bg-black/20 border border-zinc-800 rounded-xl lg:rounded-lg px-3 lg:px-2 py-2.5 lg:py-2 text-sm lg:text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-300"
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase font-black tracking-widest opacity-40 block mb-2">Fecha de Entrega</label>
+                  <label className="text-[9px] lg:text-[8px] uppercase font-black tracking-widest opacity-40 block mb-1.5">Fecha Entrega</label>
                   <input 
                     type="date" value={newTask.dueDate}
                     onChange={e => setNewTask({...newTask, dueDate: e.target.value})}
-                    className="w-full bg-black/20 border border-zinc-800 rounded-xl px-4 py-3 focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-300"
+                    className="w-full bg-black/20 border border-zinc-800 rounded-xl lg:rounded-lg px-3 lg:px-2 py-2.5 lg:py-2 text-sm lg:text-xs focus:ring-1 focus:ring-indigo-500 outline-none text-zinc-300"
                   />
                 </div>
               </div>
 
               <div>
-                <label className="text-[10px] uppercase font-black tracking-widest opacity-40 block mb-2">Adjuntar Documentos</label>
+                <label className="text-[9px] lg:text-[8px] uppercase font-black tracking-widest opacity-40 block mb-1.5">Adjuntar Documentos</label>
                 <div className="relative group">
                   <input 
                     type="file" multiple onChange={handleFileChange}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
-                  <div className="w-full bg-black/40 border-2 border-dashed border-zinc-800 rounded-2xl py-8 flex flex-col items-center justify-center group-hover:border-indigo-500/50 transition-all">
-                    <svg className="w-8 h-8 text-zinc-600 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                    <span className="text-xs text-zinc-500">Haz clic o arrastra archivos aquí</span>
+                  <div className="w-full bg-black/40 border-2 border-dashed border-zinc-800 rounded-xl lg:rounded-lg py-5 lg:py-4 flex flex-col items-center justify-center group-hover:border-indigo-500/50 transition-all">
+                    <svg className="w-6 h-6 lg:w-5 lg:h-5 text-zinc-600 mb-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                    <span className="text-[10px] lg:text-[9px] text-zinc-500">Haz clic o arrastra archivos</span>
                   </div>
                 </div>
                 {newTask.attachments.length > 0 && (
-                  <div className="mt-4 flex flex-wrap gap-2">
+                  <div className="mt-2.5 flex flex-wrap gap-1.5">
                     {newTask.attachments.map((file, idx) => (
-                      <div key={idx} className="bg-zinc-800 px-3 py-1 rounded-full text-[10px] border border-zinc-700 flex items-center gap-2">
+                      <div key={idx} className="bg-zinc-800 px-2 py-0.5 rounded-full text-[9px] lg:text-[8px] border border-zinc-700 flex items-center gap-1.5">
                         {file.name}
                         <button type="button" onClick={() => setNewTask(p => ({...p, attachments: p.attachments.filter((_, i) => i !== idx)}))}>
-                          <svg className="w-3 h-3 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                          <svg className="w-2.5 h-2.5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                       </div>
                     ))}
@@ -257,16 +257,16 @@ export const TaskBoard: React.FC = () => {
                 )}
               </div>
 
-              <div className="flex gap-4 pt-4">
+              <div className="flex gap-3 lg:gap-2 pt-2">
                 <button 
                   type="button" onClick={() => setIsModalOpen(false)}
-                  className="flex-1 px-4 py-3 rounded-xl border border-zinc-800 hover:bg-zinc-800 text-sm font-bold transition-all text-white"
+                  className="flex-1 px-3 py-2.5 lg:py-2 rounded-xl lg:rounded-lg border border-zinc-800 hover:bg-zinc-800 text-xs lg:text-[10px] font-bold transition-all text-white"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-3 rounded-xl text-sm font-bold transition-all shadow-lg shadow-indigo-500/20"
+                  className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-2.5 lg:py-2 rounded-xl lg:rounded-lg text-xs lg:text-[10px] font-bold transition-all shadow-lg shadow-indigo-500/20"
                 >
                   Guardar Tarea
                 </button>

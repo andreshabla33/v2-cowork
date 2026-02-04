@@ -4,6 +4,7 @@
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../../../lib/supabase';
 import { useStore } from '../../../store/useStore';
 import { AnalysisDashboard } from './AnalysisDashboard';
@@ -180,6 +181,7 @@ const CustomDropdown: React.FC<CustomDropdownProps> = ({ options, value, onChang
 };
 
 export const GrabacionesHistorial: React.FC = () => {
+  const { t } = useTranslation();
   const { activeWorkspace, session, theme, userRoleInActiveWorkspace } = useStore();
   const [grabaciones, setGrabaciones] = useState<Grabacion[]>([]);
   const [isLoading, setIsLoading] = useState(true);

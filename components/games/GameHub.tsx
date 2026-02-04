@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Gamepad2, X, Trophy, Medal, Star, Users, Clock, Zap, Lock, Search, 
@@ -52,87 +53,19 @@ interface GameInfo {
   banner?: string;
 }
 
-const GAMES: GameInfo[] = [
-  {
-    type: 'escape-room',
-    name: 'Escape Room Virtual',
-    description: 'Resuelve puzzles y acertijos en equipo para escapar antes de que se acabe el tiempo.',
-    icon: <Lock className="w-6 h-6" />,
-    color: 'violet',
-    players: '2-6',
-    duration: '30 min',
-    difficulty: 'Difícil',
-    skills: ['Resolución de problemas', 'Trabajo en equipo', 'Comunicación'],
-  },
-  {
-    type: 'trivia-battle',
-    name: 'Trivia Battle',
-    description: 'Compite respondiendo preguntas de cultura general y conocimiento de la empresa.',
-    icon: <Zap className="w-6 h-6" />,
-    color: 'amber',
-    players: '2-12',
-    duration: '15 min',
-    difficulty: 'Medio',
-    skills: ['Conocimiento', 'Velocidad', 'Competitividad'],
-  },
-  {
-    type: 'scavenger-hunt',
-    name: 'Scavenger Hunt 3D',
-    description: 'Explora el espacio virtual y encuentra objetos ocultos antes que los demás.',
-    icon: <Search className="w-6 h-6" />,
-    color: 'emerald',
-    players: '1-20',
-    duration: '25 min',
-    difficulty: 'Fácil',
-    skills: ['Exploración', 'Atención al detalle', 'Navegación'],
-  },
-  {
-    type: 'speed-networking',
-    name: 'Speed Networking',
-    description: 'Conoce a tus compañeros en sesiones rápidas de conversación.',
-    icon: <MessageCircle className="w-6 h-6" />,
-    color: 'pink',
-    players: '4-16',
-    duration: '15 min',
-    difficulty: 'Fácil',
-    skills: ['Comunicación', 'Networking', 'Empatía'],
-  },
-  {
-    type: 'mystery-roleplay',
-    name: 'Mystery Role Play',
-    description: 'Asume un rol secreto e investiga para resolver el misterio.',
-    icon: <Star className="w-6 h-6" />,
-    color: 'indigo',
-    players: '4-8',
-    duration: '40 min',
-    difficulty: 'Difícil',
-    skills: ['Deducción', 'Actuación', 'Análisis'],
-  },
-  {
-    type: 'building-challenge',
-    name: 'Desafío de Construcción',
-    description: 'Construye estructuras creativas y vota por la mejor creación.',
-    icon: <Building2 className="w-6 h-6" />,
-    color: 'cyan',
-    players: '2-12',
-    duration: '35 min',
-    difficulty: 'Medio',
-    skills: ['Creatividad', 'Diseño', 'Colaboración'],
-  },
-  {
-    type: 'chess',
-    name: 'Ajedrez Online',
-    description: 'Juega ajedrez en tiempo real contra compañeros de tu espacio de trabajo.',
-    icon: <Crown className="w-6 h-6" />,
-    color: 'orange',
-    players: '2',
-    duration: '10-30 min',
-    difficulty: 'Medio',
-    skills: ['Estrategia', 'Pensamiento crítico', 'Paciencia'],
-  },
-];
+// Configuración base de juegos (sin textos, se traducen dinámicamente)
+const GAMES_CONFIG = [
+  { type: 'escape-room', translationKey: 'escapeRoom', icon: <Lock className="w-6 h-6" />, color: 'violet', players: '2-6', duration: '30', difficultyKey: 'hard' },
+  { type: 'trivia-battle', translationKey: 'triviaBattle', icon: <Zap className="w-6 h-6" />, color: 'amber', players: '2-12', duration: '15', difficultyKey: 'medium' },
+  { type: 'scavenger-hunt', translationKey: 'scavengerHunt', icon: <Search className="w-6 h-6" />, color: 'emerald', players: '1-20', duration: '25', difficultyKey: 'easy' },
+  { type: 'speed-networking', translationKey: 'speedNetworking', icon: <MessageCircle className="w-6 h-6" />, color: 'pink', players: '4-16', duration: '15', difficultyKey: 'easy' },
+  { type: 'mystery-roleplay', translationKey: 'mysteryRolePlay', icon: <Star className="w-6 h-6" />, color: 'indigo', players: '4-8', duration: '40', difficultyKey: 'hard' },
+  { type: 'building-challenge', translationKey: 'buildingChallenge', icon: <Building2 className="w-6 h-6" />, color: 'cyan', players: '2-12', duration: '35', difficultyKey: 'medium' },
+  { type: 'chess', translationKey: 'chess', icon: <Crown className="w-6 h-6" />, color: 'orange', players: '2', duration: '10-30', difficultyKey: 'medium' },
+] as const;
 
 export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName, pendingInvitation, onPendingInvitationHandled }) => {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'achievements'>('games');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
   const [activePartidaId, setActivePartidaId] = useState<string | null>(null);
@@ -217,120 +150,116 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, cu
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div
-          initial={{ scale: 0.9, opacity: 0 }}
+          initial={{ scale: 0.95, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          exit={{ scale: 0.9, opacity: 0 }}
-          className="relative w-[90vw] max-w-6xl h-[85vh] bg-zinc-950 rounded-2xl border border-zinc-800 overflow-hidden shadow-2xl"
+          exit={{ scale: 0.95, opacity: 0 }}
+          className="relative w-full max-w-5xl lg:max-w-4xl md:max-w-3xl h-[75vh] lg:h-[70vh] bg-zinc-950 rounded-2xl lg:rounded-xl border border-zinc-800 overflow-hidden shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
           {selectedGame ? (
             renderGame()
           ) : (
             <>
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
-                    <Gamepad2 className="w-6 h-6 text-white" />
+              {/* Header - Compacto */}
+              <div className="flex items-center justify-between p-4 lg:p-3 border-b border-zinc-800">
+                <div className="flex items-center gap-3 lg:gap-2">
+                  <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg bg-gradient-to-br from-violet-500 to-pink-500 flex items-center justify-center">
+                    <Gamepad2 className="w-5 h-5 lg:w-4 lg:h-4 text-white" />
                   </div>
                   <div>
-                    <h2 className="text-2xl font-bold text-white">Game Hub</h2>
-                    <p className="text-sm text-zinc-400">Mini juegos de Team Building</p>
+                    <h2 className="text-xl lg:text-lg font-bold text-white">{t('gameHub.title')}</h2>
+                    <p className="text-xs lg:text-[10px] text-zinc-400">{t('gameHub.subtitle')}</p>
                   </div>
                 </div>
 
-                <div className="flex items-center gap-4">
-                  {/* Player Stats */}
-                  <div className="flex items-center gap-6 px-4 py-2 bg-zinc-900 rounded-xl">
-                    <div className="flex items-center gap-2">
-                      <Trophy className="w-4 h-4 text-amber-400" />
-                      <span className="text-sm text-white font-medium">{playerStats.wins} victorias</span>
+                <div className="flex items-center gap-3 lg:gap-2">
+                  {/* Player Stats - Compacto */}
+                  <div className="flex items-center gap-4 lg:gap-3 px-3 lg:px-2 py-1.5 bg-zinc-900 rounded-xl lg:rounded-lg">
+                    <div className="flex items-center gap-1.5">
+                      <Trophy className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-amber-400" />
+                      <span className="text-xs lg:text-[10px] text-white font-medium">{playerStats.wins}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Star className="w-4 h-4 text-violet-400" />
-                      <span className="text-sm text-white font-medium">{playerStats.totalScore.toLocaleString()} pts</span>
+                    <div className="flex items-center gap-1.5">
+                      <Star className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-violet-400" />
+                      <span className="text-xs lg:text-[10px] text-white font-medium">{playerStats.totalScore.toLocaleString()}</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-orange-400" />
-                      <span className="text-sm text-white font-medium">{playerStats.streak} racha</span>
+                    <div className="flex items-center gap-1.5">
+                      <Zap className="w-3.5 h-3.5 lg:w-3 lg:h-3 text-orange-400" />
+                      <span className="text-xs lg:text-[10px] text-white font-medium">{playerStats.streak}</span>
                     </div>
                   </div>
 
-                  <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl transition-colors">
-                    <X className="w-5 h-5 text-zinc-400" />
+                  <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg transition-colors">
+                    <X className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-zinc-400" />
                   </button>
                 </div>
               </div>
 
-              {/* Tabs */}
-              <div className="flex gap-2 px-6 pt-4">
+              {/* Tabs - Compacto */}
+              <div className="flex gap-1.5 px-4 lg:px-3 pt-3 lg:pt-2">
                 {[
-                  { id: 'games', label: 'Juegos', icon: Gamepad2 },
-                  { id: 'leaderboard', label: 'Clasificación', icon: TrendingUp },
-                  { id: 'achievements', label: 'Logros', icon: Medal },
+                  { id: 'games', label: t('gameHub.tabs.games'), icon: Gamepad2 },
+                  { id: 'leaderboard', label: t('gameHub.tabs.leaderboard'), icon: TrendingUp },
+                  { id: 'achievements', label: t('gameHub.tabs.achievements'), icon: Medal },
                 ].map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id as any)}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    className={`flex items-center gap-1.5 px-3 lg:px-2 py-1.5 rounded-lg text-xs lg:text-[10px] font-medium transition-all ${
                       activeTab === tab.id
                         ? 'bg-violet-500/20 text-violet-400'
                         : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
                     }`}
                   >
-                    <tab.icon className="w-4 h-4" />
+                    <tab.icon className="w-3.5 h-3.5 lg:w-3 lg:h-3" />
                     {tab.label}
                   </button>
                 ))}
               </div>
 
-              {/* Content */}
-              <div className="flex-1 overflow-auto p-6">
+              {/* Content - Compacto */}
+              <div className="flex-1 overflow-auto p-4 lg:p-3">
                 {activeTab === 'games' && (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {GAMES.map((game) => {
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 lg:gap-2">
+                    {GAMES_CONFIG.map((game) => {
                       const colors = getColorClasses(game.color);
+                      const gameName = t(`gameHub.${game.translationKey}.title`);
+                      const gameDesc = t(`gameHub.${game.translationKey}.description`);
+                      const difficulty = t(`gameHub.difficulty.${game.difficultyKey}`);
                       return (
                         <motion.div
                           key={game.type}
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          className={`p-5 rounded-2xl border ${colors.border} bg-zinc-900/50 cursor-pointer transition-all hover:bg-zinc-900`}
-                          onClick={() => handlePlayGame(game.type)}
+                          whileHover={{ scale: 1.01 }}
+                          whileTap={{ scale: 0.99 }}
+                          className={`p-4 lg:p-3 rounded-xl lg:rounded-lg border ${colors.border} bg-zinc-900/50 cursor-pointer transition-all hover:bg-zinc-900`}
+                          onClick={() => handlePlayGame(game.type as GameType)}
                         >
-                          <div className="flex items-start gap-4">
-                            <div className={`w-12 h-12 rounded-xl ${colors.bg} ${colors.text} flex items-center justify-center flex-shrink-0`}>
+                          <div className="flex items-start gap-3 lg:gap-2">
+                            <div className={`w-10 h-10 lg:w-8 lg:h-8 rounded-lg ${colors.bg} ${colors.text} flex items-center justify-center flex-shrink-0`}>
                               {game.icon}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <h3 className="font-bold text-white text-lg">{game.name}</h3>
-                              <p className="text-sm text-zinc-400 mt-1 line-clamp-2">{game.description}</p>
+                              <h3 className="font-bold text-white text-sm lg:text-xs">{gameName}</h3>
+                              <p className="text-xs lg:text-[10px] text-zinc-400 mt-0.5 line-clamp-2">{gameDesc}</p>
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-3 mt-4 text-xs">
+                          <div className="flex items-center gap-2 mt-3 lg:mt-2 text-[10px] lg:text-[9px]">
                             <span className="flex items-center gap-1 text-zinc-500">
-                              <Users className="w-3 h-3" />{game.players}
+                              <Users className="w-2.5 h-2.5" />{game.players}
                             </span>
                             <span className="flex items-center gap-1 text-zinc-500">
-                              <Clock className="w-3 h-3" />{game.duration}
+                              <Clock className="w-2.5 h-2.5" />{game.duration}m
                             </span>
-                            <span className={`px-2 py-0.5 rounded ${getDifficultyColor(game.difficulty)}`}>
-                              {game.difficulty}
+                            <span className={`px-1.5 py-0.5 rounded text-[9px] lg:text-[8px] ${getDifficultyColor(difficulty)}`}>
+                              {difficulty}
                             </span>
                           </div>
 
-                          <div className="flex flex-wrap gap-1 mt-3">
-                            {game.skills.map((skill) => (
-                              <span key={skill} className="px-2 py-0.5 bg-zinc-800 text-zinc-400 rounded text-xs">
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
                         </motion.div>
                       );
                     })}

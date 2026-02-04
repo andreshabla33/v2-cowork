@@ -386,10 +386,10 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   const s = themeStyles[theme as keyof typeof themeStyles] || themeStyles.dark;
 
   return (
-    <div className={`h-full flex flex-col ${s.bg}`}>
+    <div className={`${s.bg}`}>
       {/* Header */}
-      <div className="p-6 border-b border-white/10">
-        <div className="flex items-center justify-between mb-6">
+      <div className="p-5 lg:p-4 border-b border-white/10">
+        <div className="flex items-center justify-between mb-4 lg:mb-3">
           <h1 className={`text-xl font-bold ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
             Calendario
           </h1>
@@ -405,7 +405,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         </div>
 
         {/* Search */}
-        <div className="relative mb-4">
+        <div className="relative mb-3 lg:mb-2">
           <input
             type="text"
             value={searchQuery}
@@ -448,7 +448,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-6">
+      <div className="p-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className={`w-10 h-10 border-3 ${theme === 'arcade' ? 'border-[#00ff41]' : 'border-indigo-500'} border-t-transparent rounded-full animate-spin`} />
@@ -456,7 +456,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         ) : activeTab === 'scheduled' ? (
           <>
             {/* Mini Calendar */}
-            <div className={`${s.card} border rounded-2xl p-4 mb-6`}>
+            <div className={`rounded-xl p-4 mb-4 ${theme === 'arcade' ? 'bg-zinc-900/50 border border-[#00ff41]/20' : 'bg-zinc-800/50 border border-zinc-700/50'}`}>
               <div className="flex items-center justify-between mb-3">
                 <button
                   onClick={() => setSelectedDate(new Date(selectedDate.getFullYear(), selectedDate.getMonth() - 1))}
@@ -466,7 +466,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
                   </svg>
                 </button>
-                <h4 className="font-bold text-sm">
+                <h4 className={`font-bold text-sm ${theme === 'arcade' ? 'text-[#00ff41]' : 'text-white'}`}>
                   {selectedDate.toLocaleDateString('es', { month: 'long', year: 'numeric' })}
                 </h4>
                 <button
@@ -481,7 +481,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
               <div className="grid grid-cols-7 gap-1 text-center">
                 {['D', 'L', 'M', 'X', 'J', 'V', 'S'].map(day => (
-                  <div key={day} className="text-[10px] font-bold opacity-40 py-1">{day}</div>
+                  <div key={day} className="text-[10px] font-bold text-zinc-400 py-1">{day}</div>
                 ))}
                 {getDaysInMonth(selectedDate).map((date, i) => {
                   if (!date) return <div key={i} className="p-1" />;
@@ -502,13 +502,13 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                     <div
                       key={i}
                       onClick={handleDayClick}
-                      className={`p-1 rounded-lg text-[11px] font-medium cursor-pointer transition-all ${
-                        isPast ? 'opacity-30 cursor-not-allowed' :
+                      className={`p-1.5 rounded-lg text-[11px] font-medium cursor-pointer transition-all ${
+                        isPast ? 'text-zinc-600 cursor-not-allowed' :
                         isToday 
-                          ? (theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-500 text-white') 
+                          ? (theme === 'arcade' ? 'bg-[#00ff41] text-black font-bold' : 'bg-indigo-500 text-white font-bold') 
                           : dayMeetings.length > 0 
-                            ? 'bg-indigo-500/20 hover:bg-indigo-500/30' 
-                            : 'hover:bg-white/10'
+                            ? 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30' 
+                            : 'text-zinc-300 hover:bg-white/10'
                       }`}
                       title={isPast ? 'Fecha pasada' : 'Click para crear reunión'}
                     >
@@ -524,14 +524,13 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
             {/* Meetings List */}
             {filteredMeetings.length === 0 ? (
-              <div className="text-center py-12">
-                <div className={`w-24 h-24 mx-auto mb-4 rounded-3xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-indigo-500/10'} flex items-center justify-center`}>
-                  <svg className={`w-12 h-12 ${theme === 'arcade' ? 'text-[#00ff41]/40' : 'opacity-30'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="text-center py-6">
+                <div className={`w-16 h-16 mx-auto mb-3 rounded-2xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-indigo-500/10'} flex items-center justify-center`}>
+                  <svg className={`w-8 h-8 ${theme === 'arcade' ? 'text-[#00ff41]/40' : 'opacity-30'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
-                <p className="text-sm opacity-60 mb-1">Administra tu agenda y mejora</p>
-                <p className="text-sm opacity-60 mb-4">la experiencia de tus reuniones</p>
+                <p className="text-xs opacity-60">Administra tu agenda y mejora la experiencia de tus reuniones</p>
               </div>
             ) : (
               <div className="space-y-3">
@@ -695,7 +694,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       </div>
 
       {/* Google Calendar Button */}
-      <div className="px-6 pb-4 pt-2">
+      <div className="px-6 pb-6">
         {googleConnected ? (
           <div className="flex items-center justify-center gap-3">
             <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium">
@@ -723,127 +722,127 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         )}
       </div>
 
-      {/* Modal Nueva Reunión */}
+      {/* Modal Nueva Reunión - Compacto 2026 */}
       {showScheduleModal && (
         <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 lg:p-3"
           onClick={() => setShowScheduleModal(false)}
         >
           <div 
-            className={`w-full max-w-lg rounded-3xl ${s.bg} border border-white/10 shadow-2xl overflow-hidden`}
+            className={`w-full max-w-md lg:max-w-sm rounded-2xl lg:rounded-xl ${s.bg} border border-white/10 shadow-2xl overflow-hidden`}
             onClick={e => e.stopPropagation()}
           >
-            <div className={`p-6 border-b border-white/10 ${theme === 'arcade' ? 'bg-[#00ff41]/5' : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10'}`}>
-              <div className="flex items-center gap-4">
-                <div className={`w-14 h-14 rounded-2xl ${theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-gradient-to-br from-indigo-500 to-purple-600'} flex items-center justify-center`}>
-                  <svg className={`w-7 h-7 ${theme === 'arcade' ? 'text-black' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className={`p-4 lg:p-3 border-b border-white/10 ${theme === 'arcade' ? 'bg-[#00ff41]/5' : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10'}`}>
+              <div className="flex items-center gap-3 lg:gap-2">
+                <div className={`w-10 h-10 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-gradient-to-br from-indigo-500 to-purple-600'} flex items-center justify-center`}>
+                  <svg className={`w-5 h-5 lg:w-4 lg:h-4 ${theme === 'arcade' ? 'text-black' : 'text-white'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                   </svg>
                 </div>
                 <div>
-                  <h3 className="text-xl font-bold">Nueva Reunión</h3>
-                  <p className="text-sm opacity-50">Programa y envía invitaciones</p>
+                  <h3 className="text-lg lg:text-base font-bold">Nueva Reunión</h3>
+                  <p className="text-xs lg:text-[10px] opacity-50">Programa y envía invitaciones</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 space-y-5 max-h-[60vh] overflow-y-auto">
+            <div className="p-4 lg:p-3 space-y-3 lg:space-y-2 max-h-[55vh] lg:max-h-[50vh] overflow-y-auto">
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Título *</label>
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Título *</label>
                 <input
                   type="text"
                   value={newMeeting.titulo}
                   onChange={e => setNewMeeting({ ...newMeeting, titulo: e.target.value })}
-                  placeholder="Ej: Daily Standup, Sprint Review..."
-                  className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all`}
+                  placeholder="Ej: Daily Standup..."
+                  className={`w-full ${s.input} border rounded-lg px-3 py-2 lg:py-1.5 text-sm lg:text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all`}
                 />
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Fecha *</label>
+                  <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Fecha *</label>
                   <input
                     type="date"
                     value={newMeeting.fecha}
                     onChange={e => setNewMeeting({ ...newMeeting, fecha: e.target.value })}
                     min={new Date().toISOString().split('T')[0]}
-                    className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all`}
+                    className={`w-full ${s.input} border rounded-lg px-2 py-2 lg:py-1.5 text-xs focus:outline-none transition-all`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Inicio *</label>
+                  <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Inicio *</label>
                   <input
                     type="time"
                     value={newMeeting.hora_inicio}
                     onChange={e => setNewMeeting({ ...newMeeting, hora_inicio: e.target.value })}
-                    className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all`}
+                    className={`w-full ${s.input} border rounded-lg px-2 py-2 lg:py-1.5 text-xs focus:outline-none transition-all`}
                   />
                 </div>
                 <div>
-                  <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Fin</label>
+                  <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Fin</label>
                   <input
                     type="time"
                     value={newMeeting.hora_fin}
                     onChange={e => setNewMeeting({ ...newMeeting, hora_fin: e.target.value })}
-                    className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all`}
+                    className={`w-full ${s.input} border rounded-lg px-2 py-2 lg:py-1.5 text-xs focus:outline-none transition-all`}
                   />
                 </div>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Descripción</label>
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Descripción</label>
                 <textarea
                   value={newMeeting.descripcion}
                   onChange={e => setNewMeeting({ ...newMeeting, descripcion: e.target.value })}
                   placeholder="Agenda o detalles..."
-                  rows={3}
-                  className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all resize-none`}
+                  rows={2}
+                  className={`w-full ${s.input} border rounded-lg px-3 py-2 lg:py-1.5 text-sm lg:text-xs focus:outline-none transition-all resize-none`}
                 />
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Recordatorio</label>
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Recordatorio</label>
                 <select
                   value={newMeeting.recordatorio_minutos}
                   onChange={e => setNewMeeting({ ...newMeeting, recordatorio_minutos: parseInt(e.target.value) })}
-                  className={`w-full ${s.input} border rounded-xl px-4 py-3 text-sm focus:outline-none transition-all`}
+                  className={`w-full ${s.input} border rounded-lg px-3 py-2 lg:py-1.5 text-sm lg:text-xs focus:outline-none transition-all`}
                   style={{ colorScheme: 'dark' }}
                 >
-                  <option value={5} className="bg-zinc-800 text-white">5 minutos antes</option>
-                  <option value={10} className="bg-zinc-800 text-white">10 minutos antes</option>
-                  <option value={15} className="bg-zinc-800 text-white">15 minutos antes</option>
-                  <option value={30} className="bg-zinc-800 text-white">30 minutos antes</option>
+                  <option value={5} className="bg-zinc-800 text-white">5 min antes</option>
+                  <option value={10} className="bg-zinc-800 text-white">10 min antes</option>
+                  <option value={15} className="bg-zinc-800 text-white">15 min antes</option>
+                  <option value={30} className="bg-zinc-800 text-white">30 min antes</option>
                   <option value={60} className="bg-zinc-800 text-white">1 hora antes</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider opacity-60 mb-2">Participantes</label>
-                <div className={`${s.input} border rounded-xl p-3 max-h-40 overflow-y-auto`}>
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Participantes</label>
+                <div className={`${s.input} border rounded-lg p-2 max-h-28 lg:max-h-24 overflow-y-auto`}>
                   {miembrosEspacio.filter(m => m.id !== currentUser.id).length === 0 ? (
-                    <p className="text-sm opacity-40 text-center py-2">No hay otros miembros</p>
+                    <p className="text-xs opacity-40 text-center py-1">No hay otros miembros</p>
                   ) : (
-                    <div className="space-y-1">
+                    <div className="space-y-0.5">
                       {miembrosEspacio.filter(m => m.id !== currentUser.id).map(member => (
                         <button
                           key={member.id}
                           onClick={() => toggleParticipant(member.id)}
-                          className={`w-full flex items-center gap-3 p-2 rounded-lg transition-all ${
+                          className={`w-full flex items-center gap-2 p-1.5 rounded-lg transition-all ${
                             newMeeting.participantes.includes(member.id)
                               ? (theme === 'arcade' ? 'bg-[#00ff41]/20 border border-[#00ff41]/50' : 'bg-indigo-500/20 border border-indigo-500/50')
                               : 'hover:bg-white/5'
                           }`}
                         >
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold ${
                             newMeeting.participantes.includes(member.id) 
                               ? (theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-indigo-500') 
                               : 'bg-white/10'
                           }`}>
                             {member.nombre?.charAt(0) || '?'}
                           </div>
-                          <span className="text-sm font-medium flex-1 text-left">{member.nombre}</span>
+                          <span className="text-xs font-medium flex-1 text-left truncate">{member.nombre}</span>
                           {newMeeting.participantes.includes(member.id) && (
-                            <svg className={`w-4 h-4 ${theme === 'arcade' ? 'text-[#00ff41]' : 'text-indigo-400'}`} fill="currentColor" viewBox="0 0 24 24">
+                            <svg className={`w-3.5 h-3.5 ${theme === 'arcade' ? 'text-[#00ff41]' : 'text-indigo-400'}`} fill="currentColor" viewBox="0 0 24 24">
                               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                             </svg>
                           )}
@@ -855,17 +854,17 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
               </div>
             </div>
 
-            <div className="p-6 border-t border-white/10 flex gap-3">
+            <div className="p-4 lg:p-3 border-t border-white/10 flex gap-2">
               <button
                 onClick={() => { setShowScheduleModal(false); resetNewMeeting(); }}
-                className="flex-1 px-4 py-3 bg-white/5 hover:bg-white/10 rounded-xl text-sm font-bold transition-all"
+                className="flex-1 px-3 py-2.5 lg:py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm lg:text-xs font-bold transition-all"
               >
                 Cancelar
               </button>
               <button
                 onClick={createMeeting}
                 disabled={!newMeeting.titulo.trim() || !newMeeting.fecha || !newMeeting.hora_inicio}
-                className={`flex-1 px-4 py-3 ${s.btn} disabled:opacity-30 disabled:cursor-not-allowed rounded-xl text-sm font-bold transition-all shadow-lg`}
+                className={`flex-1 px-3 py-2.5 lg:py-2 ${s.btn} disabled:opacity-30 disabled:cursor-not-allowed rounded-lg text-sm lg:text-xs font-bold transition-all shadow-lg`}
               >
                 Programar
               </button>

@@ -15,6 +15,7 @@ import { GameHub, GameInvitationNotification } from './games';
 import { SettingsModal } from './settings/SettingsModal';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
+import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
 
 export const WorkspaceLayout: React.FC = () => {
   const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
@@ -23,6 +24,15 @@ export const WorkspaceLayout: React.FC = () => {
   const [showGameHub, setShowGameHub] = useState(false);
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
   const presenceChannelRef = useRef<any>(null);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Suscribirse a cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   // Handler para cuando se acepta una invitación de juego
   const handleGameInvitationAccepted = (invitacion: any, partidaId: string) => {
@@ -185,33 +195,33 @@ export const WorkspaceLayout: React.FC = () => {
   const s = themeStyles[theme] || themeStyles.dark;
 
   const themes: {id: ThemeType, label: string, icon: string}[] = [
-    { id: 'dark', label: 'Oscuro', icon: '🌑' },
-    { id: 'light', label: 'Claro', icon: '☀️' },
-    { id: 'space', label: 'Espacial', icon: '🚀' },
-    { id: 'arcade', label: 'Arcade', icon: '🎮' }
+    { id: 'dark', label: t('theme.dark', currentLang), icon: '🌑' },
+    { id: 'light', label: t('theme.light', currentLang), icon: '☀️' },
+    { id: 'space', label: t('theme.space', currentLang), icon: '🚀' },
+    { id: 'arcade', label: t('theme.arcade', currentLang), icon: '🎮' }
   ];
 
   return (
     <div className={`flex h-screen w-screen overflow-hidden transition-all duration-500 ${s.bg} ${s.text}`}>
       
-      {/* Sidebar Global */}
-      <aside className={`w-[70px] ${s.globalNav} flex flex-col items-center py-8 gap-6 shrink-0 z-[100] border-r ${s.border}`}>
+      {/* Sidebar Global - 2026 Minimal Style */}
+      <aside className={`w-[52px] ${s.globalNav} flex flex-col items-center py-5 gap-4 shrink-0 z-[100] border-r ${s.border}`}>
         <div 
           onClick={() => setView('dashboard')}
-          className={`w-12 h-12 rounded-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-all shadow-2xl overflow-hidden ${theme === 'arcade' ? 'bg-[#00ff41] border-2 border-[#00ff41]' : 'bg-white'}`}
+          className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer hover:scale-105 transition-all shadow-lg overflow-hidden ${theme === 'arcade' ? 'bg-[#00ff41] border border-[#00ff41]' : 'bg-white'}`}
         >
-          {/* Logo SVG reemplazando imagen rota */}
-          <svg className={`w-8 h-8 ${theme === 'arcade' ? 'text-black' : 'text-indigo-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+          {/* Logo SVG */}
+          <svg className={`w-5 h-5 ${theme === 'arcade' ? 'text-black' : 'text-indigo-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.384-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
           </svg>
         </div>
 
-        <nav className="flex-1 flex flex-col gap-5 mt-4">
+        <nav className="flex-1 flex flex-col gap-1 mt-3">
           {[
-            { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Espacio' },
-            { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Mensajes' },
-            { id: 'tasks', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', label: 'Tareas' },
-            { id: 'grabaciones', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', label: 'Grabaciones' }
+            { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: t('nav.space', currentLang) },
+            { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: t('nav.messages', currentLang) },
+            { id: 'tasks', icon: 'M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2', label: t('nav.tasks', currentLang) },
+            { id: 'grabaciones', icon: 'M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z', label: t('nav.recordings', currentLang) }
           ].map(item => (
             <button 
               key={item.id}
@@ -219,12 +229,20 @@ export const WorkspaceLayout: React.FC = () => {
                 setActiveSubTab(item.id as any);
                 if (item.id === 'chat') clearUnreadChat();
               }}
-              className={`p-3.5 rounded-2xl transition-all shadow-xl relative ${activeSubTab === item.id ? (theme === 'arcade' ? 'bg-[#00ff41] text-black shadow-[0_0_20px_#00ff41]' : 'bg-white/20 text-white') : 'opacity-40 hover:opacity-100 hover:bg-white/5'}`}
+              className={`relative p-2.5 rounded-lg transition-all duration-200 group ${activeSubTab === item.id 
+                ? (theme === 'arcade' 
+                    ? 'bg-[#00ff41]/15 text-[#00ff41]' 
+                    : 'bg-white/10 text-white') 
+                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'}`}
               title={item.label}
             >
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d={item.icon}/></svg>
+              {/* Indicador lateral activo - Tendencia 2026 */}
+              {activeSubTab === item.id && (
+                <span className={`absolute left-0 top-1/2 -translate-y-1/2 w-[2px] h-4 rounded-full ${theme === 'arcade' ? 'bg-[#00ff41] shadow-[0_0_8px_#00ff41]' : 'bg-gradient-to-b from-violet-400 to-cyan-400'}`} />
+              )}
+              <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d={item.icon}/></svg>
               {item.id === 'chat' && unreadChatCount > 0 && activeSubTab !== 'chat' && (
-                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
+                <span className="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">
                   {unreadChatCount > 9 ? '9+' : unreadChatCount}
                 </span>
               )}
@@ -232,27 +250,27 @@ export const WorkspaceLayout: React.FC = () => {
           ))}
         </nav>
 
-        <div className="mt-auto flex flex-col gap-4 items-center pb-4">
-          {/* Botón de Configuración */}
+        <div className="mt-auto flex flex-col gap-1 items-center pb-3">
+          {/* Botón de Configuración - 2026 Minimal */}
           <button
             onClick={() => setShowSettings(true)}
-            className={`p-3 rounded-2xl transition-all ${
+            className={`p-2.5 rounded-lg transition-all duration-200 ${
               theme === 'arcade' 
-                ? 'text-[#00ff41] hover:bg-[#00ff41]/20' 
-                : 'text-zinc-400 hover:text-white hover:bg-white/10'
+                ? 'text-[#00ff41]/60 hover:text-[#00ff41] hover:bg-[#00ff41]/10' 
+                : 'text-white/40 hover:text-white/80 hover:bg-white/[0.04]'
             }`}
-            title="Configuración"
+            title={t('nav.settings', currentLang)}
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <svg className="w-[18px] h-[18px]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
           </button>
           
-          {/* Avatar del usuario */}
+          {/* Avatar del usuario - Más compacto */}
           <div 
             onClick={() => setActiveSubTab('avatar')}
-            className={`w-11 h-11 rounded-2xl overflow-hidden cursor-pointer hover:ring-4 transition-all relative group ${theme === 'arcade' ? 'ring-[#00ff41]' : 'ring-white/50'}`}
+            className={`w-8 h-8 rounded-lg overflow-hidden cursor-pointer hover:ring-2 transition-all relative group ${theme === 'arcade' ? 'ring-[#00ff41]/50 hover:ring-[#00ff41]' : 'ring-white/20 hover:ring-white/50'}`}
           >
             <AvatarPreview config={currentUser.avatarConfig!} size="small" />
           </div>
@@ -298,7 +316,7 @@ export const WorkspaceLayout: React.FC = () => {
             }`}>
               <span className={`text-[8px] font-black uppercase tracking-widest px-2 hidden lg:block ${
                 theme === 'light' ? 'text-zinc-400' : 'opacity-40'
-              }`}>Estilo</span>
+              }`}>{t('theme.style', currentLang)}</span>
               {themes.map(t => (
                 <button 
                   key={t.id} 
@@ -329,7 +347,7 @@ export const WorkspaceLayout: React.FC = () => {
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
               </svg>
-              <span>Juegos</span>
+              <span>{t('button.games', currentLang)}</span>
             </button>
 
             {/* BOTÓN VIBEN AI - Estilo onboarding con gradiente */}
@@ -369,19 +387,19 @@ export const WorkspaceLayout: React.FC = () => {
               {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
             {activeSubTab === 'settings' && (
               <div className="p-16 max-w-4xl mx-auto">
-                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">Configuración</h2>
+                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">{t('settings.title', currentLang)}</h2>
                 <div className={`p-12 rounded-[50px] border-2 ${s.border} bg-black/10 backdrop-blur-3xl shadow-2xl`}>
                   <div className={`flex justify-between items-center pb-10 border-b-2 ${s.border}`}>
                     <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30">Workspace en uso</p>
+                      <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30">{t('workspace.inUse', currentLang)}</p>
                       <p className="text-4xl font-bold mt-2">{activeWorkspace?.name}</p>
                     </div>
-                    <button className={`px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all ${s.btn}`}>Personalizar</button>
+                    <button className={`px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all ${s.btn}`}>{t('button.customize', currentLang)}</button>
                   </div>
                   <div className="pt-10">
                     <button onClick={() => setActiveWorkspace(null)} className="text-red-500 text-[11px] font-black uppercase tracking-[0.2em] hover:text-red-400 flex items-center gap-3 transition-colors">
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                      Cerrar Sesión de Espacio
+                      {t('button.logout', currentLang)}
                     </button>
                   </div>
                 </div>

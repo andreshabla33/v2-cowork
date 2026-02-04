@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
-import { t, Language, getCurrentLanguage, notifyLanguageChange, subscribeToLanguageChange } from '../../../lib/i18n';
+import { Language, getCurrentLanguage, setLanguage } from '../../../lib/i18n';
 
 interface GeneralSettings {
   skipWelcomeScreen: boolean;
@@ -20,29 +21,26 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
   settings,
   onSettingsChange
 }) => {
-  const [currentLang, setCurrentLang] = useState<Language>(settings.language);
+  const { t, i18n } = useTranslation();
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
 
-  // Escuchar cambios de idioma
+  // Escuchar cambios de idioma de i18next
   useEffect(() => {
-    const unsubscribe = subscribeToLanguageChange(() => {
-      setCurrentLang(getCurrentLanguage());
-    });
-    return unsubscribe;
-  }, []);
-
-  // Actualizar cuando cambie settings.language
-  useEffect(() => {
-    setCurrentLang(settings.language);
-  }, [settings.language]);
+    const handleLanguageChange = (lng: string) => {
+      setCurrentLang(lng.substring(0, 2) as Language);
+    };
+    i18n.on('languageChanged', handleLanguageChange);
+    return () => {
+      i18n.off('languageChanged', handleLanguageChange);
+    };
+  }, [i18n]);
 
   const updateSetting = <K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
     
-    // Si cambió el idioma, notificar a todos los componentes
+    // Si cambió el idioma, usar i18next para cambiar
     if (key === 'language') {
-      setTimeout(() => {
-        notifyLanguageChange();
-      }, 0);
+      setLanguage(value as Language);
     }
   };
 
@@ -72,23 +70,23 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          {t('settings.general.title', currentLang)}
+          {t('settings.general.title')}
         </h2>
         <p className="text-sm text-zinc-400">
-          {t('settings.general.description', currentLang)}
+          {t('settings.general.description')}
         </p>
       </div>
 
       <SettingSection title={getTitle('start')}>
         <SettingToggle
-          label={t('settings.general.skipWelcome', currentLang)}
-          description={t('settings.general.skipWelcomeDesc', currentLang)}
+          label={t('settings.general.skipWelcome')}
+          description={t('settings.general.skipWelcomeDesc')}
           checked={settings.skipWelcomeScreen}
           onChange={(v) => updateSetting('skipWelcomeScreen', v)}
         />
         <SettingToggle
-          label={t('settings.general.autoUpdates', currentLang)}
-          description={t('settings.general.autoUpdatesDesc', currentLang)}
+          label={t('settings.general.autoUpdates')}
+          description={t('settings.general.autoUpdatesDesc')}
           checked={settings.autoUpdates}
           onChange={(v) => updateSetting('autoUpdates', v)}
         />
@@ -96,8 +94,8 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
 
       <SettingSection title={getTitle('language')}>
         <SettingDropdown
-          label={t('settings.general.language', currentLang)}
-          description={t('settings.general.languageDesc', currentLang)}
+          label={t('settings.general.language')}
+          description={t('settings.general.languageDesc')}
           value={settings.language}
           options={languageOptions}
           onChange={(v) => updateSetting('language', v as Language)}
@@ -106,8 +104,8 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
 
       <SettingSection title={getTitle('appearance')}>
         <SettingDropdown
-          label={t('settings.general.colorMode', currentLang)}
-          description={t('settings.general.colorModeDesc', currentLang)}
+          label={t('settings.general.colorMode')}
+          description={t('settings.general.colorModeDesc')}
           value={settings.colorMode}
           options={colorModeOptions}
           onChange={(v) => updateSetting('colorMode', v)}

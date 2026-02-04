@@ -3,6 +3,7 @@ import {
   Settings, Calendar, Layout, Mic, Video, Users2, Bell, Lock, Zap, 
   Gamepad2, UserPlus, ShieldCheck, X 
 } from 'lucide-react';
+import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../../lib/i18n';
 import { SettingsGeneral } from './sections/SettingsGeneral';
 import { SettingsCalendar } from './sections/SettingsCalendar';
 import { SettingsMiniMode } from './sections/SettingsMiniMode';
@@ -34,7 +35,7 @@ const defaultSettings = {
   general: {
     skipWelcomeScreen: false,
     colorMode: 'dark',
-    language: 'es',
+    language: 'es' as Language,
     autoUpdates: true
   },
   calendar: {
@@ -142,6 +143,15 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('general');
   const [settings, setSettings] = useState(defaultSettings);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Suscribirse a cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   // Cargar settings de localStorage
   useEffect(() => {
@@ -183,19 +193,19 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   if (!isOpen) return null;
 
   const tabs = [
-    { id: 'general', label: 'General', Icon: Settings, category: 'Preferencias' },
-    { id: 'calendar', label: 'Calendario', Icon: Calendar, category: 'Preferencias' },
-    { id: 'minimode', label: 'Mini Mode', Icon: Layout, category: 'Preferencias' },
-    { id: 'audio', label: 'Audio', Icon: Mic, category: 'Preferencias' },
-    { id: 'video', label: 'Video', Icon: Video, category: 'Preferencias' },
-    { id: 'meetings', label: 'Reuniones', Icon: Users2, category: 'Preferencias' },
-    { id: 'notifications', label: 'Notificaciones', Icon: Bell, category: 'Preferencias' },
-    { id: 'privacy', label: 'Privacidad', Icon: Lock, category: 'Preferencias' },
-    { id: 'performance', label: 'Rendimiento', Icon: Zap, category: 'Preferencias' },
-    { id: 'space3d', label: 'Espacio 3D', Icon: Gamepad2, category: 'Preferencias' },
-    { id: 'members', label: 'Miembros', Icon: Users2, category: 'Espacio' },
-    { id: 'guests', label: 'Invitados', Icon: UserPlus, category: 'Espacio', adminOnly: true },
-    { id: 'security', label: 'Seguridad', Icon: ShieldCheck, category: 'Espacio', adminOnly: true },
+    { id: 'general', label: t('settings.general.title', currentLang), Icon: Settings, category: t('settings.category.preferences', currentLang) },
+    { id: 'calendar', label: t('settings.calendar.title', currentLang), Icon: Calendar, category: t('settings.category.preferences', currentLang) },
+    { id: 'minimode', label: 'Mini Mode', Icon: Layout, category: t('settings.category.preferences', currentLang) },
+    { id: 'audio', label: t('settings.audio.title', currentLang), Icon: Mic, category: t('settings.category.preferences', currentLang) },
+    { id: 'video', label: t('settings.video.title', currentLang), Icon: Video, category: t('settings.category.preferences', currentLang) },
+    { id: 'meetings', label: t('settings.meetings.title', currentLang), Icon: Users2, category: t('settings.category.preferences', currentLang) },
+    { id: 'notifications', label: t('settings.notifications.title', currentLang), Icon: Bell, category: t('settings.category.preferences', currentLang) },
+    { id: 'privacy', label: t('settings.privacy.title', currentLang), Icon: Lock, category: t('settings.category.preferences', currentLang) },
+    { id: 'performance', label: t('settings.performance.title', currentLang), Icon: Zap, category: t('settings.category.preferences', currentLang) },
+    { id: 'space3d', label: t('settings.space3d.title', currentLang), Icon: Gamepad2, category: t('settings.category.preferences', currentLang) },
+    { id: 'members', label: t('settings.members.title', currentLang), Icon: Users2, category: t('settings.category.workspace', currentLang) },
+    { id: 'guests', label: t('settings.guests.title', currentLang), Icon: UserPlus, category: t('settings.category.workspace', currentLang), adminOnly: true },
+    { id: 'security', label: t('settings.security.title', currentLang), Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
   ];
 
   const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin);
@@ -217,7 +227,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           {/* Header */}
           <div className="p-5 border-b border-white/[0.05]">
             <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white">
-              Configuración
+              {t('settings.title', currentLang)}
             </h2>
           </div>
           

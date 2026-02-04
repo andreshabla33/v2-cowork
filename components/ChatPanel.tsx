@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { supabase } from '../lib/supabase';
 import { ChatGroup, ChatMessage, User } from '../types';
 import { useStore } from '../store/useStore';
@@ -50,6 +51,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   const [showMeetingRooms, setShowMeetingRooms] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const { t } = useTranslation();
   
   const mensajesRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<any>(null);
@@ -58,7 +60,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   const globalNotifChannelRef = useRef<any>(null);
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  // Inicializar sonido de notificación
+  // Inicializar sonido de notificaciÃ³n
   useEffect(() => {
     notificationSoundRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
     notificationSoundRef.current.volume = 0.3;
@@ -97,11 +99,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
     // Cargar miembros del espacio
     const cargarMiembros = async () => {
-      // Obtener el usuario actual de la sesión
+      // Obtener el usuario actual de la sesiÃ³n
       const { data: { session } } = await supabase.auth.getSession();
       const currentUserId = session?.user?.id;
       
-      // Query directa a usuarios a través del usuario_id
+      // Query directa a usuarios a travÃ©s del usuario_id
       const { data, error } = await supabase
         .from('miembros_espacio')
         .select('usuario_id')
@@ -111,7 +113,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       console.log('Miembros IDs:', data, 'Error:', error, 'CurrentUserId:', currentUserId);
       
       if (data && data.length > 0) {
-        // Filtrar el usuario actual y obtener IDs únicos (evitar duplicados)
+        // Filtrar el usuario actual y obtener IDs Ãºnicos (evitar duplicados)
         const otrosIds = [...new Set(
           data
             .map((m: any) => m.usuario_id)
@@ -136,7 +138,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     cargarMiembros();
   }, [activeWorkspace]);
 
-  // Suscripción global para toast notifications (todos los canales)
+  // SuscripciÃ³n global para toast notifications (todos los canales)
   useEffect(() => {
     if (!activeWorkspace || !currentUser.id) return;
     
@@ -182,14 +184,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           const menciones = payload.new.menciones || [];
           const isMentioned = menciones.includes(currentUser.id);
           
-          console.log('🔔 Toast notification:', senderData.nombre, payload.new.contenido, isMentioned ? '(MENCIONADO)' : '');
+          console.log('ðŸ”” Toast notification:', senderData.nombre, payload.new.contenido, isMentioned ? '(MENCIONADO)' : '');
           
-          // Reproducir sonido de notificación
+          // Reproducir sonido de notificaciÃ³n
           playNotificationSound();
           
           addToastNotification(
             senderData.nombre,
-            isMentioned ? `📢 Te mencionó: ${payload.new.contenido}` : payload.new.contenido,
+            isMentioned ? `ðŸ“¢ Te mencionÃ³: ${payload.new.contenido}` : payload.new.contenido,
             payload.new.grupo_id,
             isDirect ? undefined : grupoData?.nombre,
             isDirect
@@ -287,7 +289,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
             if (!prev.includes(payload.user_name)) return [...prev, payload.user_name];
             return prev;
           });
-          // Remover después de 3 segundos
+          // Remover despuÃ©s de 3 segundos
           setTimeout(() => {
             setTypingUsers(prev => prev.filter(u => u !== payload.user_name));
           }, 3000);
@@ -324,7 +326,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   };
 
   // Emojis comunes
-  const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '👎', '❤️', '🔥', '🎉', '✅', '💯', '🚀', '💡', '⭐'];
+  const emojis = ['ðŸ˜€', 'ðŸ˜‚', 'ðŸ¥°', 'ðŸ˜Ž', 'ðŸ¤”', 'ðŸ‘', 'ðŸ‘Ž', 'â¤ï¸', 'ðŸ”¥', 'ðŸŽ‰', 'âœ…', 'ðŸ’¯', 'ðŸš€', 'ðŸ’¡', 'â­'];
 
   // Detectar menciones en el texto (@usuario)
   const detectMentions = (text: string): string[] => {
@@ -339,13 +341,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     return [...new Set(mentions)];
   };
 
-  // Manejar input con detección de @
+  // Manejar input con detecciÃ³n de @
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     const cursorPos = e.target.selectionStart || 0;
     setNuevoMensaje(value);
     
-    // Detectar si estamos escribiendo una mención
+    // Detectar si estamos escribiendo una menciÃ³n
     const textBeforeCursor = value.substring(0, cursorPos);
     const atMatch = textBeforeCursor.match(/@(\w*)$/);
     
@@ -360,7 +362,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     handleTyping();
   };
 
-  // Insertar mención seleccionada
+  // Insertar menciÃ³n seleccionada
   const insertMention = (user: any) => {
     const beforeMention = nuevoMensaje.substring(0, mentionCursorPos);
     const afterMention = nuevoMensaje.substring(mentionCursorPos).replace(/@\w*/, '');
@@ -447,7 +449,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
   const handleChannelSelect = (id: string) => {
     setGrupoActivo(id);
-    setUnreadByChannel(prev => ({ ...prev, [id]: 0 })); // Limpiar no leídos del canal
+    setUnreadByChannel(prev => ({ ...prev, [id]: 0 })); // Limpiar no leÃ­dos del canal
     setActiveSubTab('chat' as any);
     if (onChannelSelect) onChannelSelect();
   };
@@ -487,7 +489,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           nombre: `${currentUser.id}|${targetUser.id}`,
           tipo: 'directo',
           creado_por: currentUser.id,
-          icono: '💬'
+          icono: 'ðŸ’¬'
         })
         .select()
         .single();
@@ -554,7 +556,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       await supabase.from('mensajes_chat').insert({
         grupo_id: grupoActivo,
         usuario_id: currentUser.id,
-        contenido: `📎 [${file.name}](${urlData.publicUrl})`,
+        contenido: `ðŸ“Ž [${file.name}](${urlData.publicUrl})`,
         tipo: 'archivo'
       });
     }
@@ -613,18 +615,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar">
-          {/* Navegación Principal: Hilos, Juntas */}
+          {/* Navegación Principal: Juntas, Calendario */}
           <div className="px-2 py-4 space-y-0.5">
-            <button className="w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-all flex items-center gap-3">
-              <span className="w-4 text-center opacity-60">💬</span>
-              <span className="truncate">Hilos</span>
-            </button>
             <button 
               onClick={() => setShowMeetingRooms(!showMeetingRooms)}
               className={`w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${showMeetingRooms ? s.activeItem : 'hover:bg-white/5'}`}
             >
               <span className="w-4 text-center opacity-60">🎧</span>
-              <span className="truncate">Juntas</span>
+              <span className="truncate">{t('sidebar.meetings')}</span>
               <svg className={`w-3 h-3 ml-auto opacity-50 transition-transform ${showMeetingRooms ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
               </svg>
@@ -635,14 +633,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               className={`w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-3 ${activeSubTab === 'calendar' ? s.activeItem : 'hover:bg-white/5'}`}
             >
               <span className="w-4 text-center opacity-60">📅</span>
-              <span className="truncate">Calendario</span>
+              <span className="truncate">{t('sidebar.calendar')}</span>
               <svg className="w-3 h-3 ml-auto opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
               </svg>
-            </button>
-            <button className="w-full text-left px-3 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-all flex items-center gap-3">
-              <span className="w-4 text-center opacity-60">📝</span>
-              <span className="truncate">Borradores</span>
             </button>
           </div>
 
@@ -651,7 +645,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           {/* Canales */}
           <div className="px-2 py-4">
             <div className="px-3 mb-2 group flex items-center justify-between">
-              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>Canales</h3>
+              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>{t('sidebar.channels')}</h3>
               <button 
                 onClick={(e) => { e.stopPropagation(); setShowCreateModal(true); }}
                 className={`w-6 h-6 rounded-lg flex items-center justify-center transition-all ${theme === 'arcade' ? 'bg-[#00ff41] text-black shadow-[0_0_10px_#00ff41]' : 'bg-white/10 hover:bg-white/20 text-white'}`}
@@ -686,7 +680,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           {/* Mensajes Directos */}
           <div className="px-2 py-4">
             <div className="px-3 mb-2">
-              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>Mensajes Directos</h3>
+              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>{t('sidebar.directMessages')}</h3>
             </div>
             <div className="space-y-0.5">
               {grupos.filter(g => g.tipo === 'directo' && g.nombre.includes(currentUser.id)).map(g => {
@@ -721,10 +715,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
           <div className="h-px bg-white/5 mx-4 my-2" />
 
-          {/* Personas */}
+          {/* Conectados */}
           <div className="px-2 py-4">
             <div className="px-3 mb-2">
-              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>Personas</h3>
+              <h3 className={`text-[10px] font-black uppercase tracking-[0.2em] opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>CONECTADOS ({onlineUsers.length})</h3>
             </div>
             <div className="space-y-0.5">
               {miembrosEspacio.filter((u: any) => u.id !== currentUser.id).length > 0 ? miembrosEspacio.filter((u: any) => u.id !== currentUser.id).map((u: any) => {
@@ -744,14 +738,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               );}) : (
                  <p className="px-4 py-2 text-[9px] opacity-30 italic font-bold">No hay otros miembros</p>
               )}
-              {/* Botón para invitar - Solo visible para admin y super_admin */}
+              {/* BotÃ³n para invitar - Solo visible para admin y super_admin */}
               {userRoleInActiveWorkspace && !['member', 'miembro'].includes(userRoleInActiveWorkspace) && (
                 <button 
                   onClick={() => setActiveSubTab('miembros')}
                   className="w-full text-left px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.2em] text-indigo-400 hover:bg-indigo-500/10 transition-all flex items-center gap-3 mt-2"
                 >
                   <span className="w-5 h-5 flex items-center justify-center bg-indigo-500/20 rounded-lg text-lg">+</span>
-                  Invitar personas
+                  {t('sidebar.invitePeople')}
                 </button>
               )}
             </div>
@@ -779,7 +773,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       <div className={`px-8 py-5 border-b border-white/5 flex items-center justify-between shrink-0 shadow-sm`}>
          <div className="flex items-center gap-4">
             <span className={`text-2xl opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
-              {grupoActivoData?.tipo === 'directo' ? '💬' : (grupoActivoData?.tipo === 'privado' ? '🔒' : '#')}
+              {grupoActivoData?.tipo === 'directo' ? 'ðŸ’¬' : (grupoActivoData?.tipo === 'privado' ? 'ðŸ”’' : '#')}
             </span>
             <div>
               <h3 className={`font-black text-sm uppercase tracking-widest truncate ${theme === 'arcade' ? 'text-[#00ff41] neon-text' : ''}`}>
@@ -789,25 +783,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                 }
               </h3>
               <p className="text-[9px] font-bold opacity-30 uppercase tracking-tighter">
-                {grupoActivoData?.tipo === 'directo' ? 'Mensaje directo' : 'Espacio de colaboración abierta'}
+                {grupoActivoData?.tipo === 'directo' ? t('chat.directMessage') : t('chat.openCollaboration')}
               </p>
             </div>
          </div>
-         {/* BOTÓN DE AÑADIR MIEMBROS REPARADO Y MEJORADO */}
+         {/* BOTÃ“N DE AÃ‘ADIR MIEMBROS REPARADO Y MEJORADO */}
          <button 
            onClick={() => setShowAddMembers(true)} 
            className={`p-3 rounded-2xl transition-all shadow-xl flex items-center gap-2 group ${theme === 'arcade' ? 'bg-[#00ff41] text-black font-black' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
          >
             <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            <span className="hidden md:block text-[10px] uppercase font-black tracking-widest px-1">Añadir</span>
+            <span className="hidden md:block text-[10px] uppercase font-black tracking-widest px-1">{t('action.add')}</span>
          </button>
       </div>
 
       <div ref={mensajesRef} className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
         {mensajes.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-20 select-none">
-             <span className="text-6xl mb-4">💬</span>
-             <p className="font-black uppercase tracking-[0.3em] text-[10px]">No hay mensajes en este canal</p>
+             <span className="text-6xl mb-4">ðŸ’¬</span>
+             <p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('chat.noMessages')}</p>
           </div>
         ) : mensajes.map((m, idx) => {
           const prevMsg = mensajes[idx - 1];
@@ -841,7 +835,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                     </div>
                   )}
                   {m.tipo === 'archivo' && m.contenido.includes('](') ? (() => {
-                    const match = m.contenido.match(/📎 \[(.+?)\]\((.+?)\)/);
+                    const match = m.contenido.match(/ðŸ“Ž \[(.+?)\]\((.+?)\)/);
                     if (match) {
                       const [, fileName, fileUrl] = match;
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
@@ -871,7 +865,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                     <p className="text-[14px] leading-relaxed break-words whitespace-pre-wrap">{renderMessageContent(m.contenido)}</p>
                   )}
                   
-                  {/* Botón de hilo */}
+                  {/* BotÃ³n de hilo */}
                   <button 
                     onClick={() => openThread(m.id)}
                     className={`mt-2 flex items-center gap-1 text-[10px] transition-opacity ${threadCounts[m.id] ? 'opacity-80 text-indigo-400' : 'opacity-40 hover:opacity-100'}`}
@@ -895,14 +889,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
               <span className="w-1.5 h-1.5 bg-current rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
             </span>
-            <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? 'está' : 'están'} escribiendo...</span>
+            <span>{typingUsers.join(', ')} {typingUsers.length === 1 ? t('state.typingSingular') : t('state.typingPlural')}</span>
           </div>
         )}
         
         {/* Mention picker */}
         {showMentionPicker && filteredMentionUsers.length > 0 && (
           <div className="mb-2 p-2 rounded-xl bg-black/80 border border-indigo-500/30 backdrop-blur-xl max-h-40 overflow-y-auto">
-            <p className="text-[9px] uppercase tracking-widest opacity-40 px-2 mb-2">Mencionar a</p>
+            <p className="text-[9px] uppercase tracking-widest opacity-40 px-2 mb-2">{t('chat.mention')}</p>
             {filteredMentionUsers.map(user => (
               <button
                 key={user.id}
@@ -924,9 +918,9 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           <div className="mb-2 p-2 rounded-xl bg-indigo-500/10 border border-indigo-500/30 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
-              <span className="text-[12px] text-indigo-300">Respondiendo en hilo</span>
+              <span className="text-[12px] text-indigo-300">{t('chat.replyingInThread')}</span>
             </div>
-            <button onClick={closeThread} className="text-[10px] opacity-60 hover:opacity-100">✕ Cerrar</button>
+            <button onClick={closeThread} className="text-[10px] opacity-60 hover:opacity-100">âœ• {t('action.close')}</button>
           </div>
         )}
 
@@ -957,10 +951,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
             value={nuevoMensaje} 
             onChange={handleInputChange} 
             placeholder={activeThread 
-              ? 'Responder en hilo...'
+              ? t('chat.replyInThread')
               : (grupoActivoData?.tipo === 'directo' 
-                ? `Mensaje a ${miembrosEspacio.find(m => grupoActivoData?.nombre.includes(m.id) && m.id !== currentUser.id)?.nombre || 'usuario'}`
-                : `Mensaje en #${grupoActivoData?.nombre || 'canal'}`)} 
+                ? `${t('chat.messageTo')} ${miembrosEspacio.find(m => grupoActivoData?.nombre.includes(m.id) && m.id !== currentUser.id)?.nombre || t('chat.user')}`
+                : `${t('chat.messageIn')} #${grupoActivoData?.nombre || t('chat.channel')}`)} 
             className="flex-1 bg-transparent border-none text-[14px] focus:outline-none py-2 placeholder:opacity-30" 
           />
           <div className="flex items-center gap-1">
@@ -990,8 +984,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                   <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z"/></svg>
                 </div>
                 <div>
-                  <h3 className="font-black text-[11px] uppercase tracking-widest">Hilo</h3>
-                  <p className="text-[9px] opacity-50">{threadMessages.length} {threadMessages.length === 1 ? 'mensaje' : 'mensajes'}</p>
+                  <h3 className="font-black text-[11px] uppercase tracking-widest">{t('chat.thread')}</h3>
+                  <p className="text-[9px] opacity-50">{threadMessages.length} {threadMessages.length === 1 ? t('chat.message') : t('chat.messages')}</p>
                 </div>
               </div>
               <button onClick={closeThread} className="p-2 hover:bg-white/10 rounded-xl transition-all hover:rotate-90 duration-200">
@@ -1011,7 +1005,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                       <div className="flex items-center gap-2 mb-1">
                         <span className="font-bold text-[12px]">{tm.usuario?.nombre || 'Usuario'}</span>
                         <span className="text-[9px] opacity-30">{new Date(tm.creado_en).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' })}</span>
-                        {idx === 0 && <span className="text-[8px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full uppercase tracking-wider">Original</span>}
+                        {idx === 0 && <span className="text-[8px] px-2 py-0.5 bg-indigo-500/20 text-indigo-300 rounded-full uppercase tracking-wider">{t('chat.original')}</span>}
                       </div>
                       <p className="text-[13px] leading-relaxed break-words text-white/80">{renderMessageContent(tm.contenido)}</p>
                     </div>
@@ -1022,7 +1016,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               {threadMessages.length === 1 && (
                 <div className="text-center py-8 opacity-30">
                   <svg className="w-12 h-12 mx-auto mb-3 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>
-                  <p className="text-[11px] font-medium">Sé el primero en responder</p>
+                  <p className="text-[11px] font-medium">{t('chat.beFirstToReply')}</p>
                 </div>
               )}
             </div>
@@ -1036,7 +1030,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                     type="text"
                     value={nuevoMensaje}
                     onChange={handleInputChange}
-                    placeholder="Responder en hilo..."
+                    placeholder={t('chat.replyInThread')}
                     className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-[13px] focus:outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all placeholder:opacity-30"
                   />
                   <button 

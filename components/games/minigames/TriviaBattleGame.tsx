@@ -155,59 +155,59 @@ export const TriviaBattleGame: React.FC<TriviaBattleGameProps> = ({ onClose }) =
   if (gameState === 'lobby') {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-500/20 flex items-center justify-center">
-              <Zap className="w-6 h-6 text-amber-400" />
+        <div className="flex items-center justify-between p-4 lg:p-3 border-b border-zinc-800">
+          <div className="flex items-center gap-3 lg:gap-2">
+            <div className="w-10 h-10 lg:w-8 lg:h-8 rounded-xl lg:rounded-lg bg-amber-500/20 flex items-center justify-center">
+              <Zap className="w-5 h-5 lg:w-4 lg:h-4 text-amber-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Trivia Battle</h2>
-              <p className="text-sm text-zinc-400">Demuestra tus conocimientos</p>
+              <h2 className="text-xl lg:text-lg font-bold text-white">Trivia Battle</h2>
+              <p className="text-xs lg:text-[10px] text-zinc-400">Demuestra tus conocimientos</p>
             </div>
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl"><X className="w-5 h-5 text-zinc-400" /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg"><X className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-zinc-400" /></button>
         </div>
 
-        <div className="flex-1 flex">
-          <div className="flex-1 p-8 space-y-6">
-            <div className="grid grid-cols-4 gap-4">
+        <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 p-5 lg:p-4 space-y-4 lg:space-y-3 overflow-auto">
+            <div className="grid grid-cols-4 gap-3 lg:gap-2">
               {[{ icon: Clock, value: TRIVIA_QUESTIONS.length, label: 'Preguntas' }, { icon: Users, value: '4', label: 'Jugadores' }, { icon: Trophy, value: '2.5k', label: 'Puntos máx' }, { icon: TrendingUp, value: '+50', label: 'Bonus racha' }].map((item, i) => (
-                <div key={i} className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                  <item.icon className="w-5 h-5 text-zinc-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">{item.value}</p>
-                  <p className="text-xs text-zinc-500">{item.label}</p>
+                <div key={i} className="p-3 lg:p-2 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                  <item.icon className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-zinc-400 mb-1.5" />
+                  <p className="text-xl lg:text-lg font-bold text-white">{item.value}</p>
+                  <p className="text-[10px] lg:text-[9px] text-zinc-500">{item.label}</p>
                 </div>
               ))}
             </div>
 
-            <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Cómo jugar</h3>
-              <div className="space-y-3">
-                {['Responde antes de que se acabe el tiempo', 'Más rápido = más puntos (bonus por tiempo)', 'Racha de aciertos = bonus extra', '¡Compite por el primer lugar!'].map((text, i) => (
-                  <div key={i} className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-sm">{i + 1}</div>
-                    <p className="text-zinc-400">{text}</p>
+            <div className="space-y-3 lg:space-y-2">
+              <h3 className="text-base lg:text-sm font-semibold text-white">Cómo jugar</h3>
+              <div className="space-y-2 lg:space-y-1.5">
+                {['Responde antes de que se acabe el tiempo', 'Más rápido = más puntos', 'Racha de aciertos = bonus extra', '¡Compite por el primer lugar!'].map((text, i) => (
+                  <div key={i} className="flex items-start gap-2">
+                    <div className="w-6 h-6 lg:w-5 lg:h-5 rounded-md bg-amber-500/20 flex items-center justify-center text-amber-400 font-bold text-xs lg:text-[10px]">{i + 1}</div>
+                    <p className="text-zinc-400 text-sm lg:text-xs">{text}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <button onClick={handleStartGame} className="w-full py-4 bg-amber-600 hover:bg-amber-500 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors">
-              <Zap className="w-5 h-5" />¡Comenzar Trivia!
+            <button onClick={handleStartGame} className="w-full py-3 lg:py-2.5 bg-amber-600 hover:bg-amber-500 text-white rounded-xl lg:rounded-lg font-semibold text-sm lg:text-xs flex items-center justify-center gap-2 transition-colors">
+              <Zap className="w-4 h-4 lg:w-3.5 lg:h-3.5" />¡Comenzar Trivia!
             </button>
           </div>
 
-          <div className="w-80 p-6 border-l border-zinc-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Jugadores</h3>
-            <div className="space-y-3">
+          <div className="w-64 lg:w-56 p-4 lg:p-3 border-l border-zinc-800 overflow-auto">
+            <h3 className="text-base lg:text-sm font-semibold text-white mb-3 lg:mb-2">Jugadores</h3>
+            <div className="space-y-2 lg:space-y-1.5">
               {players.map((player, idx) => (
-                <div key={player.id} className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl">
-                  <span className="text-2xl">{player.avatar}</span>
-                  <div className="flex-1">
-                    <p className="font-medium text-white">{player.name}</p>
-                    <p className="text-xs text-green-400">● En línea</p>
+                <div key={player.id} className="flex items-center gap-2 p-2.5 lg:p-2 bg-zinc-900 rounded-xl lg:rounded-lg">
+                  <span className="text-xl lg:text-lg">{player.avatar}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-white text-sm lg:text-xs truncate">{player.name}</p>
+                    <p className="text-[10px] lg:text-[9px] text-green-400">● En línea</p>
                   </div>
-                  {idx === 0 && <span className="px-2 py-1 bg-amber-500/20 text-amber-400 text-xs rounded-lg">Tú</span>}
+                  {idx === 0 && <span className="px-1.5 py-0.5 bg-amber-500/20 text-amber-400 text-[9px] lg:text-[8px] rounded-md">Tú</span>}
                 </div>
               ))}
             </div>
@@ -272,55 +272,55 @@ export const TriviaBattleGame: React.FC<TriviaBattleGameProps> = ({ onClose }) =
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between p-4 border-b border-zinc-800 bg-zinc-950">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-xl bg-amber-500/20 flex items-center justify-center">
-            <Zap className="w-5 h-5 text-amber-400" />
+      <div className="flex items-center justify-between p-3 lg:p-2 border-b border-zinc-800 bg-zinc-950">
+        <div className="flex items-center gap-3 lg:gap-2">
+          <div className="w-8 h-8 lg:w-7 lg:h-7 rounded-lg bg-amber-500/20 flex items-center justify-center">
+            <Zap className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-amber-400" />
           </div>
           <div className="flex items-center gap-2">
-            <span className={`px-2 py-0.5 rounded text-xs font-medium ${getCategoryColor(currentQuestion.category)}`}>{currentQuestion.category}</span>
-            <span className="text-xs text-zinc-500">Pregunta {currentQuestionIndex + 1} de {TRIVIA_QUESTIONS.length}</span>
+            <span className={`px-1.5 py-0.5 rounded text-[10px] lg:text-[9px] font-medium ${getCategoryColor(currentQuestion.category)}`}>{currentQuestion.category}</span>
+            <span className="text-[10px] lg:text-[9px] text-zinc-500">Pregunta {currentQuestionIndex + 1}/{TRIVIA_QUESTIONS.length}</span>
           </div>
         </div>
 
-        <div className="flex items-center gap-4">
-          <div className={`flex items-center gap-2 px-4 py-2 rounded-xl font-mono text-lg font-bold ${timeRemaining < 5 ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-white'}`}>
-            <Clock className="w-4 h-4" />{timeRemaining}s
+        <div className="flex items-center gap-3 lg:gap-2">
+          <div className={`flex items-center gap-1.5 px-3 lg:px-2 py-1.5 rounded-lg font-mono text-sm lg:text-xs font-bold ${timeRemaining < 5 ? 'bg-red-500/20 text-red-400' : 'bg-zinc-800 text-white'}`}>
+            <Clock className="w-3.5 h-3.5 lg:w-3 lg:h-3" />{timeRemaining}s
           </div>
-          <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl"><X className="w-5 h-5 text-zinc-400" /></button>
+          <button onClick={onClose} className="p-1.5 hover:bg-zinc-800 rounded-lg"><X className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-zinc-400" /></button>
         </div>
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 p-8 overflow-auto">
+        <div className="flex-1 p-5 lg:p-4 overflow-auto">
           <AnimatePresence mode="wait">
-            <motion.div key={currentQuestion.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-2xl mx-auto space-y-6">
+            <motion.div key={currentQuestion.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }} className="max-w-xl lg:max-w-lg mx-auto space-y-4 lg:space-y-3">
               <div className="text-center">
-                <h3 className="text-2xl font-bold text-white leading-relaxed">{currentQuestion.question}</h3>
-                <p className="text-zinc-500 mt-2">Valor: <span className="text-amber-400 font-semibold">{currentQuestion.points} pts</span>{timeRemaining > 0 && <span className="ml-2">+ Bonus tiempo</span>}</p>
+                <h3 className="text-xl lg:text-lg font-bold text-white leading-relaxed">{currentQuestion.question}</h3>
+                <p className="text-zinc-500 mt-1.5 text-sm lg:text-xs">Valor: <span className="text-amber-400 font-semibold">{currentQuestion.points} pts</span>{timeRemaining > 0 && <span className="ml-2">+ Bonus</span>}</p>
               </div>
 
-              <div className="grid grid-cols-1 gap-3">
+              <div className="grid grid-cols-1 gap-2.5 lg:gap-2">
                 {currentQuestion.options.map((option, idx) => (
-                  <motion.button key={idx} onClick={() => handleAnswerSelect(idx)} disabled={selectedAnswer !== null || showResult} whileHover={selectedAnswer === null ? { scale: 1.02 } : {}} whileTap={selectedAnswer === null ? { scale: 0.98 } : {}} className={`p-4 rounded-xl border-2 text-left transition-all ${getAnswerStyle(idx)}`}>
-                    <div className="flex items-center gap-3">
-                      <span className="w-8 h-8 rounded-lg bg-black/20 flex items-center justify-center font-bold text-sm">{String.fromCharCode(65 + idx)}</span>
-                      <span className={`font-medium ${showResult && idx === currentQuestion.correctAnswer ? 'text-white' : showResult && idx === selectedAnswer ? 'text-white' : selectedAnswer === idx ? 'text-white' : 'text-zinc-300'}`}>{option}</span>
-                      {showResult && idx === currentQuestion.correctAnswer && <CheckCircle2 className="w-5 h-5 text-white ml-auto" />}
-                      {showResult && selectedAnswer === idx && idx !== currentQuestion.correctAnswer && <XCircle className="w-5 h-5 text-white ml-auto" />}
+                  <motion.button key={idx} onClick={() => handleAnswerSelect(idx)} disabled={selectedAnswer !== null || showResult} whileHover={selectedAnswer === null ? { scale: 1.01 } : {}} whileTap={selectedAnswer === null ? { scale: 0.99 } : {}} className={`p-3 lg:p-2.5 rounded-xl lg:rounded-lg border-2 text-left transition-all ${getAnswerStyle(idx)}`}>
+                    <div className="flex items-center gap-2.5 lg:gap-2">
+                      <span className="w-7 h-7 lg:w-6 lg:h-6 rounded-md bg-black/20 flex items-center justify-center font-bold text-xs lg:text-[10px]">{String.fromCharCode(65 + idx)}</span>
+                      <span className={`font-medium text-sm lg:text-xs ${showResult && idx === currentQuestion.correctAnswer ? 'text-white' : showResult && idx === selectedAnswer ? 'text-white' : selectedAnswer === idx ? 'text-white' : 'text-zinc-300'}`}>{option}</span>
+                      {showResult && idx === currentQuestion.correctAnswer && <CheckCircle2 className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-white ml-auto" />}
+                      {showResult && selectedAnswer === idx && idx !== currentQuestion.correctAnswer && <XCircle className="w-4 h-4 lg:w-3.5 lg:h-3.5 text-white ml-auto" />}
                     </div>
                   </motion.button>
                 ))}
               </div>
 
               {showResult && (
-                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-4 rounded-xl text-center ${selectedAnswer === currentQuestion.correctAnswer ? 'bg-green-500/20 text-green-400' : selectedAnswer === null ? 'bg-zinc-700/50 text-zinc-400' : 'bg-red-500/20 text-red-400'}`}>
+                <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-3 lg:p-2.5 rounded-xl lg:rounded-lg text-center text-sm lg:text-xs ${selectedAnswer === currentQuestion.correctAnswer ? 'bg-green-500/20 text-green-400' : selectedAnswer === null ? 'bg-zinc-700/50 text-zinc-400' : 'bg-red-500/20 text-red-400'}`}>
                   {selectedAnswer === currentQuestion.correctAnswer ? (
-                    <div className="flex items-center justify-center gap-2"><CheckCircle2 className="w-5 h-5" /><span>¡Correcto!</span></div>
+                    <div className="flex items-center justify-center gap-2"><CheckCircle2 className="w-4 h-4 lg:w-3.5 lg:h-3.5" /><span>¡Correcto!</span></div>
                   ) : selectedAnswer === null ? (
-                    <div className="flex items-center justify-center gap-2"><AlertCircle className="w-5 h-5" /><span>Se acabó el tiempo</span></div>
+                    <div className="flex items-center justify-center gap-2"><AlertCircle className="w-4 h-4 lg:w-3.5 lg:h-3.5" /><span>Se acabó el tiempo</span></div>
                   ) : (
-                    <div className="flex items-center justify-center gap-2"><XCircle className="w-5 h-5" /><span>Incorrecto. La respuesta era: {currentQuestion.options[currentQuestion.correctAnswer]}</span></div>
+                    <div className="flex items-center justify-center gap-2"><XCircle className="w-4 h-4 lg:w-3.5 lg:h-3.5" /><span>Incorrecto: {currentQuestion.options[currentQuestion.correctAnswer]}</span></div>
                   )}
                 </motion.div>
               )}
@@ -328,22 +328,22 @@ export const TriviaBattleGame: React.FC<TriviaBattleGameProps> = ({ onClose }) =
           </AnimatePresence>
         </div>
 
-        <div className="w-72 border-l border-zinc-800 bg-zinc-950 p-4">
-          <h3 className="font-semibold text-white mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4" />Clasificación en vivo</h3>
-          <div className="space-y-2">
+        <div className="w-56 lg:w-48 border-l border-zinc-800 bg-zinc-950 p-3 lg:p-2 overflow-auto">
+          <h3 className="font-semibold text-white mb-3 lg:mb-2 text-sm lg:text-xs flex items-center gap-1.5"><TrendingUp className="w-3.5 h-3.5 lg:w-3 lg:h-3" />Clasificación</h3>
+          <div className="space-y-1.5 lg:space-y-1">
             {[...players].sort((a, b) => b.score - a.score).map((player, idx) => (
-              <div key={player.id} className={`p-3 rounded-xl ${player.id === '1' ? 'bg-amber-500/10' : 'bg-zinc-900'}`}>
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-bold text-zinc-500 w-4">{idx + 1}</span>
-                  <span className="text-lg">{player.avatar}</span>
+              <div key={player.id} className={`p-2 lg:p-1.5 rounded-lg ${player.id === '1' ? 'bg-amber-500/10' : 'bg-zinc-900'}`}>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs lg:text-[10px] font-bold text-zinc-500 w-3">{idx + 1}</span>
+                  <span className="text-base lg:text-sm">{player.avatar}</span>
                   <div className="flex-1 min-w-0">
-                    <p className="font-medium text-white text-sm truncate">{player.name}</p>
+                    <p className="font-medium text-white text-xs lg:text-[10px] truncate">{player.name}</p>
                     <div className="flex items-center gap-1">
-                      {player.streak > 1 && <span className="text-xs text-orange-400">🔥 {player.streak}</span>}
-                      {player.answered && <span className="text-xs text-green-400">✓</span>}
+                      {player.streak > 1 && <span className="text-[9px] lg:text-[8px] text-orange-400">🔥{player.streak}</span>}
+                      {player.answered && <span className="text-[9px] lg:text-[8px] text-green-400">✓</span>}
                     </div>
                   </div>
-                  <span className="font-bold text-amber-400 text-sm">{player.score.toLocaleString()}</span>
+                  <span className="font-bold text-amber-400 text-xs lg:text-[10px]">{player.score.toLocaleString()}</span>
                 </div>
               </div>
             ))}

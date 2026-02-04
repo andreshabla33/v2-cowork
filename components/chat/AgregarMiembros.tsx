@@ -1,6 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../lib/supabase';
+import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../../lib/i18n';
 
 interface Props {
   grupoId: string;
@@ -13,6 +13,14 @@ export const AgregarMiembros: React.FC<Props> = ({ grupoId, espacioId, onClose }
   const [miembrosActuales, setMiembrosActuales] = useState<string[]>([]);
   const [seleccionados, setSeleccionados] = useState<string[]>([]);
   const [busqueda, setBusqueda] = useState('');
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const cargar = async () => {
@@ -76,11 +84,11 @@ export const AgregarMiembros: React.FC<Props> = ({ grupoId, espacioId, onClose }
   return (
     <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[1000] p-6">
       <div className="bg-[#0d0d0f] border border-white/10 rounded-[48px] p-12 w-full max-w-md shadow-[0_50px_100px_rgba(0,0,0,0.8)] animate-in zoom-in duration-300">
-        <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-8 text-white">Añadir al canal</h2>
+        <h2 className="text-3xl font-black uppercase italic tracking-tighter mb-8 text-white">{t('chat.addToChannel', currentLang)}</h2>
         
         <input 
           type="text"
-          placeholder="Buscar miembros..."
+          placeholder={t('chat.searchMembers', currentLang)}
           value={busqueda}
           onChange={(e) => setBusqueda(e.target.value)}
           className="w-full bg-black/40 border border-white/10 rounded-2xl px-6 py-4 mb-6 text-sm focus:ring-2 focus:ring-indigo-600 outline-none text-white placeholder:text-zinc-800"
@@ -111,7 +119,7 @@ export const AgregarMiembros: React.FC<Props> = ({ grupoId, espacioId, onClose }
                   <p className="text-[9px] text-zinc-600 font-bold uppercase truncate">{user.email}</p>
                 </div>
                 {esMiembro && (
-                  <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">Miembro</span>
+                  <span className="text-[8px] font-black uppercase tracking-widest text-zinc-500">{t('chat.member', currentLang)}</span>
                 )}
                 {!esMiembro && estaSeleccionado && (
                   <span className="text-indigo-200">✓</span>
@@ -126,14 +134,14 @@ export const AgregarMiembros: React.FC<Props> = ({ grupoId, espacioId, onClose }
             onClick={onClose}
             className="flex-1 py-4 font-black uppercase tracking-widest text-[10px] text-zinc-500 hover:text-white transition-colors"
           >
-            Cancelar
+            {t('button.cancel', currentLang)}
           </button>
           <button
             onClick={agregarMiembros}
             disabled={seleccionados.length === 0}
             className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-5 rounded-2xl font-black uppercase tracking-widest text-[10px] shadow-xl disabled:opacity-50"
           >
-            Añadir ({seleccionados.length})
+            {t('action.add', currentLang)} ({seleccionados.length})
           </button>
         </div>
       </div>

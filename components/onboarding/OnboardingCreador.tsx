@@ -176,7 +176,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#050508] flex items-center justify-center p-4 overflow-y-auto">
+    <div className="fixed inset-0 bg-[#050508] flex items-center justify-center p-4 lg:p-3 overflow-y-auto">
       {/* Fondo con gradientes neon animados - mismo estilo que login */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-30%] left-[-20%] w-[70%] h-[70%] rounded-full bg-violet-600/15 blur-[180px] animate-pulse" />
@@ -186,60 +186,60 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
       </div>
 
       <AnimatePresence mode="wait">
-        {/* PASO: Bienvenida */}
+        {/* PASO: Bienvenida - Compacto */}
         {paso === 'bienvenida' && (
           <motion.div
             key="bienvenida"
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-lg text-center relative z-10"
+            className="w-full max-w-md lg:max-w-sm text-center relative z-10"
           >
-            <div className="mb-8">
+            <div className="mb-6 lg:mb-5">
               {/* Logo con glow neon */}
-              <div className="relative group mx-auto w-20 h-20 mb-6">
-                <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-2xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
-                <div className="relative w-20 h-20 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-2xl flex items-center justify-center shadow-2xl">
-                  <Sparkles className="w-10 h-10 text-white" />
+              <div className="relative group mx-auto w-14 h-14 lg:w-12 lg:h-12 mb-4 lg:mb-3">
+                <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-cyan-500 rounded-xl blur-lg opacity-40 group-hover:opacity-60 transition-opacity duration-500" />
+                <div className="relative w-14 h-14 lg:w-12 lg:h-12 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-xl flex items-center justify-center shadow-2xl">
+                  <Sparkles className="w-7 h-7 lg:w-6 lg:h-6 text-white" />
                 </div>
               </div>
-              <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-4">
+              <h1 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
                 ¡Bienvenido, {userName.split(' ')[0]}!
               </h1>
-              <p className="text-lg text-zinc-400">
+              <p className="text-sm lg:text-xs text-zinc-400">
                 Vamos a configurar tu espacio de trabajo en menos de 2 minutos
               </p>
             </div>
 
-            <div className="space-y-3 mb-8">
-              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
-                  <span className="text-violet-400 font-black">1</span>
+            <div className="space-y-2 lg:space-y-1.5 mb-6 lg:mb-5">
+              <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
+                <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black text-sm lg:text-xs">1</span>
                 </div>
-                <span className="text-zinc-300 font-medium">Selecciona tu cargo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
               </div>
-              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
-                  <span className="text-violet-400 font-black">2</span>
+              <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
+                <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black text-sm lg:text-xs">2</span>
                 </div>
-                <span className="text-zinc-300 font-medium">Crea tu espacio de trabajo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Crea tu espacio de trabajo</span>
               </div>
-              <div className="flex items-center gap-4 p-4 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-2xl group hover:border-violet-500/30 transition-all">
-                <div className="w-10 h-10 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-xl flex items-center justify-center border border-violet-500/20">
-                  <span className="text-violet-400 font-black">3</span>
+              <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
+                <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black text-sm lg:text-xs">3</span>
                 </div>
-                <span className="text-zinc-300 font-medium">Invita a tu equipo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Invita a tu equipo</span>
               </div>
             </div>
 
             <button
               onClick={() => setPaso('cargo')}
-              className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98]"
+              className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-3 lg:py-2.5 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98]"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
               <span className="relative flex items-center justify-center gap-2">
                 Comenzar
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
               </span>
             </button>
           </motion.div>

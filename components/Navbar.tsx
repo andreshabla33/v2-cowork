@@ -1,7 +1,7 @@
-
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ThemeType, AvatarConfig } from '../types';
+import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
 
 export const AvatarPreview: React.FC<{
   config: AvatarConfig, 
@@ -57,12 +57,21 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onVibenToggle }) => {
   const { theme, setTheme, currentUser } = useStore();
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Suscribirse a cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   const themes: {id: ThemeType, label: string, icon: string, color: string}[] = [
-    { id: 'dark', label: 'Dark', icon: '🌑', color: 'bg-zinc-950' },
-    { id: 'light', label: 'Light', icon: '☀️', color: 'bg-white' },
-    { id: 'space', label: 'Espacial', icon: '🚀', color: 'bg-indigo-950' },
-    { id: 'arcade', label: 'Arcade', icon: '🎮', color: 'bg-black' }
+    { id: 'dark', label: t('theme.dark', currentLang), icon: '🌑', color: 'bg-zinc-950' },
+    { id: 'light', label: t('theme.light', currentLang), icon: '☀️', color: 'bg-white' },
+    { id: 'space', label: t('theme.space', currentLang), icon: '🚀', color: 'bg-indigo-950' },
+    { id: 'arcade', label: t('theme.arcade', currentLang), icon: '🎮', color: 'bg-black' }
   ];
 
   return (
@@ -95,7 +104,7 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onViben
 
         <button onClick={onVibenToggle} className={`flex items-center gap-2 border px-4 py-1.5 rounded-full transition-all group ${theme === 'arcade' ? 'bg-[#00ff41]/5 border-[#00ff41]/30 hover:bg-[#00ff41]/10 text-[#00ff41]' : 'bg-indigo-600/10 hover:bg-indigo-600/20 border-indigo-600/30 text-indigo-500'}`}>
           <span className={`w-1.5 h-1.5 rounded-full animate-pulse ${theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-indigo-500'}`}></span>
-          <span className="text-[10px] font-black uppercase tracking-widest">Ask Viben</span>
+          <span className="text-[10px] font-black uppercase tracking-widest">{t('button.askViben', currentLang)}</span>
         </button>
 
         <div className={`flex items-center gap-3 pl-4 border-l ${theme === 'light' ? 'border-zinc-200' : 'border-white/10'}`}>

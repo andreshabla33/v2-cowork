@@ -1,7 +1,8 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useStore } from './store/useStore';
 import { supabase } from './lib/supabase';
+import './lib/i18n-config'; // Inicializar i18next
 import { LoginScreen } from './components/LoginScreen';
 import { Dashboard } from './components/Dashboard';
 import { WorkspaceLayout } from './components/WorkspaceLayout';
