@@ -1,0 +1,16 @@
+{
+  "rewrites": [
+    {
+      "source": "/join/:token*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/meet/:code*",
+      "destination": "/index.html"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
