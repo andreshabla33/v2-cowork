@@ -191,11 +191,12 @@ export const InviteLinkGenerator: React.FC<InviteLinkGeneratorProps> = ({
                     <select
                       value={invitado.tipo}
                       onChange={(e) => updateInvitado(index, 'tipo', e.target.value as any)}
-                      className="bg-white/5 border border-white/10 rounded-lg px-2 py-2 text-xs focus:outline-none"
+                      className="bg-zinc-800 border border-white/10 rounded-lg px-2 py-2 text-xs focus:outline-none text-white min-w-[100px]"
+                      style={{ colorScheme: 'dark' }}
                     >
-                      <option value="invitado">Invitado</option>
-                      <option value="cliente">Cliente</option>
-                      <option value="candidato">Candidato</option>
+                      <option value="invitado" className="bg-zinc-800 text-white py-1">Invitado</option>
+                      <option value="cliente" className="bg-zinc-800 text-white py-1">Cliente</option>
+                      <option value="candidato" className="bg-zinc-800 text-white py-1">Candidato</option>
                     </select>
                     {invitados.length > 1 && (
                       <button
