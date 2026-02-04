@@ -1,6 +1,19 @@
 // Sistema de internacionalización simple
 export type Language = 'es' | 'en' | 'pt';
 
+// Evento personalizado para cambios de idioma
+const LANGUAGE_CHANGE_EVENT = 'languagechange';
+
+export function subscribeToLanguageChange(callback: () => void): () => void {
+  const handler = () => callback();
+  window.addEventListener(LANGUAGE_CHANGE_EVENT, handler);
+  return () => window.removeEventListener(LANGUAGE_CHANGE_EVENT, handler);
+}
+
+export function notifyLanguageChange(): void {
+  window.dispatchEvent(new CustomEvent(LANGUAGE_CHANGE_EVENT));
+}
+
 const translations = {
   es: {
     // General

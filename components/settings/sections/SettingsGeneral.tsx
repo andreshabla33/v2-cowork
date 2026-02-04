@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
-import { t, Language, getCurrentLanguage } from '../../../lib/i18n';
+import { t, Language, getCurrentLanguage, notifyLanguageChange, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface GeneralSettings {
   skipWelcomeScreen: boolean;
@@ -24,13 +24,10 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
 
   // Escuchar cambios de idioma
   useEffect(() => {
-    const handleStorageChange = () => {
-      const newLang = getCurrentLanguage();
-      setCurrentLang(newLang);
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
   }, []);
 
   // Actualizar cuando cambie settings.language
@@ -41,10 +38,10 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
   const updateSetting = <K extends keyof GeneralSettings>(key: K, value: GeneralSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
     
-    // Si cambió el idioma, disparar evento para actualizar UI
+    // Si cambió el idioma, notificar a todos los componentes
     if (key === 'language') {
       setTimeout(() => {
-        window.dispatchEvent(new Event('storage'));
+        notifyLanguageChange();
       }, 0);
     }
   };
