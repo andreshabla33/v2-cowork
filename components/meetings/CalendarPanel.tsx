@@ -3,9 +3,15 @@ import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting } from '../../types';
 import { googleCalendar, GoogleCalendarEvent } from '../../lib/googleCalendar';
+import { MeetingRoom, InviteLinkGenerator } from './videocall';
 
 interface CalendarPanelProps {
   onJoinMeeting?: (salaId: string) => void;
+}
+
+interface ActiveMeeting {
+  salaId: string;
+  titulo: string;
 }
 
 export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) => {
@@ -20,6 +26,10 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   const [miembrosEspacio, setMiembrosEspacio] = useState<any[]>([]);
   const [googleConnected, setGoogleConnected] = useState(googleCalendar.isConnected());
   const [syncingGoogle, setSyncingGoogle] = useState(false);
+  
+  // Estados para videollamadas
+  const [activeMeeting, setActiveMeeting] = useState<ActiveMeeting | null>(null);
+  const [showInviteModal, setShowInviteModal] = useState<string | null>(null);
 
   const [newMeeting, setNewMeeting] = useState({
     titulo: '',
@@ -165,6 +175,32 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       .single();
 
     if (!error && meeting) {
+      // Crear sala de videollamada asociada
+      const { data: sala } = await supabase
+        .from('salas_reunion')
+        .insert({
+          nombre: newMeeting.titulo.trim(),
+          espacio_id: activeWorkspace.id,
+          creador_id: currentUser.id,
+          tipo: 'programada',
+          reunion_programada_id: meeting.id,
+          configuracion: {
+            sala_espera: true,
+            permitir_grabacion: true,
+            max_participantes: 50
+          }
+        })
+        .select()
+        .single();
+
+      // Actualizar reunión con sala_id
+      if (sala) {
+        await supabase
+          .from('reuniones_programadas')
+          .update({ sala_id: sala.id })
+          .eq('id', meeting.id);
+      }
+
       // Insertar participantes
       if (newMeeting.participantes.length > 0) {
         const participantesData = newMeeting.participantes.map(uid => ({
@@ -615,12 +651,30 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                         </div>
 
                         <div className="flex flex-col gap-2">
-                          {isNow && meeting.sala_id && (
+                          {/* Botón Iniciar/Unirse Videollamada */}
+                          {meeting.sala_id && (
                             <button
-                              onClick={() => onJoinMeeting?.(meeting.sala_id!)}
-                              className={`px-4 py-2 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-green-500'} hover:opacity-80 rounded-xl text-xs font-bold transition-all`}
+                              onClick={() => setActiveMeeting({ salaId: meeting.sala_id!, titulo: meeting.titulo })}
+                              className={`px-4 py-2 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-gradient-to-r from-indigo-500 to-purple-600'} hover:opacity-80 rounded-xl text-xs font-bold transition-all flex items-center gap-2 justify-center`}
                             >
-                              Unirse
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                              </svg>
+                              {isNow ? 'Unirse' : 'Iniciar'}
+                            </button>
+                          )}
+
+                          {/* Botón Invitar Externos */}
+                          {isCreator(meeting) && meeting.sala_id && (
+                            <button
+                              onClick={() => setShowInviteModal(meeting.sala_id!)}
+                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 justify-center"
+                              title="Invitar clientes o candidatos"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                              </svg>
+                              Invitar
                             </button>
                           )}
 
@@ -871,6 +925,24 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal de Videollamada */}
+      {activeMeeting && (
+        <div className="fixed inset-0 z-[100]">
+          <MeetingRoom
+            salaId={activeMeeting.salaId}
+            onLeave={() => setActiveMeeting(null)}
+          />
+        </div>
+      )}
+
+      {/* Modal de Invitación */}
+      {showInviteModal && (
+        <InviteLinkGenerator
+          salaId={showInviteModal}
+          onClose={() => setShowInviteModal(null)}
+        />
       )}
     </div>
   );
