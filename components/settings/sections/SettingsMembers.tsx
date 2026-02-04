@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { SettingSection } from '../components/SettingSection';
+import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface Member {
   id: string;
@@ -25,6 +26,15 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
 }) => {
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const loadMembers = async () => {
@@ -55,14 +65,14 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
       admin: 'bg-violet-600 text-white',
       member: 'bg-zinc-700 text-zinc-300'
     };
-    const labels: Record<string, string> = {
-      super_admin: 'Super Admin',
-      admin: 'Admin',
-      member: 'Miembro'
+    const labels: Record<string, Record<Language, string>> = {
+      super_admin: { es: 'Super Admin', en: 'Super Admin', pt: 'Super Admin' },
+      admin: { es: 'Admin', en: 'Admin', pt: 'Admin' },
+      member: { es: 'Miembro', en: 'Member', pt: 'Membro' }
     };
     return (
       <span className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase ${colors[rol] || colors.member}`}>
-        {labels[rol] || rol}
+        {labels[rol]?.[currentLang] || rol}
       </span>
     );
   };
@@ -71,14 +81,14 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Gestionar Miembros
+          {currentLang === 'en' ? 'Manage Members' : currentLang === 'pt' ? 'Gerenciar Membros' : 'Gestionar Miembros'}
         </h2>
         <p className="text-sm text-zinc-400">
-          Administra los miembros del espacio de trabajo
+          {currentLang === 'en' ? 'Manage workspace members' : currentLang === 'pt' ? 'Gerenciar os membros do espaço de trabalho' : 'Administra los miembros del espacio de trabajo'}
         </p>
       </div>
 
-      <SettingSection title={`Miembros (${members.length})`}>
+      <SettingSection title={`${currentLang === 'en' ? 'Members' : currentLang === 'pt' ? 'Membros' : 'Miembros'} (${members.length})`}>
         {loading ? (
           <div className="py-8 text-center">
             <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
@@ -108,7 +118,7 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
                   )}
                   {getRoleBadge(member.rol)}
                   {!member.aceptado && (
-                    <span className="text-xs text-amber-400">Pendiente</span>
+                    <span className="text-xs text-amber-400">{currentLang === 'en' ? 'Pending' : currentLang === 'pt' ? 'Pendente' : 'Pendiente'}</span>
                   )}
                 </div>
               </div>
@@ -123,7 +133,7 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
-            Invitar nuevo miembro
+            {currentLang === 'en' ? 'Invite new member' : currentLang === 'pt' ? 'Convidar novo membro' : 'Invitar nuevo miembro'}
           </button>
         </div>
       )}

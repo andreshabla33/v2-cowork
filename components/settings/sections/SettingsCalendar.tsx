@@ -3,6 +3,7 @@ import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
 import { googleCalendar } from '../../../lib/googleCalendar';
+import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface CalendarSettings {
   googleConnected: boolean;
@@ -23,6 +24,15 @@ export const SettingsCalendar: React.FC<SettingsCalendarProps> = ({
 }) => {
   const [googleConnected, setGoogleConnected] = useState(googleCalendar.isConnected());
   const [syncing, setSyncing] = useState(false);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     setGoogleConnected(googleCalendar.isConnected());
@@ -54,33 +64,33 @@ export const SettingsCalendar: React.FC<SettingsCalendarProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Calendario
+          {currentLang === 'en' ? 'Calendar' : currentLang === 'pt' ? 'Calendário' : 'Calendario'}
         </h2>
         <p className="text-sm text-zinc-400">
-          Configura la sincronización y preferencias de calendario
+          {currentLang === 'en' ? 'Configure calendar sync and preferences' : currentLang === 'pt' ? 'Configure a sincronização e preferências do calendário' : 'Configura la sincronización y preferencias de calendario'}
         </p>
       </div>
 
-      <SettingSection title="Google Calendar">
+      <SettingSection title={currentLang === 'en' ? 'Google Calendar' : currentLang === 'pt' ? 'Google Calendar' : 'Google Calendar'}>
         <div className="py-4 border-b border-white/[0.05]">
           <div className="flex items-center justify-between">
             <div className="flex-1 pr-4">
-              <p className="text-sm font-medium text-white">Conectar Google Calendar</p>
+              <p className="text-sm font-medium text-white">{currentLang === 'en' ? 'Connect Google Calendar' : currentLang === 'pt' ? 'Conectar Google Calendar' : 'Conectar Google Calendar'}</p>
               <p className="text-xs text-zinc-400 mt-0.5">
-                Sincroniza tus eventos y crea reuniones con Google Meet
+                {currentLang === 'en' ? 'Sync your events and create meetings with Google Meet' : currentLang === 'pt' ? 'Sincronize seus eventos e crie reuniões com Google Meet' : 'Sincroniza tus eventos y crea reuniones con Google Meet'}
               </p>
             </div>
             {googleConnected ? (
               <div className="flex items-center gap-3">
                 <div className="flex items-center gap-2 px-3 py-1.5 bg-green-500/20 text-green-400 rounded-lg text-xs font-medium">
                   <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" />
-                  Conectado
+                  {currentLang === 'en' ? 'Connected' : currentLang === 'pt' ? 'Conectado' : 'Conectado'}
                 </div>
                 <button
                   onClick={disconnectGoogle}
                   className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-all"
                 >
-                  Desconectar
+                  {currentLang === 'en' ? 'Disconnect' : currentLang === 'pt' ? 'Desconectar' : 'Desconectar'}
                 </button>
               </div>
             ) : (
@@ -91,7 +101,7 @@ export const SettingsCalendar: React.FC<SettingsCalendarProps> = ({
                 <svg className="w-4 h-4" viewBox="0 0 24 24">
                   <path fill="currentColor" d="M12.545,10.239v3.821h5.445c-0.712,2.315-2.647,3.972-5.445,3.972c-3.332,0-6.033-2.701-6.033-6.032s2.701-6.032,6.033-6.032c1.498,0,2.866,0.549,3.921,1.453l2.814-2.814C17.503,2.988,15.139,2,12.545,2C7.021,2,2.543,6.477,2.543,12s4.478,10,10.002,10c8.396,0,10.249-7.85,9.426-11.748L12.545,10.239z"/>
                 </svg>
-                Conectar
+                {currentLang === 'en' ? 'Connect' : currentLang === 'pt' ? 'Conectar' : 'Conectar'}
               </button>
             )}
           </div>
@@ -100,14 +110,14 @@ export const SettingsCalendar: React.FC<SettingsCalendarProps> = ({
         {googleConnected && (
           <>
             <SettingToggle
-              label="Mostrar eventos de Google"
-              description="Muestra tus eventos de Google Calendar en el calendario de Cowork"
+              label={currentLang === 'en' ? 'Show Google events' : currentLang === 'pt' ? 'Mostrar eventos do Google' : 'Mostrar eventos de Google'}
+              description={currentLang === 'en' ? 'Show your Google Calendar events in Cowork calendar' : currentLang === 'pt' ? 'Mostrar seus eventos do Google Calendar no calendário do Cowork' : 'Muestra tus eventos de Google Calendar en el calendario de Cowork'}
               checked={settings.showGoogleEvents}
               onChange={(v) => updateSetting('showGoogleEvents', v)}
             />
             <SettingToggle
-              label="Crear eventos en Google automáticamente"
-              description="Al crear una reunión en Cowork, también se crea en Google Calendar"
+              label={currentLang === 'en' ? 'Auto-create events in Google' : currentLang === 'pt' ? 'Criar eventos no Google automaticamente' : 'Crear eventos en Google automáticamente'}
+              description={currentLang === 'en' ? 'When creating a meeting in Cowork, also create it in Google Calendar' : currentLang === 'pt' ? 'Ao criar uma reunião no Cowork, também crie no Google Calendar' : 'Al crear una reunión en Cowork, también se crea en Google Calendar'}
               checked={settings.autoCreateGoogleEvent}
               onChange={(v) => updateSetting('autoCreateGoogleEvent', v)}
             />
@@ -115,20 +125,20 @@ export const SettingsCalendar: React.FC<SettingsCalendarProps> = ({
         )}
       </SettingSection>
 
-      <SettingSection title="Recordatorios">
+      <SettingSection title={currentLang === 'en' ? 'Reminders' : currentLang === 'pt' ? 'Lembretes' : 'Recordatorios'}>
         <SettingDropdown
-          label="Recordatorio predeterminado"
-          description="Tiempo antes de la reunión para recibir notificación"
+          label={currentLang === 'en' ? 'Default reminder' : currentLang === 'pt' ? 'Lembrete padrão' : 'Recordatorio predeterminado'}
+          description={currentLang === 'en' ? 'Time before meeting to receive notification' : currentLang === 'pt' ? 'Tempo antes da reunião para receber notificação' : 'Tiempo antes de la reunión para recibir notificación'}
           value={settings.defaultReminder.toString()}
           options={reminderOptions}
           onChange={(v) => updateSetting('defaultReminder', parseInt(v))}
         />
       </SettingSection>
 
-      <SettingSection title="Sincronización">
+      <SettingSection title={currentLang === 'en' ? 'Sync' : currentLang === 'pt' ? 'Sincronização' : 'Sincronización'}>
         <SettingToggle
-          label="Sincronización automática"
-          description="Mantener el calendario sincronizado en tiempo real"
+          label={currentLang === 'en' ? 'Auto sync' : currentLang === 'pt' ? 'Sincronização automática' : 'Sincronización automática'}
+          description={currentLang === 'en' ? 'Keep calendar synced in real-time' : currentLang === 'pt' ? 'Mantenha o calendário sincronizado em tempo real' : 'Mantener el calendario sincronizado en tiempo real'}
           checked={settings.syncEnabled}
           onChange={(v) => updateSetting('syncEnabled', v)}
         />

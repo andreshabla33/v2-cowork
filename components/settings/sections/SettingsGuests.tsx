@@ -3,6 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
+import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface Guest {
   id: string;
@@ -33,6 +34,15 @@ export const SettingsGuests: React.FC<SettingsGuestsProps> = ({
 }) => {
   const [guests, setGuests] = useState<Guest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     loadGuests();
@@ -73,11 +83,11 @@ export const SettingsGuests: React.FC<SettingsGuestsProps> = ({
   };
 
   const durationOptions = [
-    { value: '1', label: '1 hora' },
-    { value: '8', label: '8 horas' },
-    { value: '24', label: '24 horas' },
-    { value: '168', label: '1 semana' },
-    { value: '720', label: '30 días' }
+    { value: '1', label: currentLang === 'en' ? '1 hour' : currentLang === 'pt' ? '1 hora' : '1 hora' },
+    { value: '8', label: currentLang === 'en' ? '8 hours' : currentLang === 'pt' ? '8 horas' : '8 horas' },
+    { value: '24', label: currentLang === 'en' ? '24 hours' : currentLang === 'pt' ? '24 horas' : '24 horas' },
+    { value: '168', label: currentLang === 'en' ? '1 week' : currentLang === 'pt' ? '1 semana' : '1 semana' },
+    { value: '720', label: currentLang === 'en' ? '30 days' : currentLang === 'pt' ? '30 dias' : '30 días' }
   ];
 
   const formatDate = (dateStr: string) => {
@@ -95,58 +105,58 @@ export const SettingsGuests: React.FC<SettingsGuestsProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Gestión de Invitados
+          {currentLang === 'en' ? 'Guest Management' : currentLang === 'pt' ? 'Gestão de Convidados' : 'Gestión de Invitados'}
         </h2>
         <p className="text-sm text-zinc-400">
-          Controla el acceso de invitados externos al espacio
+          {currentLang === 'en' ? 'Control external guest access to the space' : currentLang === 'pt' ? 'Controle o acesso de convidados externos ao espaço' : 'Controla el acceso de invitados externos al espacio'}
         </p>
       </div>
 
-      <SettingSection title="Acceso de Invitados">
+      <SettingSection title={currentLang === 'en' ? 'Guest Access' : currentLang === 'pt' ? 'Acesso de Convidados' : 'Acceso de Invitados'}>
         <SettingToggle
-          label="Check-in de invitados"
-          description="Los invitados deben solicitar acceso a un miembro en línea"
+          label={currentLang === 'en' ? 'Guest check-in' : currentLang === 'pt' ? 'Check-in de convidados' : 'Check-in de invitados'}
+          description={currentLang === 'en' ? 'Guests must request access from an online member' : currentLang === 'pt' ? 'Convidados devem solicitar acesso a um membro online' : 'Los invitados deben solicitar acceso a un miembro en línea'}
           checked={settings.guestCheckInEnabled}
           onChange={(v) => updateSetting('guestCheckInEnabled', v)}
         />
         <SettingToggle
-          label="Requiere aprobación"
-          description="Un admin debe aprobar cada invitado antes de que pueda entrar"
+          label={currentLang === 'en' ? 'Requires approval' : currentLang === 'pt' ? 'Requer aprovação' : 'Requiere aprobación'}
+          description={currentLang === 'en' ? 'An admin must approve each guest before they can enter' : currentLang === 'pt' ? 'Um admin deve aprovar cada convidado antes de poder entrar' : 'Un admin debe aprobar cada invitado antes de que pueda entrar'}
           checked={settings.requireApproval}
           onChange={(v) => updateSetting('requireApproval', v)}
         />
         <SettingDropdown
-          label="Duración del acceso"
-          description="Tiempo que un invitado puede permanecer en el espacio"
+          label={currentLang === 'en' ? 'Access duration' : currentLang === 'pt' ? 'Duração do acesso' : 'Duración del acceso'}
+          description={currentLang === 'en' ? 'Time a guest can stay in the space' : currentLang === 'pt' ? 'Tempo que um convidado pode permanecer no espaço' : 'Tiempo que un invitado puede permanecer en el espacio'}
           value={settings.guestAccessDuration.toString()}
           options={durationOptions}
           onChange={(v) => updateSetting('guestAccessDuration', parseInt(v))}
         />
       </SettingSection>
 
-      <SettingSection title="Permisos de Invitados">
+      <SettingSection title={currentLang === 'en' ? 'Guest Permissions' : currentLang === 'pt' ? 'Permissões de Convidados' : 'Permisos de Invitados'}>
         <SettingToggle
-          label="Permitir chat"
-          description="Los invitados pueden enviar mensajes"
+          label={currentLang === 'en' ? 'Allow chat' : currentLang === 'pt' ? 'Permitir chat' : 'Permitir chat'}
+          description={currentLang === 'en' ? 'Guests can send messages' : currentLang === 'pt' ? 'Convidados podem enviar mensagens' : 'Los invitados pueden enviar mensajes'}
           checked={settings.allowGuestChat}
           onChange={(v) => updateSetting('allowGuestChat', v)}
         />
         <SettingToggle
-          label="Permitir video"
-          description="Los invitados pueden activar su cámara"
+          label={currentLang === 'en' ? 'Allow video' : currentLang === 'pt' ? 'Permitir vídeo' : 'Permitir video'}
+          description={currentLang === 'en' ? 'Guests can enable their camera' : currentLang === 'pt' ? 'Convidados podem ativar sua câmera' : 'Los invitados pueden activar su cámara'}
           checked={settings.allowGuestVideo}
           onChange={(v) => updateSetting('allowGuestVideo', v)}
         />
       </SettingSection>
 
-      <SettingSection title={`Invitaciones Pendientes (${guests.length})`}>
+      <SettingSection title={`${currentLang === 'en' ? 'Pending Invitations' : currentLang === 'pt' ? 'Convites Pendentes' : 'Invitaciones Pendientes'} (${guests.length})`}>
         {loading ? (
           <div className="py-8 text-center">
             <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin mx-auto" />
           </div>
         ) : guests.length === 0 ? (
           <div className="py-6 text-center text-zinc-500 text-sm">
-            No hay invitaciones pendientes
+            {currentLang === 'en' ? 'No pending invitations' : currentLang === 'pt' ? 'Nenhum convite pendente' : 'No hay invitaciones pendientes'}
           </div>
         ) : (
           <div className="divide-y divide-white/[0.05]">
@@ -155,9 +165,9 @@ export const SettingsGuests: React.FC<SettingsGuestsProps> = ({
                 <div>
                   <p className="text-sm font-medium text-white">{guest.email}</p>
                   <p className="text-xs text-zinc-500">
-                    Expira: {formatDate(guest.acceso_hasta)}
+                    {currentLang === 'en' ? 'Expires: ' : currentLang === 'pt' ? 'Expira: ' : 'Expira: '} {formatDate(guest.acceso_hasta)}
                     {isExpired(guest.acceso_hasta) && (
-                      <span className="ml-2 text-red-400">(Expirado)</span>
+                      <span className="ml-2 text-red-400">({currentLang === 'en' ? 'Expired' : currentLang === 'pt' ? 'Expirado' : 'Expirado'})</span>
                     )}
                   </p>
                 </div>
@@ -165,7 +175,7 @@ export const SettingsGuests: React.FC<SettingsGuestsProps> = ({
                   onClick={() => revokeGuest(guest.id)}
                   className="px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg text-xs font-medium transition-all"
                 >
-                  Revocar
+                  {currentLang === 'en' ? 'Revoke' : currentLang === 'pt' ? 'Revogar' : 'Revocar'}
                 </button>
               </div>
             ))}

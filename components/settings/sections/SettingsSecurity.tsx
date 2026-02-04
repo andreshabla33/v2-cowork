@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
+import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface SecuritySettings {
   requireLogin: boolean;
@@ -27,6 +28,15 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
 }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [newDomain, setNewDomain] = useState('');
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   const updateSetting = <K extends keyof SecuritySettings>(key: K, value: SecuritySettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
@@ -44,41 +54,41 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
   };
 
   const sessionOptions = [
-    { value: '30', label: '30 minutos' },
-    { value: '60', label: '1 hora' },
-    { value: '240', label: '4 horas' },
-    { value: '480', label: '8 horas' },
-    { value: '1440', label: '24 horas' }
+    { value: '30', label: currentLang === 'en' ? '30 minutes' : currentLang === 'pt' ? '30 minutos' : '30 minutos' },
+    { value: '60', label: currentLang === 'en' ? '1 hour' : currentLang === 'pt' ? '1 hora' : '1 hora' },
+    { value: '240', label: currentLang === 'en' ? '4 hours' : currentLang === 'pt' ? '4 horas' : '4 horas' },
+    { value: '480', label: currentLang === 'en' ? '8 hours' : currentLang === 'pt' ? '8 horas' : '8 horas' },
+    { value: '1440', label: currentLang === 'en' ? '24 hours' : currentLang === 'pt' ? '24 horas' : '24 horas' }
   ];
 
   return (
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Seguridad
+          {currentLang === 'en' ? 'Security' : currentLang === 'pt' ? 'Segurança' : 'Seguridad'}
         </h2>
         <p className="text-sm text-zinc-400">
-          Configura las políticas de seguridad del espacio
+          {currentLang === 'en' ? 'Configure space security policies' : currentLang === 'pt' ? 'Configure as políticas de segurança do espaço' : 'Configura las políticas de seguridad del espacio'}
         </p>
       </div>
 
-      <SettingSection title="Acceso al Espacio">
+      <SettingSection title={currentLang === 'en' ? 'Space Access' : currentLang === 'pt' ? 'Acesso ao Espaço' : 'Acceso al Espacio'}>
         <SettingToggle
-          label="Requerir inicio de sesión"
-          description="Los usuarios deben tener una cuenta para acceder"
+          label={currentLang === 'en' ? 'Require login' : currentLang === 'pt' ? 'Requerir login' : 'Requerir inicio de sesión'}
+          description={currentLang === 'en' ? 'Users must have an account to access' : currentLang === 'pt' ? 'Usuários devem ter uma conta para acessar' : 'Los usuarios deben tener una cuenta para acceder'}
           checked={settings.requireLogin}
           onChange={(v) => updateSetting('requireLogin', v)}
         />
         <SettingToggle
-          label="Protección con contraseña"
-          description="Requiere una contraseña adicional para entrar al espacio"
+          label={currentLang === 'en' ? 'Password protection' : currentLang === 'pt' ? 'Proteção com senha' : 'Protección con contraseña'}
+          description={currentLang === 'en' ? 'Requires an additional password to enter the space' : currentLang === 'pt' ? 'Requer uma senha adicional para entrar no espaço' : 'Requiere una contraseña adicional para entrar al espacio'}
           checked={settings.passwordProtection}
           onChange={(v) => updateSetting('passwordProtection', v)}
         />
         {settings.passwordProtection && (
           <div className="py-4 border-b border-white/[0.05]">
             <div className="flex-1">
-              <p className="text-sm font-medium text-white mb-2">Contraseña del espacio</p>
+              <p className="text-sm font-medium text-white mb-2">{currentLang === 'en' ? 'Space password' : currentLang === 'pt' ? 'Senha do espaço' : 'Contraseña del espacio'}</p>
               <div className="flex gap-2">
                 <div className="relative flex-1">
                   <input
@@ -86,7 +96,7 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
                     value={settings.spacePassword}
                     onChange={(e) => updateSetting('spacePassword', e.target.value)}
                     className="w-full bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500/50"
-                    placeholder="Ingresa la contraseña"
+                    placeholder={currentLang === 'en' ? 'Enter password' : currentLang === 'pt' ? 'Digite a senha' : 'Ingresa la contraseña'}
                   />
                   <button
                     onClick={() => setShowPassword(!showPassword)}
@@ -107,10 +117,10 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
         )}
       </SettingSection>
 
-      <SettingSection title="Restricción por Dominio">
+      <SettingSection title={currentLang === 'en' ? 'Domain Restriction' : currentLang === 'pt' ? 'Restrição por Domínio' : 'Restricción por Dominio'}>
         <div className="py-4 border-b border-white/[0.05]">
-          <p className="text-sm font-medium text-white mb-1">Dominios permitidos</p>
-          <p className="text-xs text-zinc-400 mb-3">Solo usuarios con estos dominios de email pueden acceder</p>
+          <p className="text-sm font-medium text-white mb-1">{currentLang === 'en' ? 'Allowed domains' : currentLang === 'pt' ? 'Domínios permitidos' : 'Dominios permitidos'}</p>
+          <p className="text-xs text-zinc-400 mb-3">{currentLang === 'en' ? 'Only users with these email domains can access' : currentLang === 'pt' ? 'Apenas usuários com esses domínios de email podem acessar' : 'Solo usuarios con estos dominios de email pueden acceder'}</p>
           
           <div className="flex gap-2 mb-3">
             <input
@@ -118,14 +128,14 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
               value={newDomain}
               onChange={(e) => setNewDomain(e.target.value)}
               className="flex-1 bg-white/[0.05] border border-white/[0.1] rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:border-violet-500/50"
-              placeholder="ejemplo.com"
+              placeholder={currentLang === 'en' ? 'example.com' : currentLang === 'pt' ? 'exemplo.com' : 'ejemplo.com'}
               onKeyDown={(e) => e.key === 'Enter' && addDomain()}
             />
             <button
               onClick={addDomain}
               className="px-4 py-2.5 bg-violet-600 hover:bg-violet-500 rounded-xl text-sm font-medium transition-all"
             >
-              Agregar
+              {currentLang === 'en' ? 'Add' : currentLang === 'pt' ? 'Adicionar' : 'Agregar'}
             </button>
           </div>
 
@@ -149,28 +159,28 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
               ))}
             </div>
           ) : (
-            <p className="text-xs text-zinc-500 italic">Sin restricción de dominio</p>
+            <p className="text-xs text-zinc-500 italic">{currentLang === 'en' ? 'No domain restriction' : currentLang === 'pt' ? 'Sem restrição de domínio' : 'Sin restricción de dominio'}</p>
           )}
         </div>
       </SettingSection>
 
-      <SettingSection title="Sesión y Acceso">
+      <SettingSection title={currentLang === 'en' ? 'Session & Access' : currentLang === 'pt' ? 'Sessão e Acesso' : 'Sesión y Acceso'}>
         <SettingDropdown
-          label="Tiempo de expiración de sesión"
-          description="Cerrar sesión automáticamente después de inactividad"
+          label={currentLang === 'en' ? 'Session timeout' : currentLang === 'pt' ? 'Tempo de expiração da sessão' : 'Tiempo de expiración de sesión'}
+          description={currentLang === 'en' ? 'Automatically log out after inactivity' : currentLang === 'pt' ? 'Encerrar sessão automaticamente após inatividade' : 'Cerrar sesión automáticamente después de inactividad'}
           value={settings.sessionTimeout.toString()}
           options={sessionOptions}
           onChange={(v) => updateSetting('sessionTimeout', parseInt(v))}
         />
         <SettingToggle
-          label="Requerir 2FA"
-          description="Los usuarios deben configurar autenticación de dos factores"
+          label={currentLang === 'en' ? 'Require 2FA' : currentLang === 'pt' ? 'Requerir 2FA' : 'Requerir 2FA'}
+          description={currentLang === 'en' ? 'Users must set up two-factor authentication' : currentLang === 'pt' ? 'Usuários devem configurar autenticação de dois fatores' : 'Los usuarios deben configurar autenticación de dos factores'}
           checked={settings.twoFactorRequired}
           onChange={(v) => updateSetting('twoFactorRequired', v)}
         />
         <SettingToggle
-          label="Permitir acceso de soporte"
-          description="El equipo de Cowork puede acceder para ayudar con problemas"
+          label={currentLang === 'en' ? 'Allow staff access' : currentLang === 'pt' ? 'Permitir acesso de suporte' : 'Permitir acceso de soporte'}
+          description={currentLang === 'en' ? 'Cowork team can access to help with issues' : currentLang === 'pt' ? 'A equipe Cowork pode acessar para ajudar com problemas' : 'El equipo de Cowork puede acceder para ayudar con problemas'}
           checked={settings.allowStaffAccess}
           onChange={(v) => updateSetting('allowStaffAccess', v)}
         />
@@ -182,12 +192,12 @@ export const SettingsSecurity: React.FC<SettingsSecurityProps> = ({
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
           </svg>
           <div>
-            <p className="text-sm font-medium text-red-400">Zona de peligro</p>
+            <p className="text-sm font-medium text-red-400">{currentLang === 'en' ? 'Danger zone' : currentLang === 'pt' ? 'Zona de perigo' : 'Zona de peligro'}</p>
             <p className="text-xs text-zinc-400 mt-1 mb-3">
-              Acciones irreversibles que afectan a todo el espacio.
+              {currentLang === 'en' ? 'Irreversible actions that affect the entire space.' : currentLang === 'pt' ? 'Ações irreversíveis que afetam todo o espaço.' : 'Acciones irreversibles que afectan a todo el espacio.'}
             </p>
             <button className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg text-xs font-medium transition-all border border-red-500/30">
-              Eliminar espacio de trabajo
+              {currentLang === 'en' ? 'Delete workspace' : currentLang === 'pt' ? 'Excluir espaço de trabalho' : 'Eliminar espacio de trabajo'}
             </button>
           </div>
         </div>
