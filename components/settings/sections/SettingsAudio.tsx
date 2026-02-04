@@ -3,6 +3,7 @@ import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSlider } from '../components/SettingSlider';
 import { SettingSection } from '../components/SettingSection';
+import { t, Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface AudioSettings {
   selectedMicrophoneId: string;
@@ -26,6 +27,15 @@ export const SettingsAudio: React.FC<SettingsAudioProps> = ({
 }) => {
   const [microphones, setMicrophones] = useState<MediaDeviceInfo[]>([]);
   const [speakers, setSpeakers] = useState<MediaDeviceInfo[]>([]);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const loadDevices = async () => {
@@ -65,62 +75,62 @@ export const SettingsAudio: React.FC<SettingsAudioProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Audio
+          {t('settings.audio.title', currentLang)}
         </h2>
         <p className="text-sm text-zinc-400">
-          Configura tus dispositivos y preferencias de audio
+          {t('settings.audio.description', currentLang)}
         </p>
       </div>
 
-      <SettingSection title="Dispositivos">
+      <SettingSection title={currentLang === 'en' ? 'Devices' : currentLang === 'pt' ? 'Dispositivos' : 'Dispositivos'}>
         <SettingDropdown
-          label="Micrófono"
-          description="Selecciona el dispositivo de entrada de audio"
+          label={t('settings.audio.microphone', currentLang)}
+          description={t('settings.audio.microphoneDesc', currentLang)}
           value={settings.selectedMicrophoneId}
           options={microphoneOptions.length > 0 ? microphoneOptions : [{ value: '', label: 'No hay dispositivos' }]}
           onChange={(v) => updateSetting('selectedMicrophoneId', v)}
         />
         <SettingDropdown
-          label="Altavoz"
-          description="Selecciona el dispositivo de salida de audio"
+          label={t('settings.audio.speaker', currentLang)}
+          description={t('settings.audio.speakerDesc', currentLang)}
           value={settings.selectedSpeakerId}
           options={speakerOptions.length > 0 ? speakerOptions : [{ value: '', label: 'No hay dispositivos' }]}
           onChange={(v) => updateSetting('selectedSpeakerId', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Procesamiento de Audio">
+      <SettingSection title={currentLang === 'en' ? 'Audio Processing' : currentLang === 'pt' ? 'Processamento de Áudio' : 'Procesamiento de Audio'}>
         <SettingDropdown
-          label="Reducción de ruido"
+          label={t('settings.audio.noiseReduction', currentLang)}
           description="Suprime automáticamente el ruido de fondo"
           value={settings.noiseReductionLevel}
           options={noiseReductionOptions}
           onChange={(v) => updateSetting('noiseReductionLevel', v)}
         />
         <SettingToggle
-          label="Cancelación de eco"
-          description="Reduce el eco cuando tu micrófono capta el sonido de los altavoces"
+          label={t('settings.audio.echoCancellation', currentLang)}
+          description={t('settings.audio.echoCancellationDesc', currentLang)}
           checked={settings.echoCancellation}
           onChange={(v) => updateSetting('echoCancellation', v)}
         />
         <SettingToggle
-          label="Control de ganancia automático"
-          description="Ajusta automáticamente el nivel de entrada del micrófono"
+          label={t('settings.audio.autoGain', currentLang)}
+          description={t('settings.audio.autoGainDesc', currentLang)}
           checked={settings.autoGainControl}
           onChange={(v) => updateSetting('autoGainControl', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Sonidos">
+      <SettingSection title={currentLang === 'en' ? 'Sounds' : currentLang === 'pt' ? 'Sons' : 'Sonidos'}>
         <SettingToggle
-          label="Sonidos de chat"
-          description="Reproducir sonido al recibir mensajes nuevos"
+          label={t('settings.audio.chatSounds', currentLang)}
+          description={t('settings.audio.chatSoundsDesc', currentLang)}
           checked={settings.chatSounds}
           onChange={(v) => updateSetting('chatSounds', v)}
         />
         <SettingSlider
-          label="Volumen de efectos"
-          description="Ajusta el volumen de los sonidos de la aplicación"
+          label={t('settings.audio.sfxVolume', currentLang)}
+          description={t('settings.audio.sfxVolumeDesc', currentLang)}
           value={settings.sfxVolume}
           min={0}
           max={100}

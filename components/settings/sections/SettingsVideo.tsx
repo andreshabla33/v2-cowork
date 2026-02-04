@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
+import { t, Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface VideoSettings {
   selectedCameraId: string;
@@ -21,6 +22,15 @@ export const SettingsVideo: React.FC<SettingsVideoProps> = ({
   onSettingsChange
 }) => {
   const [cameras, setCameras] = useState<MediaDeviceInfo[]>([]);
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
 
   useEffect(() => {
     const loadDevices = async () => {
@@ -48,48 +58,48 @@ export const SettingsVideo: React.FC<SettingsVideoProps> = ({
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Video
+          {t('settings.video.title', currentLang)}
         </h2>
         <p className="text-sm text-zinc-400">
-          Configura tu cámara y preferencias de video
+          {t('settings.video.description', currentLang)}
         </p>
       </div>
 
-      <SettingSection title="Dispositivo">
+      <SettingSection title={currentLang === 'en' ? 'Device' : currentLang === 'pt' ? 'Dispositivo' : 'Dispositivo'}>
         <SettingDropdown
-          label="Cámara"
-          description="Selecciona el dispositivo de video"
+          label={t('settings.video.camera', currentLang)}
+          description={t('settings.video.cameraDesc', currentLang)}
           value={settings.selectedCameraId}
           options={cameraOptions.length > 0 ? cameraOptions : [{ value: '', label: 'No hay dispositivos' }]}
           onChange={(v) => updateSetting('selectedCameraId', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Calidad">
+      <SettingSection title={currentLang === 'en' ? 'Quality' : currentLang === 'pt' ? 'Qualidade' : 'Calidad'}>
         <SettingToggle
-          label="Calidad HD"
-          description="Transmitir video en alta definición cuando esté disponible"
+          label={t('settings.video.hdQuality', currentLang)}
+          description={t('settings.video.hdQualityDesc', currentLang)}
           checked={settings.hdQuality}
           onChange={(v) => updateSetting('hdQuality', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Preferencias de Video">
+      <SettingSection title={currentLang === 'en' ? 'Video Preferences' : currentLang === 'pt' ? 'Preferências de Vídeo' : 'Preferencias de Video'}>
         <SettingToggle
-          label="Espejo de video"
-          description="Voltea tu video como un espejo. Otros siempre ven tu video sin invertir"
+          label={t('settings.video.mirror', currentLang)}
+          description={t('settings.video.mirrorDesc', currentLang)}
           checked={settings.mirrorVideo}
           onChange={(v) => updateSetting('mirrorVideo', v)}
         />
         <SettingToggle
-          label="Ocultar mi video"
-          description="Oculta tu propia vista durante conversaciones, pero sigues visible para otros"
+          label={t('settings.video.hideSelf', currentLang)}
+          description={t('settings.video.hideSelfDesc', currentLang)}
           checked={settings.hideSelfView}
           onChange={(v) => updateSetting('hideSelfView', v)}
         />
         <SettingToggle
-          label="Auto-silenciar al salir"
-          description="Apaga automáticamente mic y cámara cuando cambias de pestaña"
+          label={t('settings.video.autoMute', currentLang)}
+          description={t('settings.video.autoMuteDesc', currentLang)}
           checked={settings.autoIdleMuting}
           onChange={(v) => updateSetting('autoIdleMuting', v)}
         />

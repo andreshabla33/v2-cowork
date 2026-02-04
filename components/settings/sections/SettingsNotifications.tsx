@@ -1,6 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingSection } from '../components/SettingSection';
+import { t, Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 
 interface NotificationSettings {
   desktopNotifications: boolean;
@@ -18,49 +19,68 @@ export const SettingsNotifications: React.FC<SettingsNotificationsProps> = ({
   settings,
   onSettingsChange
 }) => {
+  const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Escuchar cambios de idioma
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChange(() => {
+      setCurrentLang(getCurrentLanguage());
+    });
+    return unsubscribe;
+  }, []);
+
   const updateSetting = <K extends keyof NotificationSettings>(key: K, value: NotificationSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
+  };
+
+  const getTitle = (key: string) => {
+    const titles: Record<string, Record<Language, string>> = {
+      system: { es: 'Notificaciones del Sistema', en: 'System Notifications', pt: 'Notificações do Sistema' },
+      sounds: { es: 'Sonidos', en: 'Sounds', pt: 'Sons' },
+      mentions: { es: 'Menciones', en: 'Mentions', pt: 'Menções' }
+    };
+    return titles[key]?.[currentLang] || titles[key]?.['es'] || key;
   };
 
   return (
     <div>
       <div className="mb-8">
         <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
-          Notificaciones
+          {t('settings.notifications.title', currentLang)}
         </h2>
         <p className="text-sm text-zinc-400">
-          Configura cómo y cuándo recibir notificaciones
+          {t('settings.notifications.description', currentLang)}
         </p>
       </div>
 
-      <SettingSection title="Notificaciones del Sistema">
+      <SettingSection title={getTitle('system')}>
         <SettingToggle
-          label="Notificaciones de escritorio"
-          description="Mostrar notificaciones del sistema operativo"
+          label={t('settings.notifications.desktop', currentLang)}
+          description={t('settings.notifications.desktopDesc', currentLang)}
           checked={settings.desktopNotifications}
           onChange={(v) => updateSetting('desktopNotifications', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Sonidos">
+      <SettingSection title={getTitle('sounds')}>
         <SettingToggle
-          label="Sonido de mensaje nuevo"
-          description="Reproducir sonido al recibir un mensaje de chat"
+          label={t('settings.notifications.messageSound', currentLang)}
+          description={t('settings.notifications.messageSoundDesc', currentLang)}
           checked={settings.newMessageSound}
           onChange={(v) => updateSetting('newMessageSound', v)}
         />
         <SettingToggle
-          label="Sonido de usuario cercano"
-          description="Reproducir sonido cuando alguien se acerca en el espacio"
+          label={t('settings.notifications.nearbySound', currentLang)}
+          description={t('settings.notifications.nearbySoundDesc', currentLang)}
           checked={settings.nearbyUserSound}
           onChange={(v) => updateSetting('nearbyUserSound', v)}
         />
       </SettingSection>
 
-      <SettingSection title="Menciones">
+      <SettingSection title={getTitle('mentions')}>
         <SettingToggle
-          label="Notificar menciones"
-          description="Recibir notificación cuando te mencionan (@)"
+          label={t('settings.notifications.mentions', currentLang)}
+          description={t('settings.notifications.mentionsDesc', currentLang)}
           checked={settings.mentionNotifications}
           onChange={(v) => updateSetting('mentionNotifications', v)}
         />
