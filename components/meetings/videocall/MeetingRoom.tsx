@@ -5,16 +5,9 @@ import {
   LiveKitRoom,
   VideoConference,
   RoomAudioRenderer,
-  ControlBar,
-  useTracks,
-  useParticipants,
-  useRoomContext,
-  GridLayout,
-  ParticipantTile,
-  TrackRefContext,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Track, Room, RoomEvent } from 'livekit-client';
+import { Room } from 'livekit-client';
 import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 
@@ -97,8 +90,11 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         body.sala_id = salaId;
       }
 
+      const SUPABASE_URL = 'https://lcryrsdyrzotjqdxcwtp.supabase.co';
+      console.log('🔵 Llamando Edge Function livekit-token...', { body });
+      
       const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/livekit-token`,
+        `${SUPABASE_URL}/functions/v1/livekit-token`,
         {
           method: 'POST',
           headers,
@@ -106,12 +102,26 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         }
       );
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error obteniendo token');
+      console.log('📡 Response status:', response.status, response.statusText);
+
+      const text = await response.text();
+      console.log('📡 Response text:', text);
+
+      if (!text) {
+        throw new Error('Respuesta vacía del servidor. Verifica que LiveKit esté configurado.');
       }
 
-      const data: TokenData = await response.json();
+      let data: TokenData;
+      try {
+        data = JSON.parse(text);
+      } catch (e) {
+        throw new Error(`Error parseando respuesta: ${text.substring(0, 200)}`);
+      }
+
+      if (!response.ok) {
+        throw new Error((data as any).error || `Error ${response.status}: ${response.statusText}`);
+      }
+
       setTokenData(data);
     } catch (err: any) {
       console.error('Error fetching token:', err);
@@ -127,9 +137,8 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   }, [fetchToken]);
 
   // Manejar eventos de la sala
-  const handleRoomConnected = useCallback((room: Room) => {
-    console.log('Conectado a la sala:', room.name);
-    setRoom(room);
+  const handleRoomConnected = useCallback(() => {
+    console.log('Conectado a la sala');
 
     // Actualizar estado en Supabase
     if (!tokenInvitacion && currentUser) {
@@ -222,7 +231,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   );
 };
 
-// Componente interno con el contenido de la sala
+// Componente interno simplificado usando VideoConference
 interface MeetingRoomContentProps {
   theme: string;
   isHost: boolean;
@@ -230,57 +239,11 @@ interface MeetingRoomContentProps {
 }
 
 const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({ theme, isHost, onLeave }) => {
-  const room = useRoomContext();
-  const participants = useParticipants();
-  const tracks = useTracks([
-    { source: Track.Source.Camera, withPlaceholder: true },
-    { source: Track.Source.ScreenShare, withPlaceholder: false },
-  ]);
-
-  const s = themeStyles[theme as keyof typeof themeStyles] || themeStyles.dark;
-
   return (
-    <div className="h-full flex flex-col">
-      {/* Header */}
-      <div className={`px-4 py-3 border-b border-white/10 flex items-center justify-between ${s.bg}`}>
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${room?.state === 'connected' ? 'bg-green-500 animate-pulse' : 'bg-yellow-500'}`} />
-          <h2 className={`font-bold ${s.text}`}>{room?.name || 'Sala de reunión'}</h2>
-          <span className="text-xs opacity-50">
-            {participants.length} participante{participants.length !== 1 ? 's' : ''}
-          </span>
-        </div>
-        
-        <div className="flex items-center gap-2">
-          {isHost && (
-            <span className={`px-2 py-1 text-[10px] font-bold uppercase rounded ${theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'}`}>
-              Host
-            </span>
-          )}
-        </div>
-      </div>
-
-      {/* Video Grid */}
-      <div className="flex-1 p-4">
-        <GridLayout tracks={tracks} style={{ height: '100%' }}>
-          <ParticipantTile />
-        </GridLayout>
-      </div>
-
-      {/* Controls */}
-      <div className={`px-4 py-3 border-t border-white/10 ${s.bg}`}>
-        <ControlBar 
-          variation="minimal"
-          controls={{
-            microphone: true,
-            camera: true,
-            screenShare: true,
-            chat: true,
-            leave: true,
-          }}
-        />
-      </div>
-    </div>
+    <VideoConference 
+      chatMessageFormatter={(message) => message}
+      style={{ height: '100%' }}
+    />
   );
 };
 

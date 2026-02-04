@@ -100,7 +100,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   }, [activeWorkspace?.id, loadMeetings, loadMiembros]);
 
   const createMeeting = async () => {
-    if (!newMeeting.titulo.trim() || !newMeeting.fecha || !newMeeting.hora_inicio || !activeWorkspace?.id) return;
+    console.log('🔵 createMeeting llamado', { newMeeting, activeWorkspace: activeWorkspace?.id, currentUser: currentUser?.id });
+    
+    if (!newMeeting.titulo.trim() || !newMeeting.fecha || !newMeeting.hora_inicio || !activeWorkspace?.id) {
+      console.log('❌ Validación falló:', { titulo: newMeeting.titulo, fecha: newMeeting.fecha, hora_inicio: newMeeting.hora_inicio, workspace: activeWorkspace?.id });
+      return;
+    }
+    
+    console.log('✅ Validación OK, creando reunión...');
 
     const fechaInicio = new Date(`${newMeeting.fecha}T${newMeeting.hora_inicio}`);
     const fechaFin = newMeeting.hora_fin 
@@ -158,6 +165,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     }
 
     // Crear reunión en Supabase
+    console.log('📝 Insertando en reuniones_programadas...');
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -174,24 +182,36 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       .select()
       .single();
 
-    if (!error && meeting) {
+    console.log('📝 Resultado reunión:', { meeting, error });
+
+    if (error) {
+      console.error('❌ Error creando reunión:', error);
+      alert('Error al crear reunión: ' + error.message);
+      return;
+    }
+
+    if (meeting) {
       // Crear sala de videollamada asociada
-      const { data: sala } = await supabase
+      console.log('🎥 Creando sala de videollamada...');
+      const { data: sala, error: salaError } = await supabase
         .from('salas_reunion')
         .insert({
           nombre: newMeeting.titulo.trim(),
           espacio_id: activeWorkspace.id,
           creador_id: currentUser.id,
-          tipo: 'programada',
-          reunion_programada_id: meeting.id,
+          tipo: 'general',
           configuracion: {
             sala_espera: true,
             permitir_grabacion: true,
-            max_participantes: 50
+            max_participantes: 50,
+            reunion_id: meeting.id,
+            es_programada: true
           }
         })
         .select()
         .single();
+
+      console.log('🎥 Resultado sala:', { sala, salaError });
 
       // Actualizar reunión con sala_id
       if (sala) {
@@ -199,6 +219,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
           .from('reuniones_programadas')
           .update({ sala_id: sala.id })
           .eq('id', meeting.id);
+        console.log('✅ Reunión actualizada con sala_id');
       }
 
       // Insertar participantes
