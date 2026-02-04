@@ -464,6 +464,9 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   showChat,
   onToggleChat,
 }) => {
+  const room = useRoomContext();
+  const [remoteRecording, setRemoteRecording] = useState<{isRecording: boolean; by: string} | null>(null);
+
   // Obtener tracks de video de todos los participantes
   const tracks = useTracks(
     [
@@ -472,6 +475,51 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
     ],
     { onlySubscribed: false }
   );
+
+  // Broadcast estado de grabación a todos los participantes
+  useEffect(() => {
+    if (!room) return;
+    
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify({
+      type: 'recording_status',
+      isRecording,
+      by: room.localParticipant?.name || 'Anfitrión'
+    }));
+    
+    room.localParticipant?.publishData(data, { reliable: true });
+  }, [isRecording, room]);
+
+  // Escuchar estado de grabación de otros participantes
+  useEffect(() => {
+    if (!room) return;
+
+    const handleDataReceived = (payload: Uint8Array, participant: any) => {
+      try {
+        const decoder = new TextDecoder();
+        const message = JSON.parse(decoder.decode(payload));
+        
+        if (message.type === 'recording_status') {
+          if (message.isRecording) {
+            setRemoteRecording({ isRecording: true, by: message.by });
+          } else {
+            setRemoteRecording(null);
+          }
+        }
+      } catch (e) {
+        // Ignorar mensajes no JSON
+      }
+    };
+
+    room.on(RoomEvent.DataReceived, handleDataReceived);
+    return () => {
+      room.off(RoomEvent.DataReceived, handleDataReceived);
+    };
+  }, [room]);
+
+  // Determinar si mostrar banner de grabación (local o remoto)
+  const showRecordingBanner = isRecording || remoteRecording?.isRecording;
+  const recordingBy = isRecording ? 'Tú' : remoteRecording?.by;
 
   return (
     <div className="relative h-full w-full">
@@ -482,7 +530,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         </GridLayout>
       </div>
 
-      {/* Panel de Chat */}
+      {/* Panel de Chat con estilos mejorados */}
       {showChat && (
         <div className="absolute top-0 right-0 h-full w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-white/10 flex flex-col">
           <div className="p-3 border-b border-white/10 flex items-center justify-between">
@@ -496,21 +544,81 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
               </svg>
             </button>
           </div>
-          <div className="flex-1 overflow-hidden">
+          <div className="flex-1 overflow-hidden lk-chat-custom">
+            <style>{`
+              .lk-chat-custom .lk-chat {
+                height: 100%;
+                display: flex;
+                flex-direction: column;
+                background: transparent;
+              }
+              .lk-chat-custom .lk-chat-messages {
+                flex: 1;
+                overflow-y: auto;
+                padding: 12px;
+              }
+              .lk-chat-custom .lk-chat-entry {
+                margin-bottom: 12px;
+              }
+              .lk-chat-custom .lk-chat-entry__name {
+                font-weight: 600;
+                color: #a5b4fc;
+                font-size: 12px;
+                margin-bottom: 4px;
+                display: block;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                max-width: 200px;
+              }
+              .lk-chat-custom .lk-chat-entry__message {
+                background: rgba(255,255,255,0.1);
+                padding: 8px 12px;
+                border-radius: 12px;
+                color: white;
+                font-size: 14px;
+                word-break: break-word;
+              }
+              .lk-chat-custom .lk-chat-form {
+                padding: 12px;
+                border-top: 1px solid rgba(255,255,255,0.1);
+              }
+              .lk-chat-custom .lk-chat-form input {
+                width: 100%;
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.1);
+                border-radius: 8px;
+                padding: 10px 12px;
+                color: white;
+                font-size: 14px;
+              }
+              .lk-chat-custom .lk-chat-form input::placeholder {
+                color: rgba(255,255,255,0.4);
+              }
+              .lk-chat-custom .lk-chat-form input:focus {
+                outline: none;
+                border-color: rgba(99, 102, 241, 0.5);
+              }
+              .lk-chat-custom .lk-chat-form button {
+                display: none;
+              }
+            `}</style>
             <Chat style={{ height: '100%' }} />
           </div>
         </div>
       )}
 
-      {/* Banner de grabación activa */}
-      {isRecording && (
+      {/* Banner de grabación activa - visible para TODOS */}
+      {showRecordingBanner && (
         <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[150]">
           <div className="flex items-center gap-2 px-4 py-2 bg-red-600/90 backdrop-blur-sm rounded-full shadow-lg">
             <span className="relative flex h-2 w-2">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
               <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
             </span>
-            <span className="text-white text-sm font-medium">Grabando reunión</span>
+            <span className="text-white text-sm font-medium">
+              {isRecording ? 'Grabando reunión' : `${recordingBy} está grabando`}
+            </span>
           </div>
         </div>
       )}
