@@ -1,4 +1,5 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Option {
   value: string;
@@ -23,19 +24,132 @@ export const SettingDropdown: React.FC<SettingDropdownProps> = ({
   disabled = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [dropdownPosition, setDropdownPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const dropdownContentRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+  // Calcular posición de forma síncrona al abrir
+  const calculatePosition = useCallback(() => {
+    if (buttonRef.current) {
+      const rect = buttonRef.current.getBoundingClientRect();
+      return {
+        top: rect.bottom + window.scrollY + 8,
+        left: rect.left + window.scrollX,
+        width: Math.max(rect.width, 180)
+      };
+    }
+    return null;
   }, []);
 
+  const handleToggle = useCallback(() => {
+    if (disabled) return;
+    
+    if (!isOpen) {
+      // Calcular posición ANTES de abrir
+      const pos = calculatePosition();
+      if (pos) {
+        setDropdownPosition(pos);
+        setIsOpen(true);
+      }
+    } else {
+      setIsOpen(false);
+    }
+  }, [isOpen, disabled, calculatePosition]);
+
+  // Cerrar al hacer click fuera
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as Node;
+      // No cerrar si el click fue en el botón o dentro del dropdown
+      if (
+        buttonRef.current?.contains(target) ||
+        dropdownContentRef.current?.contains(target)
+      ) {
+        return;
+      }
+      setIsOpen(false);
+    };
+    
+    // Usar click en lugar de mousedown para que onClick de las opciones funcione primero
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [isOpen]);
+
+  // Cerrar con ESC
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setIsOpen(false);
+    };
+    
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [isOpen]);
+
+  // Actualizar posición en resize/scroll
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleUpdate = () => {
+      const pos = calculatePosition();
+      if (pos) setDropdownPosition(pos);
+    };
+    
+    window.addEventListener('resize', handleUpdate);
+    window.addEventListener('scroll', handleUpdate, true);
+    return () => {
+      window.removeEventListener('resize', handleUpdate);
+      window.removeEventListener('scroll', handleUpdate, true);
+    };
+  }, [isOpen, calculatePosition]);
+
   const selectedOption = options.find(o => o.value === value);
+
+  const dropdownContent = dropdownPosition && (
+    <div 
+      ref={dropdownContentRef} 
+      className="fixed backdrop-blur-xl bg-zinc-800 border-2 border-violet-500/50 rounded-xl shadow-2xl overflow-hidden"
+      style={{ 
+        zIndex: 99999, 
+        top: dropdownPosition.top, 
+        left: dropdownPosition.left,
+        minWidth: dropdownPosition.width,
+        maxWidth: 280,
+        animation: 'dropdownFadeIn 0.15s ease-out'
+      }}
+    >
+      <style>{`
+        @keyframes dropdownFadeIn {
+          from { opacity: 0; transform: translateY(-4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+      {options.map((option) => (
+        <button
+          key={option.value}
+          onClick={() => {
+            onChange(option.value);
+            setIsOpen(false);
+          }}
+          className={`w-full px-4 py-3 text-left text-sm font-medium transition-all flex items-center gap-2 hover:bg-violet-600/20 ${
+            option.value === value
+              ? 'bg-violet-600 text-white'
+              : 'text-zinc-200'
+          }`}
+        >
+          {option.value === value && (
+            <svg className="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+            </svg>
+          )}
+          <span className={option.value === value ? '' : 'ml-6'}>{option.label}</span>
+        </button>
+      ))}
+    </div>
+  );
 
   return (
     <div className="flex items-center justify-between py-4 border-b border-white/[0.05] last:border-b-0">
@@ -45,40 +159,22 @@ export const SettingDropdown: React.FC<SettingDropdownProps> = ({
           <p className="text-xs text-zinc-400 mt-0.5">{description}</p>
         )}
       </div>
-      <div ref={dropdownRef} className="relative">
+      <div className="relative">
         <button
-          onClick={() => !disabled && setIsOpen(!isOpen)}
+          ref={buttonRef}
+          onClick={handleToggle}
           disabled={disabled}
-          className={`flex items-center gap-2 px-3 py-1.5 rounded-xl backdrop-blur-xl bg-white/[0.05] border border-white/[0.1] text-sm text-white hover:border-violet-500/50 transition-all ${
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl backdrop-blur-xl bg-violet-600/20 border-2 border-violet-500/40 text-sm font-medium text-white hover:bg-violet-600/30 hover:border-violet-500/60 transition-all min-w-[140px] justify-between ${
             disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
-          }`}
+          } ${isOpen ? 'ring-2 ring-violet-500/50 border-violet-500' : ''}`}
         >
-          {selectedOption?.label || 'Seleccionar'}
-          <svg className={`w-4 h-4 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <span className="truncate">{selectedOption?.label || 'Seleccionar'}</span>
+          <svg className={`w-4 h-4 transition-transform flex-shrink-0 ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
           </svg>
         </button>
         
-        {isOpen && (
-          <div className="absolute right-0 top-full mt-2 min-w-[150px] backdrop-blur-xl bg-zinc-900/95 border border-white/[0.1] rounded-xl shadow-2xl z-50 overflow-hidden">
-            {options.map((option) => (
-              <button
-                key={option.value}
-                onClick={() => {
-                  onChange(option.value);
-                  setIsOpen(false);
-                }}
-                className={`w-full px-4 py-2.5 text-left text-sm transition-colors ${
-                  option.value === value
-                    ? 'bg-violet-600/20 text-violet-300'
-                    : 'text-zinc-300 hover:bg-white/[0.05]'
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-        )}
+        {isOpen && dropdownContent && createPortal(dropdownContent, document.body)}
       </div>
     </div>
   );

@@ -280,6 +280,7 @@ export const GrabacionesHistorial: React.FC = () => {
     console.log('GrabacionesHistorial: Cargando grabaciones para espacio:', activeWorkspace.id);
 
     try {
+      console.log('GrabacionesHistorial: Consultando grabaciones del creador...');
       // Obtener grabaciones donde el usuario es creador
       const { data: grabacionesCreador, error: errorCreador } = await supabase
         .from('grabaciones')
@@ -288,13 +289,16 @@ export const GrabacionesHistorial: React.FC = () => {
         .eq('creado_por', userId)
         .order('creado_en', { ascending: false });
 
+      console.log('GrabacionesHistorial: Resultado grabaciones creador:', { count: grabacionesCreador?.length, error: errorCreador });
       if (errorCreador) throw errorCreador;
 
+      console.log('GrabacionesHistorial: Consultando participaciones...');
       // Obtener grabaciones donde el usuario es participante
       const { data: participaciones, error: errorParticipaciones } = await supabase
         .from('participantes_grabacion')
         .select('grabacion_id')
         .eq('usuario_id', userId);
+      console.log('GrabacionesHistorial: Resultado participaciones:', { count: participaciones?.length, error: errorParticipaciones });
 
       let grabacionesParticipante: any[] = [];
       if (!errorParticipaciones && participaciones && participaciones.length > 0) {
@@ -320,37 +324,49 @@ export const GrabacionesHistorial: React.FC = () => {
 
       console.log('GrabacionesHistorial: Grabaciones encontradas:', todasGrabaciones.length);
       
-      // Cargar datos relacionados según permisos
+      // Cargar datos relacionados según permisos - SIMPLIFICADO para evitar bloqueos
+      console.log('GrabacionesHistorial: Procesando', todasGrabaciones.length, 'grabaciones');
+      
+      // Primero setear las grabaciones básicas para mostrar algo rápido
+      setGrabaciones(todasGrabaciones);
+      setIsLoading(false);
+      
+      // Luego cargar datos adicionales en background (sin bloquear UI)
       if (todasGrabaciones.length > 0) {
-        const grabacionesConDatos = await Promise.all(
-          todasGrabaciones.map(async (grabacion) => {
-            // Transcripciones: todos pueden ver (creador y participantes)
-            const transcRes = await supabase
-              .from('transcripciones')
-              .select('*')
-              .eq('grabacion_id', grabacion.id);
-            
-            // Análisis: SOLO si es creador
-            let analisisRes = { data: [] as any[] };
-            let resumenRes = { data: [] as any[] };
-            if (grabacion.esCreador) {
-              [analisisRes, resumenRes] = await Promise.all([
-                supabase.from('analisis_comportamiento').select('*').eq('grabacion_id', grabacion.id),
-                supabase.from('resumenes_ai').select('*').eq('grabacion_id', grabacion.id)
-              ]);
-            }
-            
-            return {
-              ...grabacion,
-              transcripciones: transcRes.data || [],
-              analisis_comportamiento: analisisRes.data || [],
-              resumenes_ai: resumenRes.data || []
-            };
-          })
-        );
-        setGrabaciones(grabacionesConDatos);
-      } else {
-        setGrabaciones([]);
+        try {
+          const grabacionesConDatos = await Promise.all(
+            todasGrabaciones.map(async (grabacion, index) => {
+              console.log(`GrabacionesHistorial: Cargando datos para grabación ${index + 1}/${todasGrabaciones.length}`);
+              
+              // Transcripciones: todos pueden ver (creador y participantes)
+              const transcRes = await supabase
+                .from('transcripciones')
+                .select('*')
+                .eq('grabacion_id', grabacion.id);
+              
+              // Análisis: SOLO si es creador - limitar cantidad
+              let analisisRes = { data: [] as any[] };
+              let resumenRes = { data: [] as any[] };
+              if (grabacion.esCreador) {
+                [analisisRes, resumenRes] = await Promise.all([
+                  supabase.from('analisis_comportamiento').select('*').eq('grabacion_id', grabacion.id).limit(100),
+                  supabase.from('resumenes_ai').select('*').eq('grabacion_id', grabacion.id)
+                ]);
+              }
+              
+              return {
+                ...grabacion,
+                transcripciones: transcRes.data || [],
+                analisis_comportamiento: analisisRes.data || [],
+                resumenes_ai: resumenRes.data || []
+              };
+            })
+          );
+          console.log('GrabacionesHistorial: Datos adicionales cargados');
+          setGrabaciones(grabacionesConDatos);
+        } catch (bgError) {
+          console.error('GrabacionesHistorial: Error cargando datos adicionales:', bgError);
+        }
       }
       
       console.log('GrabacionesHistorial: Grabaciones cargadas:', todasGrabaciones.length);
