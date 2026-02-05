@@ -30,12 +30,15 @@ interface TokenData {
   token: string;
   url: string;
   sala_nombre: string;
+  sala_id?: string;
   participante_id: string;
   permisos: {
     canPublish: boolean;
     canSubscribe: boolean;
     roomAdmin: boolean;
   };
+  tipo_reunion?: string;
+  reunion_id?: string;
 }
 
 // Estilos por tema
@@ -146,6 +149,19 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
       }
 
       setTokenData(data);
+      
+      // Usar tipo_reunion del token si viene (para invitados)
+      if (data.tipo_reunion) {
+        const tipoMap: Record<string, TipoReunion> = {
+          'equipo': 'equipo',
+          'deal': 'deal',
+          'entrevista': 'entrevista'
+        };
+        setTipoReunion(tipoMap[data.tipo_reunion] || 'equipo');
+      }
+      if (data.reunion_id) {
+        setReunionId(data.reunion_id);
+      }
     } catch (err: any) {
       console.error('Error fetching token:', err);
       setError(err.message);
@@ -641,10 +657,10 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         </GridLayout>
       </div>
 
-      {/* Panel de Chat */}
+      {/* Panel de Chat - Estilos mejorados */}
       {showChat && (
-        <div className="absolute top-0 right-0 h-full w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-white/10 flex flex-col z-[100]">
-          <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0">
+        <div className="absolute top-0 right-0 bottom-0 w-80 bg-zinc-900/98 backdrop-blur-xl border-l border-white/10 flex flex-col z-[100]">
+          <div className="p-4 border-b border-white/10 flex items-center justify-between shrink-0">
             <h3 className="text-white font-bold text-sm">Chat de la reunión</h3>
             <button 
               onClick={onToggleChat}
@@ -655,7 +671,70 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
               </svg>
             </button>
           </div>
-          <div className="flex-1 overflow-hidden lk-chat-custom min-h-0">
+          <div className="flex-1 overflow-hidden min-h-0 pb-20">
+            <style>{`
+              .lk-chat {
+                height: 100% !important;
+                display: flex !important;
+                flex-direction: column !important;
+                background: transparent !important;
+              }
+              .lk-chat-messages, .lk-message-list {
+                flex: 1 !important;
+                overflow-y: auto !important;
+                padding: 16px !important;
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 12px !important;
+              }
+              .lk-chat-entry, .lk-message {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 4px !important;
+              }
+              .lk-chat-entry__name, .lk-message-sender, .lk-participant-name {
+                font-weight: 600 !important;
+                color: #a5b4fc !important;
+                font-size: 12px !important;
+              }
+              .lk-chat-entry__message, .lk-message-body, .lk-message-text {
+                background: rgba(255,255,255,0.08) !important;
+                padding: 10px 14px !important;
+                border-radius: 12px !important;
+                color: white !important;
+                font-size: 14px !important;
+                line-height: 1.5 !important;
+                word-break: break-word !important;
+              }
+              .lk-chat-form, .lk-message-form {
+                padding: 16px !important;
+                border-top: 1px solid rgba(255,255,255,0.1) !important;
+                background: rgba(24,24,27,0.95) !important;
+                position: absolute !important;
+                bottom: 0 !important;
+                left: 0 !important;
+                right: 0 !important;
+              }
+              .lk-chat-form input, .lk-message-form input, .lk-form-control {
+                width: 100% !important;
+                background: rgba(255,255,255,0.08) !important;
+                border: 1px solid rgba(255,255,255,0.15) !important;
+                border-radius: 10px !important;
+                padding: 12px 16px !important;
+                color: white !important;
+                font-size: 14px !important;
+              }
+              .lk-chat-form input::placeholder, .lk-message-form input::placeholder {
+                color: rgba(255,255,255,0.4) !important;
+              }
+              .lk-chat-form input:focus, .lk-message-form input:focus {
+                outline: none !important;
+                border-color: #6366f1 !important;
+              }
+              .lk-chat-form button, .lk-button {
+                display: none !important;
+              }
+            `}</style>
             <Chat style={{ height: '100%' }} />
           </div>
         </div>
