@@ -301,13 +301,18 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
       console.log('🎥 Resultado sala:', { sala, salaError });
 
-      // Actualizar reunión con sala_id
+      // Actualizar reunión con sala_id y link correcto de videollamada
       if (sala) {
+        const videoCallLink = `${window.location.origin}/sala/${sala.id}`;
         await supabase
           .from('reuniones_programadas')
-          .update({ sala_id: sala.id })
+          .update({ 
+            sala_id: sala.id,
+            meeting_link: videoCallLink 
+          })
           .eq('id', meeting.id);
-        console.log('✅ Reunión actualizada con sala_id');
+        meetingLink = videoCallLink; // Actualizar para emails
+        console.log('✅ Reunión actualizada con sala_id y link:', videoCallLink);
       }
 
       // Insertar participantes

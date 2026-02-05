@@ -33,8 +33,9 @@ const App: React.FC = () => {
     return () => subscription.unsubscribe();
   }, []);
 
-  // Detectar si es una invitación de videollamada (URL: /join/TOKEN)
+  // Detectar si es una invitación de videollamada (URL: /join/TOKEN) o acceso directo (URL: /sala/ID)
   const [meetingToken, setMeetingToken] = useState<string | null>(null);
+  const [directSalaId, setDirectSalaId] = useState<string | null>(null);
   const [inMeeting, setInMeeting] = useState(false);
   const [meetingNombre, setMeetingNombre] = useState('');
 
@@ -44,6 +45,11 @@ const App: React.FC = () => {
       const token = path.replace('/join/', '');
       if (token) {
         setMeetingToken(token);
+      }
+    } else if (path.startsWith('/sala/')) {
+      const salaId = path.replace('/sala/', '');
+      if (salaId) {
+        setDirectSalaId(salaId);
       }
     }
   }, []);
@@ -71,6 +77,19 @@ const App: React.FC = () => {
         onLeave={() => {
           setInMeeting(false);
           setMeetingToken(null);
+          window.history.pushState({}, '', '/');
+        }}
+      />
+    );
+  }
+
+  // Acceso directo a sala de videollamada (URL: /sala/ID) - requiere sesión
+  if (directSalaId && session) {
+    return (
+      <MeetingRoom
+        salaId={directSalaId}
+        onLeave={() => {
+          setDirectSalaId(null);
           window.history.pushState({}, '', '/');
         }}
       />
