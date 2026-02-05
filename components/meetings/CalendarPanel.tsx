@@ -1,9 +1,19 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting } from '../../types';
 import { googleCalendar, GoogleCalendarEvent } from '../../lib/googleCalendar';
 import { MeetingRoom, InviteLinkGenerator } from './videocall';
+import { CargoLaboral } from './recording/types/analysis';
+import { 
+  TipoReunionUnificado, 
+  TIPOS_REUNION_CONFIG,
+  getTiposReunionPorCargo,
+  InvitadoExterno,
+  validarInvitadoExterno,
+  crearConfiguracionSala,
+  MAPEO_TIPO_GRABACION
+} from '../../types/meeting-types';
 
 interface CalendarPanelProps {
   onJoinMeeting?: (salaId: string) => void;
@@ -39,33 +49,33 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     hora_fin: '',
     participantes: [] as string[],
     recordatorio_minutos: 15,
-    tipo_reunion: 'equipo' as 'equipo' | 'deal' | 'entrevista'
+    tipo_reunion: 'equipo' as TipoReunionUnificado
   });
 
-  // Configuración de tipos de reunión
-  const TIPOS_REUNION = {
-    equipo: {
-      label: 'Equipo',
-      icon: '👥',
-      color: 'from-blue-500 to-cyan-500',
-      bgActive: 'bg-blue-500/20 border-blue-500/50',
-      description: 'Reunión interna del equipo'
-    },
-    deal: {
-      label: 'Cliente',
-      icon: '💼',
-      color: 'from-emerald-500 to-teal-500',
-      bgActive: 'bg-emerald-500/20 border-emerald-500/50',
-      description: 'Reunión con cliente o prospecto'
-    },
-    entrevista: {
-      label: 'Candidato',
-      icon: '🎯',
-      color: 'from-purple-500 to-pink-500',
-      bgActive: 'bg-purple-500/20 border-purple-500/50',
-      description: 'Entrevista con candidato'
-    }
-  };
+  // Estado para invitados externos (cliente/candidato)
+  const [invitadosExternos, setInvitadosExternos] = useState<InvitadoExterno[]>([]);
+  const [nuevoInvitado, setNuevoInvitado] = useState<Partial<InvitadoExterno>>({
+    email: '',
+    nombre: '',
+    empresa: '',
+    puesto_aplicado: ''
+  });
+  const [erroresInvitado, setErroresInvitado] = useState<string[]>([]);
+
+  // Obtener cargo del usuario actual (desde miembros_espacio o default)
+  const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral>('colaborador');
+
+  // RBAC: Obtener tipos de reunión disponibles según cargo
+  const tiposReunionDisponibles = useMemo(() => 
+    getTiposReunionPorCargo(cargoUsuario),
+    [cargoUsuario]
+  );
+
+  // Configuración del tipo seleccionado
+  const configTipoActual = useMemo(() => 
+    TIPOS_REUNION_CONFIG[newMeeting.tipo_reunion],
+    [newMeeting.tipo_reunion]
+  );
 
   const loadMeetings = useCallback(async () => {
     if (!activeWorkspace?.id) return;
@@ -88,11 +98,12 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   }, [activeWorkspace?.id]);
 
   const loadMiembros = useCallback(async () => {
-    if (!activeWorkspace?.id) return;
+    if (!activeWorkspace?.id || !currentUser?.id) return;
     
+    // Cargar miembros del espacio
     const { data } = await supabase
       .from('miembros_espacio')
-      .select('usuario_id')
+      .select('usuario_id, rol')
       .eq('espacio_id', activeWorkspace.id)
       .eq('aceptado', true);
 
@@ -104,8 +115,24 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         .in('id', ids);
       
       if (usuarios) setMiembrosEspacio(usuarios);
+
+      // Obtener cargo del usuario actual para RBAC
+      const miembroActual = data.find((m: any) => m.usuario_id === currentUser.id);
+      if (miembroActual?.rol) {
+        // Mapear rol del espacio a CargoLaboral
+        const rolCargoMap: Record<string, CargoLaboral> = {
+          'super_admin': 'ceo',
+          'admin': 'manager_equipo',
+          'miembro': 'colaborador',
+          'rrhh': 'director_rrhh',
+          'comercial': 'director_comercial',
+          'reclutador': 'reclutador',
+          'team_lead': 'team_lead'
+        };
+        setCargoUsuario(rolCargoMap[miembroActual.rol] || 'colaborador');
+      }
     }
-  }, [activeWorkspace?.id]);
+  }, [activeWorkspace?.id, currentUser?.id]);
 
   useEffect(() => {
     loadMeetings();
@@ -190,16 +217,24 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       }
     }
 
-    // Mapear tipo de reunión a tipo de sala
-    const tipoSalaMap: Record<string, 'general' | 'deal' | 'entrevista'> = {
+    // Mapear tipo de reunión unificado a tipo de sala en BD
+    const tipoSalaMap: Record<TipoReunionUnificado, 'general' | 'deal' | 'entrevista'> = {
       'equipo': 'general',
-      'deal': 'deal',
-      'entrevista': 'entrevista'
+      'one_to_one': 'general',
+      'cliente': 'deal',
+      'candidato': 'entrevista'
     };
     const tipoSala = tipoSalaMap[newMeeting.tipo_reunion] || 'general';
 
+    // Crear configuración de sala con invitados externos
+    const configuracionSala = crearConfiguracionSala(
+      newMeeting.tipo_reunion,
+      invitadosExternos.length > 0 ? invitadosExternos : undefined,
+      undefined // reunionId se agregará después
+    );
+
     // Crear reunión en Supabase
-    console.log('📝 Insertando en reuniones_programadas...', { tipo_reunion: newMeeting.tipo_reunion });
+    console.log('📝 Insertando en reuniones_programadas...', { tipo_reunion: newMeeting.tipo_reunion, invitados: invitadosExternos.length });
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -226,8 +261,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     }
 
     if (meeting) {
-      // Crear sala de videollamada asociada
-      console.log('🎥 Creando sala de videollamada...', { tipo: tipoSala });
+      // Crear sala de videollamada asociada con configuración unificada
+      console.log('🎥 Creando sala de videollamada...', { tipo: tipoSala, invitados: invitadosExternos.length });
       const { data: sala, error: salaError } = await supabase
         .from('salas_reunion')
         .insert({
@@ -236,12 +271,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
           creador_id: currentUser.id,
           tipo: tipoSala,
           configuracion: {
-            sala_espera: true,
-            permitir_grabacion: true,
-            max_participantes: 50,
-            reunion_id: meeting.id,
-            tipo_reunion: newMeeting.tipo_reunion,
-            es_programada: true
+            ...configuracionSala,
+            reunion_id: meeting.id
           }
         })
         .select()
@@ -276,6 +307,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   };
 
   const resetNewMeeting = () => {
+    // Establecer el primer tipo disponible según el cargo del usuario
+    const primerTipoDisponible = tiposReunionDisponibles[0] || 'equipo';
     setNewMeeting({
       titulo: '',
       descripcion: '',
@@ -284,8 +317,12 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       hora_fin: '',
       participantes: [],
       recordatorio_minutos: 15,
-      tipo_reunion: 'equipo'
+      tipo_reunion: primerTipoDisponible
     });
+    // Limpiar invitados externos
+    setInvitadosExternos([]);
+    setNuevoInvitado({ email: '', nombre: '', empresa: '', puesto_aplicado: '' });
+    setErroresInvitado([]);
   };
 
   const respondToMeeting = async (meetingId: string, estado: 'aceptado' | 'rechazado' | 'tentativo') => {
@@ -870,31 +907,44 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                 />
               </div>
 
-              {/* Selector de Tipo de Reunión - Estilo 2026 */}
+              {/* Selector de Tipo de Reunión - RBAC por cargo */}
               <div>
-                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">Tipo de Reunión</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {(Object.keys(TIPOS_REUNION) as Array<keyof typeof TIPOS_REUNION>).map((tipo) => {
-                    const config = TIPOS_REUNION[tipo];
+                <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-1.5 lg:mb-1">
+                  Tipo de Reunión {tiposReunionDisponibles.length > 1 ? '' : '(según tu rol)'}
+                </label>
+                <div className={`grid gap-2 ${
+                  tiposReunionDisponibles.length === 1 ? 'grid-cols-1' :
+                  tiposReunionDisponibles.length === 2 ? 'grid-cols-2' :
+                  tiposReunionDisponibles.length === 3 ? 'grid-cols-3' :
+                  'grid-cols-2 lg:grid-cols-4'
+                }`}>
+                  {tiposReunionDisponibles.map((tipo) => {
+                    const config = TIPOS_REUNION_CONFIG[tipo];
                     const isSelected = newMeeting.tipo_reunion === tipo;
                     return (
                       <button
                         key={tipo}
                         type="button"
-                        onClick={() => setNewMeeting({ ...newMeeting, tipo_reunion: tipo })}
+                        onClick={() => {
+                          setNewMeeting({ ...newMeeting, tipo_reunion: tipo });
+                          // Limpiar invitados si cambia a tipo que no requiere externos
+                          if (!TIPOS_REUNION_CONFIG[tipo].requiereInvitadoExterno) {
+                            setInvitadosExternos([]);
+                          }
+                        }}
                         className={`relative flex flex-col items-center gap-1 p-2.5 lg:p-2 rounded-xl border transition-all duration-200 ${
                           isSelected
-                            ? `${config.bgActive} border`
+                            ? `bg-gradient-to-br ${config.color} border-transparent shadow-lg`
                             : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                         }`}
                       >
                         <span className="text-xl lg:text-lg">{config.icon}</span>
-                        <span className={`text-[10px] lg:text-[9px] font-bold ${isSelected ? 'opacity-100' : 'opacity-70'}`}>
+                        <span className={`text-[10px] lg:text-[9px] font-bold ${isSelected ? 'text-white' : 'opacity-70'}`}>
                           {config.label}
                         </span>
                         {isSelected && (
-                          <div className={`absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gradient-to-br ${config.color} flex items-center justify-center`}>
-                            <svg className="w-2.5 h-2.5 text-white" fill="currentColor" viewBox="0 0 24 24">
+                          <div className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-white flex items-center justify-center">
+                            <svg className="w-2.5 h-2.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
                             </svg>
                           </div>
@@ -904,9 +954,107 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                   })}
                 </div>
                 <p className="text-[9px] opacity-40 mt-1 text-center">
-                  {TIPOS_REUNION[newMeeting.tipo_reunion].description}
+                  {configTipoActual.descripcion}
                 </p>
               </div>
+
+              {/* Formulario de Invitado Externo (solo para cliente/candidato) */}
+              {configTipoActual.requiereInvitadoExterno && (
+                <div className="bg-white/5 rounded-xl p-3 border border-white/10">
+                  <label className="block text-[9px] font-bold uppercase tracking-wider opacity-60 mb-2">
+                    {newMeeting.tipo_reunion === 'cliente' ? '🤝 Invitar Cliente' : '🎯 Invitar Candidato'}
+                  </label>
+                  
+                  {/* Lista de invitados agregados */}
+                  {invitadosExternos.length > 0 && (
+                    <div className="mb-3 space-y-2">
+                      {invitadosExternos.map((inv, idx) => (
+                        <div key={idx} className="flex items-center gap-2 bg-white/5 rounded-lg p-2">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white text-xs font-bold">
+                            {inv.nombre.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate">{inv.nombre}</p>
+                            <p className="text-[10px] opacity-50 truncate">{inv.email}</p>
+                            {inv.empresa && <p className="text-[10px] text-emerald-400 truncate">🏢 {inv.empresa}</p>}
+                            {inv.puesto_aplicado && <p className="text-[10px] text-blue-400 truncate">💼 {inv.puesto_aplicado}</p>}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setInvitadosExternos(prev => prev.filter((_, i) => i !== idx))}
+                            className="w-6 h-6 rounded-full bg-red-500/20 hover:bg-red-500/40 flex items-center justify-center text-red-400"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Formulario para agregar nuevo invitado */}
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="email"
+                        placeholder="📧 Email *"
+                        value={nuevoInvitado.email || ''}
+                        onChange={e => setNuevoInvitado({ ...nuevoInvitado, email: e.target.value })}
+                        className={`w-full ${s.input} border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
+                      />
+                      <input
+                        type="text"
+                        placeholder="👤 Nombre *"
+                        value={nuevoInvitado.nombre || ''}
+                        onChange={e => setNuevoInvitado({ ...nuevoInvitado, nombre: e.target.value })}
+                        className={`w-full ${s.input} border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
+                      />
+                    </div>
+                    
+                    {newMeeting.tipo_reunion === 'cliente' && (
+                      <input
+                        type="text"
+                        placeholder="🏢 Nombre de la empresa *"
+                        value={nuevoInvitado.empresa || ''}
+                        onChange={e => setNuevoInvitado({ ...nuevoInvitado, empresa: e.target.value })}
+                        className={`w-full ${s.input} border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
+                      />
+                    )}
+                    
+                    {newMeeting.tipo_reunion === 'candidato' && (
+                      <input
+                        type="text"
+                        placeholder="💼 Puesto al que aplica *"
+                        value={nuevoInvitado.puesto_aplicado || ''}
+                        onChange={e => setNuevoInvitado({ ...nuevoInvitado, puesto_aplicado: e.target.value })}
+                        className={`w-full ${s.input} border rounded-lg px-3 py-2 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20`}
+                      />
+                    )}
+
+                    {erroresInvitado.length > 0 && (
+                      <div className="text-red-400 text-[10px]">
+                        {erroresInvitado.map((err, i) => <p key={i}>• {err}</p>)}
+                      </div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const validacion = validarInvitadoExterno(nuevoInvitado, newMeeting.tipo_reunion);
+                        if (validacion.valido) {
+                          setInvitadosExternos([...invitadosExternos, nuevoInvitado as InvitadoExterno]);
+                          setNuevoInvitado({ email: '', nombre: '', empresa: '', puesto_aplicado: '' });
+                          setErroresInvitado([]);
+                        } else {
+                          setErroresInvitado(validacion.errores);
+                        }
+                      }}
+                      className="w-full py-2 bg-indigo-600/30 hover:bg-indigo-600/50 border border-indigo-500/50 rounded-lg text-xs font-bold transition-all"
+                    >
+                      + Agregar {newMeeting.tipo_reunion === 'cliente' ? 'Cliente' : 'Candidato'}
+                    </button>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
