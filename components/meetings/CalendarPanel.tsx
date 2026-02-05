@@ -1267,35 +1267,35 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         />
       )}
 
-      {/* Modal Detalles de Reunión */}
+      {/* Modal Detalles de Reunión - Compacto 2026 */}
       {selectedMeeting && (
         <div 
-          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 lg:p-3"
           onClick={() => setSelectedMeeting(null)}
         >
           <div 
-            className={`w-full max-w-lg rounded-2xl ${s.bg} border border-white/10 shadow-2xl overflow-hidden`}
+            className={`w-full max-w-md lg:max-w-sm rounded-2xl lg:rounded-xl ${s.bg} border border-white/10 shadow-2xl overflow-hidden`}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className={`p-5 border-b border-white/10 ${theme === 'arcade' ? 'bg-[#00ff41]/5' : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10'}`}>
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <h3 className="text-xl font-bold">{selectedMeeting.titulo}</h3>
+            <div className={`p-4 lg:p-3 border-b border-white/10 ${theme === 'arcade' ? 'bg-[#00ff41]/5' : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10'}`}>
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <h3 className="text-base lg:text-sm font-bold truncate">{selectedMeeting.titulo}</h3>
                     {isCreator(selectedMeeting) && (
-                      <span className={`px-2 py-0.5 ${theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded text-[9px] font-bold`}>
+                      <span className={`px-1.5 py-0.5 ${theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded text-[8px] font-bold shrink-0`}>
                         ORGANIZADOR
                       </span>
                     )}
                   </div>
-                  <p className="text-sm opacity-60">{selectedMeeting.descripcion || 'Sin descripción'}</p>
+                  <p className="text-xs lg:text-[11px] opacity-60 truncate">{selectedMeeting.descripcion || 'Sin descripción'}</p>
                 </div>
                 <button 
                   onClick={() => setSelectedMeeting(null)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                  className="p-1.5 hover:bg-white/10 rounded-lg transition-all shrink-0"
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
@@ -1303,36 +1303,36 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
             </div>
 
             {/* Content */}
-            <div className="p-5 space-y-5">
+            <div className="p-4 lg:p-3 space-y-3 lg:space-y-2 max-h-[50vh] lg:max-h-[45vh] overflow-y-auto">
               {/* Fecha y Hora */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className={`p-3 rounded-xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-indigo-500/10'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="grid grid-cols-2 gap-2">
+                <div className={`p-2 lg:p-1.5 rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-indigo-500/10'}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    <span className="text-xs font-bold opacity-60">FECHA</span>
+                    <span className="text-[9px] font-bold opacity-60">FECHA</span>
                   </div>
-                  <p className="font-medium">{formatDateShort(selectedMeeting.fecha_inicio)}</p>
+                  <p className="text-xs lg:text-[11px] font-medium">{formatDateShort(selectedMeeting.fecha_inicio)}</p>
                 </div>
-                <div className={`p-3 rounded-xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-purple-500/10'}`}>
-                  <div className="flex items-center gap-2 mb-1">
-                    <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <div className={`p-2 lg:p-1.5 rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-purple-500/10'}`}>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-xs font-bold opacity-60">HORA</span>
+                    <span className="text-[9px] font-bold opacity-60">HORA</span>
                   </div>
-                  <p className="font-medium">{formatTime(selectedMeeting.fecha_inicio)} - {formatTime(selectedMeeting.fecha_fin)}</p>
+                  <p className="text-xs lg:text-[11px] font-medium">{formatTime(selectedMeeting.fecha_inicio)} - {formatTime(selectedMeeting.fecha_fin)}</p>
                 </div>
               </div>
 
               {/* Tipo de Reunión */}
               {selectedMeeting.tipo_reunion && (
                 <div>
-                  <h4 className="text-xs font-bold opacity-60 uppercase mb-2">Tipo de Reunión</h4>
-                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-white/10'}`}>
-                    <span className="text-lg">{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.icon || '📅'}</span>
-                    <span className="font-medium">{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.label || selectedMeeting.tipo_reunion}</span>
+                  <h4 className="text-[9px] font-bold opacity-60 uppercase mb-1.5 lg:mb-1">Tipo de Reunión</h4>
+                  <div className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-white/10'}`}>
+                    <span>{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.icon || '📅'}</span>
+                    <span className="font-medium text-xs">{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.label || selectedMeeting.tipo_reunion}</span>
                   </div>
                 </div>
               )}
@@ -1340,19 +1340,19 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
               {/* Link de Reunión */}
               {selectedMeeting.meeting_link && (
                 <div>
-                  <h4 className="text-xs font-bold opacity-60 uppercase mb-2">Link de Videollamada</h4>
-                  <div className="flex items-center gap-2">
+                  <h4 className="text-[9px] font-bold opacity-60 uppercase mb-1.5 lg:mb-1">Link de Videollamada</h4>
+                  <div className="flex items-center gap-1.5">
                     <input
                       type="text"
                       readOnly
                       value={selectedMeeting.meeting_link}
-                      className={`flex-1 ${s.input} border rounded-lg px-3 py-2 text-sm opacity-70`}
+                      className={`flex-1 ${s.input} border rounded-lg px-2 py-1.5 text-xs opacity-70`}
                     />
                     <button
                       onClick={() => copyMeetingLink(selectedMeeting.meeting_link, selectedMeeting.id)}
-                      className={`px-4 py-2 ${copiedLink === selectedMeeting.id ? 'bg-green-500/30 text-green-300' : theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded-lg font-medium transition-all`}
+                      className={`px-3 py-1.5 text-xs ${copiedLink === selectedMeeting.id ? 'bg-green-500/30 text-green-300' : theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded-lg font-medium transition-all`}
                     >
-                      {copiedLink === selectedMeeting.id ? '¡Copiado!' : 'Copiar'}
+                      {copiedLink === selectedMeeting.id ? '✓' : 'Copiar'}
                     </button>
                   </div>
                 </div>
@@ -1360,13 +1360,13 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
               {/* Participantes */}
               <div>
-                <h4 className="text-xs font-bold opacity-60 uppercase mb-3">Participantes ({selectedMeeting.participantes?.length || 0})</h4>
+                <h4 className="text-[9px] font-bold opacity-60 uppercase mb-1.5 lg:mb-1">Participantes ({selectedMeeting.participantes?.length || 0})</h4>
                 {selectedMeeting.participantes && selectedMeeting.participantes.length > 0 ? (
-                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                  <div className="space-y-1.5 max-h-28 overflow-y-auto">
                     {selectedMeeting.participantes.map(p => (
-                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+                      <div key={p.id} className="flex items-center justify-between p-1.5 rounded-lg bg-white/5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-full flex items-center justify-center text-[10px] font-bold ${
                             p.estado === 'aceptado' ? 'bg-green-500/30 text-green-300' :
                             p.estado === 'rechazado' ? 'bg-red-500/30 text-red-300' :
                             p.estado === 'tentativo' ? 'bg-amber-500/30 text-amber-300' :
@@ -1374,11 +1374,9 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                           }`}>
                             {p.usuario?.nombre?.charAt(0) || '?'}
                           </div>
-                          <div>
-                            <p className="font-medium text-sm">{p.usuario?.nombre || 'Participante'}</p>
-                                                      </div>
+                          <p className="font-medium text-xs">{p.usuario?.nombre || 'Participante'}</p>
                         </div>
-                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                        <span className={`px-1.5 py-0.5 rounded text-[8px] font-bold uppercase ${
                           p.estado === 'aceptado' ? 'bg-green-500/20 text-green-400' :
                           p.estado === 'rechazado' ? 'bg-red-500/20 text-red-400' :
                           p.estado === 'tentativo' ? 'bg-amber-500/20 text-amber-400' :
@@ -1390,25 +1388,25 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm opacity-50 text-center py-4">No hay participantes agregados</p>
+                  <p className="text-xs opacity-50 text-center py-3">No hay participantes agregados</p>
                 )}
               </div>
             </div>
 
             {/* Footer Actions */}
-            <div className="p-4 border-t border-white/10 flex gap-2">
+            <div className="p-3 lg:p-2 border-t border-white/10 flex gap-2">
               {selectedMeeting.sala_id && (
                 <button
                   onClick={() => {
                     setSelectedMeeting(null);
                     setActiveMeeting({ salaId: selectedMeeting.sala_id!, titulo: selectedMeeting.titulo });
                   }}
-                  className={`flex-1 px-4 py-2.5 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-gradient-to-r from-indigo-500 to-purple-600'} rounded-xl font-bold transition-all flex items-center justify-center gap-2`}
+                  className={`flex-1 px-3 py-2 lg:py-1.5 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-gradient-to-r from-indigo-500 to-purple-600'} rounded-lg lg:rounded-md text-xs font-bold transition-all flex items-center justify-center gap-1.5`}
                 >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                   </svg>
-                  {isMeetingNow(selectedMeeting) ? 'Unirse Ahora' : 'Iniciar Reunión'}
+                  {isMeetingNow(selectedMeeting) ? 'Unirse' : 'Iniciar'}
                 </button>
               )}
               {isCreator(selectedMeeting) && (
@@ -1417,7 +1415,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                     deleteMeeting(selectedMeeting.id, selectedMeeting.google_event_id);
                     setSelectedMeeting(null);
                   }}
-                  className="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl font-bold transition-all"
+                  className="px-3 py-2 lg:py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg lg:rounded-md text-xs font-bold transition-all"
                 >
                   Cancelar
                 </button>
