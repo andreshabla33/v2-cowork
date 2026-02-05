@@ -40,6 +40,19 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   // Estados para videollamadas
   const [activeMeeting, setActiveMeeting] = useState<ActiveMeeting | null>(null);
   const [showInviteModal, setShowInviteModal] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  // Función para copiar link de reunión
+  const copyMeetingLink = async (meetingLink: string, meetingId: string) => {
+    try {
+      await navigator.clipboard.writeText(meetingLink);
+      setCopiedLink(meetingId);
+      setTimeout(() => setCopiedLink(null), 2000);
+    } catch (err) {
+      console.error('Error copiando link:', err);
+      alert('No se pudo copiar el link. Intenta de nuevo.');
+    }
+  };
 
   const [newMeeting, setNewMeeting] = useState({
     titulo: '',
@@ -772,17 +785,28 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                             </button>
                           )}
 
-                          {/* Botón Invitar Externos */}
-                          {isCreator(meeting) && meeting.sala_id && (
+                          {/* Botón Copiar Link de Reunión */}
+                          {isCreator(meeting) && meeting.meeting_link && (
                             <button
-                              onClick={() => setShowInviteModal(meeting.sala_id!)}
-                              className="px-3 py-1.5 bg-white/10 hover:bg-white/20 rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 justify-center"
-                              title="Invitar clientes o candidatos"
+                              onClick={() => copyMeetingLink(meeting.meeting_link, meeting.id)}
+                              className={`px-3 py-1.5 ${copiedLink === meeting.id ? 'bg-green-500/30 text-green-300' : 'bg-white/10 hover:bg-white/20'} rounded-lg text-xs font-medium transition-all flex items-center gap-1.5 justify-center`}
+                              title="Copiar link de invitación"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                              </svg>
-                              Invitar
+                              {copiedLink === meeting.id ? (
+                                <>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                  ¡Copiado!
+                                </>
+                              ) : (
+                                <>
+                                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3" />
+                                  </svg>
+                                  Invitar
+                                </>
+                              )}
                             </button>
                           )}
 
