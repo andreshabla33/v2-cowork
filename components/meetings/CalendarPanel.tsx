@@ -332,8 +332,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       // Enviar emails a invitados externos via Resend (si no usó Google Calendar)
       if (!googleConnected && todosLosInvitados.length > 0) {
         try {
-          console.log('📧 Enviando invitaciones via Resend...');
-          await supabase.functions.invoke('enviar-invitacion-reunion', {
+          console.log('📧 Enviando invitaciones via Resend...', todosLosInvitados);
+          const { data: emailResult, error: emailError } = await supabase.functions.invoke('enviar-invitacion-reunion', {
             body: {
               destinatarios: todosLosInvitados.map(inv => ({
                 email: inv.email,
@@ -350,10 +350,16 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
               }
             }
           });
-          console.log('✅ Invitaciones enviadas via Resend');
+          console.log('📬 Respuesta Resend:', emailResult, emailError);
+          if (emailError) {
+            console.error('❌ Error Edge Function:', emailError);
+          } else if (emailResult?.resultados) {
+            emailResult.resultados.forEach((r: any) => {
+              console.log(`📧 ${r.email}: ${r.success ? '✅' : '❌'}`, r.resend_response);
+            });
+          }
         } catch (emailErr) {
-          console.error('Error enviando emails:', emailErr);
-          // No bloquear si falla el email
+          console.error('❌ Error enviando emails:', emailErr);
         }
       }
 
