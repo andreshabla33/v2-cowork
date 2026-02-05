@@ -200,29 +200,23 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       }
     }
 
-    // Crear evento en Google Calendar PRIMERO si está conectado
+    // Crear evento en Google Calendar si está conectado
+    // NOTA: Ahora usa el link interno, NO Google Meet
     if (googleConnected) {
       try {
-        const descripcionCompleta = newMeeting.descripcion.trim() 
-          ? `${newMeeting.descripcion.trim()}\n\n---\nReunión creada en Cowork Virtual`
-          : 'Reunión creada en Cowork Virtual';
-
         const googleEvent = await googleCalendar.createEvent({
           summary: newMeeting.titulo.trim(),
-          description: descripcionCompleta,
+          description: newMeeting.descripcion.trim() || 'Reunión creada en Cowork Virtual',
           start: fechaInicio.toISOString(),
           end: fechaFin.toISOString(),
-          attendees: participantesEmails, // Envía invitaciones por email
-          sendUpdates: 'all' // Notificar a todos los invitados
+          attendees: participantesEmails,
+          sendUpdates: 'all',
+          meetingLink: meetingLink // Pasa el link interno para incluir en descripción
         });
         
         if (googleEvent) {
           googleEventId = googleEvent.id;
-          
-          // Usar Google Meet link si se creó
-          if (googleEvent.hangoutLink) {
-            meetingLink = googleEvent.hangoutLink;
-          }
+          // Ya NO usamos googleEvent.hangoutLink - mantenemos meetingLink interno
         }
       } catch (err) {
         console.error('Error creando evento en Google Calendar:', err);

@@ -32,6 +32,8 @@ export interface CreateEventParams {
   attendees?: string[];
   sendUpdates?: 'all' | 'externalOnly' | 'none';
   location?: string;
+  /** Link interno de videollamada (sala propia) */
+  meetingLink?: string;
 }
 
 export interface CreateEventResponse extends GoogleCalendarEvent {
@@ -131,9 +133,12 @@ export const googleCalendar = {
 
   /**
    * Crea un evento en Google Calendar con soporte para:
-   * - Google Meet automático
+   * - Link de videollamada interno (sala propia)
    * - Invitaciones por email a participantes
    * - Notificaciones automáticas
+   * 
+   * NOTA: Ya NO crea Google Meet. El link interno se incluye en la descripción.
+   * Para restaurar Google Meet, usar el backup: googleCalendar.backup-google-meet.ts
    */
   createEvent: async (event: CreateEventParams): Promise<CreateEventResponse> => {
     const token = googleCalendar.getToken();
@@ -141,18 +146,20 @@ export const googleCalendar = {
 
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     
+    // Construir descripción con link de videollamada interno
+    let descripcionFinal = event.description || '';
+    if (event.meetingLink) {
+      const linkSection = `\n\n🎥 UNIRSE A LA VIDEOLLAMADA:\n${event.meetingLink}\n\n(Esta reunión usa la sala de videollamada de Cowork Virtual con grabación y análisis AI)`;
+      descripcionFinal = descripcionFinal + linkSection;
+    }
+    
     const body: Record<string, any> = {
       summary: event.summary,
-      description: event.description || '',
+      description: descripcionFinal,
       start: { dateTime: event.start, timeZone },
       end: { dateTime: event.end, timeZone },
-      // Crear Google Meet automáticamente
-      conferenceData: {
-        createRequest: {
-          requestId: `cowork-meet-${Date.now()}`,
-          conferenceSolutionKey: { type: 'hangoutsMeet' }
-        }
-      },
+      // NO crear Google Meet - usar sala interna
+      // conferenceData removido intencionalmente
       // Configurar recordatorios
       reminders: {
         useDefault: false,
@@ -182,7 +189,8 @@ export const googleCalendar = {
 
     // Parámetro para enviar notificaciones por email
     const sendUpdates = event.sendUpdates || 'all';
-    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=${sendUpdates}`;
+    // Removido conferenceDataVersion=1 porque ya no usamos Google Meet
+    const url = `https://www.googleapis.com/calendar/v3/calendars/primary/events?sendUpdates=${sendUpdates}`;
 
     const response = await fetch(url, {
       method: 'POST',
