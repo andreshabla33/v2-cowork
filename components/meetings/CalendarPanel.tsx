@@ -226,6 +226,15 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     };
     const tipoSala = tipoSalaMap[newMeeting.tipo_reunion] || 'general';
 
+    // Mapear tipo unificado a tipo de BD (constraint: equipo, deal, entrevista)
+    const tipoReunionBDMap: Record<TipoReunionUnificado, 'equipo' | 'deal' | 'entrevista'> = {
+      'equipo': 'equipo',
+      'one_to_one': 'equipo',
+      'cliente': 'deal',
+      'candidato': 'entrevista'
+    };
+    const tipoReunionBD = tipoReunionBDMap[newMeeting.tipo_reunion] || 'equipo';
+
     // Crear configuración de sala con invitados externos
     const configuracionSala = crearConfiguracionSala(
       newMeeting.tipo_reunion,
@@ -234,7 +243,11 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     );
 
     // Crear reunión en Supabase
-    console.log('📝 Insertando en reuniones_programadas...', { tipo_reunion: newMeeting.tipo_reunion, invitados: invitadosExternos.length });
+    console.log('📝 Insertando en reuniones_programadas...', { 
+      tipo_reunion_ui: newMeeting.tipo_reunion, 
+      tipo_reunion_bd: tipoReunionBD,
+      invitados: invitadosExternos.length 
+    });
     const { data: meeting, error } = await supabase
       .from('reuniones_programadas')
       .insert({
@@ -247,7 +260,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         recordatorio_minutos: newMeeting.recordatorio_minutos,
         meeting_link: meetingLink,
         google_event_id: googleEventId,
-        tipo_reunion: newMeeting.tipo_reunion
+        tipo_reunion: tipoReunionBD
       })
       .select()
       .single();
