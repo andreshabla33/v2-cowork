@@ -175,30 +175,47 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     fetchToken();
   }, [fetchToken]);
 
-  // Obtener tipo de reunión de la sala si no viene por props
+  // Obtener tipo de reunión de la sala (para usuarios autenticados o invitados)
   useEffect(() => {
     const fetchSalaInfo = async () => {
-      if (propTipoReunion || !salaId) return;
+      if (propTipoReunion) return;
+      
+      const tipoMap: Record<string, TipoReunion> = {
+        'general': 'equipo',
+        'deal': 'deal',
+        'entrevista': 'entrevista'
+      };
       
       try {
-        const { data: sala } = await supabase
-          .from('salas_reunion')
-          .select('tipo, configuracion')
-          .eq('id', salaId)
-          .single();
-        
-        if (sala) {
-          // Mapear tipo de sala a TipoReunion
-          const tipoMap: Record<string, TipoReunion> = {
-            'general': 'equipo',
-            'deal': 'deal',
-            'entrevista': 'entrevista'
-          };
-          setTipoReunion(tipoMap[sala.tipo] || 'equipo');
+        // Si es invitado, obtener tipo desde la invitación
+        if (tokenInvitacion) {
+          const { data: invitacion } = await supabase
+            .from('invitaciones_reunion')
+            .select('sala:salas_reunion(tipo, configuracion)')
+            .eq('token_unico', tokenInvitacion)
+            .single();
           
-          // Obtener reunionId de la configuración si existe
-          if (sala.configuracion?.reunion_id) {
-            setReunionId(sala.configuracion.reunion_id);
+          if (invitacion?.sala) {
+            const salaData = invitacion.sala as any;
+            setTipoReunion(tipoMap[salaData.tipo] || 'equipo');
+            if (salaData.configuracion?.reunion_id) {
+              setReunionId(salaData.configuracion.reunion_id);
+            }
+          }
+        } 
+        // Si es usuario autenticado con salaId
+        else if (salaId) {
+          const { data: sala } = await supabase
+            .from('salas_reunion')
+            .select('tipo, configuracion')
+            .eq('id', salaId)
+            .single();
+          
+          if (sala) {
+            setTipoReunion(tipoMap[sala.tipo] || 'equipo');
+            if (sala.configuracion?.reunion_id) {
+              setReunionId(sala.configuracion.reunion_id);
+            }
           }
         }
       } catch (err) {
@@ -207,7 +224,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     };
     
     fetchSalaInfo();
-  }, [salaId, propTipoReunion]);
+  }, [salaId, tokenInvitacion, propTipoReunion]);
 
   // Funciones de grabación
   const startRecording = useCallback(async () => {
