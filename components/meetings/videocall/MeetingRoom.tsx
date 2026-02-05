@@ -176,10 +176,13 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   }, [fetchToken]);
 
   // Obtener tipo de reunión de la sala (para usuarios autenticados o invitados)
+  // Solo se ejecuta una vez cuando tokenData está listo
+  const [salaInfoFetched, setSalaInfoFetched] = useState(false);
+  
   useEffect(() => {
+    if (propTipoReunion || salaInfoFetched || !tokenData) return;
+    
     const fetchSalaInfo = async () => {
-      if (propTipoReunion) return;
-      
       const tipoMap: Record<string, TipoReunion> = {
         'general': 'equipo',
         'deal': 'deal',
@@ -220,11 +223,13 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         }
       } catch (err) {
         console.warn('No se pudo obtener info de la sala:', err);
+      } finally {
+        setSalaInfoFetched(true);
       }
     };
     
     fetchSalaInfo();
-  }, [salaId, tokenInvitacion, propTipoReunion]);
+  }, [salaId, tokenInvitacion, propTipoReunion, tokenData, salaInfoFetched]);
 
   // Funciones de grabación
   const startRecording = useCallback(async () => {
