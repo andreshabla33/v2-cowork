@@ -41,6 +41,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   const [activeMeeting, setActiveMeeting] = useState<ActiveMeeting | null>(null);
   const [showInviteModal, setShowInviteModal] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [selectedMeeting, setSelectedMeeting] = useState<ScheduledMeeting | null>(null);
 
   // Función para copiar link de reunión
   const copyMeetingLink = async (meetingLink: string, meetingId: string) => {
@@ -738,11 +739,12 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                   return (
                     <div
                       key={meeting.id}
-                      className={`relative p-4 rounded-2xl border transition-all ${
+                      className={`relative p-4 rounded-2xl border transition-all cursor-pointer hover:scale-[1.01] ${
                         isNow ? 'bg-green-500/20 border-green-500/50' : 
                         isSoon ? 'bg-amber-500/10 border-amber-500/30' : 
                         s.card
                       }`}
+                      onClick={() => setSelectedMeeting(meeting)}
                     >
                       {isNow && (
                         <div className={`absolute -top-2 -right-2 px-2.5 py-1 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-green-500'} rounded-full text-[9px] font-black uppercase animate-pulse`}>
@@ -810,7 +812,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
                           )}
                         </div>
 
-                        <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-2" onClick={e => e.stopPropagation()}>
                           {/* Botón Iniciar/Unirse Videollamada */}
                           {meeting.sala_id && (
                             <button
@@ -1263,6 +1265,166 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
           salaId={showInviteModal}
           onClose={() => setShowInviteModal(null)}
         />
+      )}
+
+      {/* Modal Detalles de Reunión */}
+      {selectedMeeting && (
+        <div 
+          className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedMeeting(null)}
+        >
+          <div 
+            className={`w-full max-w-lg rounded-2xl ${s.bg} border border-white/10 shadow-2xl overflow-hidden`}
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className={`p-5 border-b border-white/10 ${theme === 'arcade' ? 'bg-[#00ff41]/5' : 'bg-gradient-to-r from-indigo-500/10 to-purple-500/10'}`}>
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="text-xl font-bold">{selectedMeeting.titulo}</h3>
+                    {isCreator(selectedMeeting) && (
+                      <span className={`px-2 py-0.5 ${theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded text-[9px] font-bold`}>
+                        ORGANIZADOR
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm opacity-60">{selectedMeeting.descripcion || 'Sin descripción'}</p>
+                </div>
+                <button 
+                  onClick={() => setSelectedMeeting(null)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-all"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className="p-5 space-y-5">
+              {/* Fecha y Hora */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className={`p-3 rounded-xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-indigo-500/10'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    <span className="text-xs font-bold opacity-60">FECHA</span>
+                  </div>
+                  <p className="font-medium">{formatDateShort(selectedMeeting.fecha_inicio)}</p>
+                </div>
+                <div className={`p-3 rounded-xl ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-purple-500/10'}`}>
+                  <div className="flex items-center gap-2 mb-1">
+                    <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-xs font-bold opacity-60">HORA</span>
+                  </div>
+                  <p className="font-medium">{formatTime(selectedMeeting.fecha_inicio)} - {formatTime(selectedMeeting.fecha_fin)}</p>
+                </div>
+              </div>
+
+              {/* Tipo de Reunión */}
+              {selectedMeeting.tipo_reunion && (
+                <div>
+                  <h4 className="text-xs font-bold opacity-60 uppercase mb-2">Tipo de Reunión</h4>
+                  <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]/10' : 'bg-white/10'}`}>
+                    <span className="text-lg">{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.icon || '📅'}</span>
+                    <span className="font-medium">{TIPOS_REUNION_CONFIG[selectedMeeting.tipo_reunion as TipoReunionUnificado]?.label || selectedMeeting.tipo_reunion}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Link de Reunión */}
+              {selectedMeeting.meeting_link && (
+                <div>
+                  <h4 className="text-xs font-bold opacity-60 uppercase mb-2">Link de Videollamada</h4>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={selectedMeeting.meeting_link}
+                      className={`flex-1 ${s.input} border rounded-lg px-3 py-2 text-sm opacity-70`}
+                    />
+                    <button
+                      onClick={() => copyMeetingLink(selectedMeeting.meeting_link, selectedMeeting.id)}
+                      className={`px-4 py-2 ${copiedLink === selectedMeeting.id ? 'bg-green-500/30 text-green-300' : theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-300'} rounded-lg font-medium transition-all`}
+                    >
+                      {copiedLink === selectedMeeting.id ? '¡Copiado!' : 'Copiar'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Participantes */}
+              <div>
+                <h4 className="text-xs font-bold opacity-60 uppercase mb-3">Participantes ({selectedMeeting.participantes?.length || 0})</h4>
+                {selectedMeeting.participantes && selectedMeeting.participantes.length > 0 ? (
+                  <div className="space-y-2 max-h-40 overflow-y-auto">
+                    {selectedMeeting.participantes.map(p => (
+                      <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold ${
+                            p.estado === 'aceptado' ? 'bg-green-500/30 text-green-300' :
+                            p.estado === 'rechazado' ? 'bg-red-500/30 text-red-300' :
+                            p.estado === 'tentativo' ? 'bg-amber-500/30 text-amber-300' :
+                            'bg-white/10'
+                          }`}>
+                            {p.usuario?.nombre?.charAt(0) || '?'}
+                          </div>
+                          <div>
+                            <p className="font-medium text-sm">{p.usuario?.nombre || 'Participante'}</p>
+                                                      </div>
+                        </div>
+                        <span className={`px-2 py-1 rounded text-[10px] font-bold uppercase ${
+                          p.estado === 'aceptado' ? 'bg-green-500/20 text-green-400' :
+                          p.estado === 'rechazado' ? 'bg-red-500/20 text-red-400' :
+                          p.estado === 'tentativo' ? 'bg-amber-500/20 text-amber-400' :
+                          'bg-white/10 opacity-60'
+                        }`}>
+                          {p.estado}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm opacity-50 text-center py-4">No hay participantes agregados</p>
+                )}
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-4 border-t border-white/10 flex gap-2">
+              {selectedMeeting.sala_id && (
+                <button
+                  onClick={() => {
+                    setSelectedMeeting(null);
+                    setActiveMeeting({ salaId: selectedMeeting.sala_id!, titulo: selectedMeeting.titulo });
+                  }}
+                  className={`flex-1 px-4 py-2.5 ${theme === 'arcade' ? 'bg-[#00ff41] text-black' : 'bg-gradient-to-r from-indigo-500 to-purple-600'} rounded-xl font-bold transition-all flex items-center justify-center gap-2`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+                  {isMeetingNow(selectedMeeting) ? 'Unirse Ahora' : 'Iniciar Reunión'}
+                </button>
+              )}
+              {isCreator(selectedMeeting) && (
+                <button
+                  onClick={() => {
+                    deleteMeeting(selectedMeeting.id, selectedMeeting.google_event_id);
+                    setSelectedMeeting(null);
+                  }}
+                  className="px-4 py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-xl font-bold transition-all"
+                >
+                  Cancelar
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

@@ -140,6 +140,7 @@ export interface ScheduledMeeting {
   creado_en: string;
   google_event_id?: string;
   meeting_link?: string;
+  tipo_reunion?: string;
   creador?: { id: string; nombre: string };
   sala?: { id: string; nombre: string };
   participantes?: MeetingParticipant[];
