@@ -15,6 +15,7 @@ import { Room, Track, RoomEvent } from 'livekit-client';
 import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { MeetingControlBar, TipoReunion } from './MeetingControlBar';
+import { TipoReunionUnificado, MAPEO_TIPO_GRABACION, InvitadoExterno } from '@/types/meeting-types';
 
 interface MeetingRoomProps {
   salaId: string;
@@ -37,8 +38,10 @@ interface TokenData {
     canSubscribe: boolean;
     roomAdmin: boolean;
   };
-  tipo_reunion?: string;
+  tipo_reunion?: TipoReunionUnificado;
+  tipo_grabacion?: string;
   reunion_id?: string;
+  invitado_externo?: InvitadoExterno;
 }
 
 // Estilos por tema
@@ -178,15 +181,24 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   // Obtener tipo de reunión de la sala (para usuarios autenticados o invitados)
   // Solo se ejecuta una vez cuando tokenData está listo
   const [salaInfoFetched, setSalaInfoFetched] = useState(false);
+  const [invitadoExterno, setInvitadoExterno] = useState<InvitadoExterno | null>(null);
   
   useEffect(() => {
     if (propTipoReunion || salaInfoFetched || !tokenData) return;
     
     const fetchSalaInfo = async () => {
-      const tipoMap: Record<string, TipoReunion> = {
+      // Mapeo de tipo BD a TipoReunion del ControlBar
+      const tipoMapBD: Record<string, TipoReunion> = {
         'general': 'equipo',
         'deal': 'deal',
         'entrevista': 'entrevista'
+      };
+      // Mapeo de tipo unificado a TipoReunion del ControlBar
+      const tipoMapUnificado: Record<TipoReunionUnificado, TipoReunion> = {
+        'equipo': 'equipo',
+        'one_to_one': 'equipo',
+        'cliente': 'deal',
+        'candidato': 'entrevista'
       };
       
       try {
@@ -200,9 +212,21 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           
           if (invitacion?.sala) {
             const salaData = invitacion.sala as any;
-            setTipoReunion(tipoMap[salaData.tipo] || 'equipo');
-            if (salaData.configuracion?.reunion_id) {
-              setReunionId(salaData.configuracion.reunion_id);
+            const config = salaData.configuracion;
+            
+            // Usar tipo_reunion de configuración si existe (nuevo sistema unificado)
+            if (config?.tipo_reunion) {
+              setTipoReunion(tipoMapUnificado[config.tipo_reunion as TipoReunionUnificado] || 'equipo');
+            } else {
+              setTipoReunion(tipoMapBD[salaData.tipo] || 'equipo');
+            }
+            
+            if (config?.reunion_id) {
+              setReunionId(config.reunion_id);
+            }
+            // Obtener info del invitado externo si existe
+            if (config?.invitados_externos?.[0]) {
+              setInvitadoExterno(config.invitados_externos[0]);
             }
           }
         } 
@@ -215,9 +239,21 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
             .single();
           
           if (sala) {
-            setTipoReunion(tipoMap[sala.tipo] || 'equipo');
-            if (sala.configuracion?.reunion_id) {
-              setReunionId(sala.configuracion.reunion_id);
+            const config = sala.configuracion as any;
+            
+            // Usar tipo_reunion de configuración si existe (nuevo sistema unificado)
+            if (config?.tipo_reunion) {
+              setTipoReunion(tipoMapUnificado[config.tipo_reunion as TipoReunionUnificado] || 'equipo');
+            } else {
+              setTipoReunion(tipoMapBD[sala.tipo] || 'equipo');
+            }
+            
+            if (config?.reunion_id) {
+              setReunionId(config.reunion_id);
+            }
+            // Obtener info del invitado externo si existe
+            if (config?.invitados_externos?.[0]) {
+              setInvitadoExterno(config.invitados_externos[0]);
             }
           }
         }
