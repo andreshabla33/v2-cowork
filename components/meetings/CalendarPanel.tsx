@@ -394,40 +394,41 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   };
 
   const deleteMeeting = async (meetingId: string, googleEventId?: string) => {
+    console.log('🗑️ Iniciando eliminación de reunión:', meetingId);
+    
     // Eliminar de Google Calendar PRIMERO si está conectado y tiene ID
-    // Esto envía notificación de cancelación a los invitados
     if (googleConnected && googleEventId) {
       try {
-        await googleCalendar.deleteEvent(googleEventId, 'all'); // 'all' = notificar a invitados
-        console.log('Evento eliminado de Google Calendar:', googleEventId);
+        await googleCalendar.deleteEvent(googleEventId, 'all');
+        console.log('✅ Evento eliminado de Google Calendar:', googleEventId);
       } catch (err) {
-        console.error('Error eliminando de Google Calendar:', err);
-        // Continuar con la eliminación local aunque falle Google
+        console.error('❌ Error eliminando de Google Calendar:', err);
       }
     }
-    
-    // Eliminar de Supabase (esto activará el trigger que notifica a participantes)
     
     // Actualización optimista: eliminar de la UI inmediatamente
     setMeetings(prev => prev.filter(m => m.id !== meetingId));
     
+    // Eliminar de Supabase
+    console.log('📡 Enviando DELETE a Supabase...');
     const { error, count } = await supabase
       .from('reuniones_programadas')
       .delete({ count: 'exact' })
       .eq('id', meetingId);
     
+    console.log('📡 Respuesta DELETE:', { error, count });
+    
     if (error) {
-      console.error('Error eliminando reunión:', error);
-      // Revertir si hubo error (recargar)
+      console.error('❌ Error eliminando reunión:', error);
       loadMeetings();
       alert('Error al eliminar la reunión: ' + error.message);
     } else if (count === 0) {
-      // Si no se borró nada (por RLS), recargar para mostrar estado real
-      console.warn('No se pudo eliminar la reunión (posible restricción de permisos)');
+      console.warn('⚠️ count=0, la reunión no se eliminó (RLS?)');
       loadMeetings();
+    } else {
+      console.log('✅ Reunión eliminada correctamente, count:', count);
     }
     
-    // Sincronizar Google por si acaso
     syncGoogleEvents();
   };
 
