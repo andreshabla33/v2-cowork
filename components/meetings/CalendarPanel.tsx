@@ -319,13 +319,23 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         await supabase.from('reunion_participantes').insert(participantesData);
       }
 
+      // Incluir invitado del formulario si tiene datos válidos pero no fue agregado
+      let todosLosInvitados = [...invitadosExternos];
+      if (nuevoInvitado.email && nuevoInvitado.nombre) {
+        const yaExiste = invitadosExternos.some(inv => inv.email === nuevoInvitado.email);
+        if (!yaExiste) {
+          todosLosInvitados.push(nuevoInvitado as InvitadoExterno);
+          console.log('📌 Incluyendo invitado del formulario:', nuevoInvitado.email);
+        }
+      }
+
       // Enviar emails a invitados externos via Resend (si no usó Google Calendar)
-      if (!googleConnected && invitadosExternos.length > 0) {
+      if (!googleConnected && todosLosInvitados.length > 0) {
         try {
           console.log('📧 Enviando invitaciones via Resend...');
           await supabase.functions.invoke('enviar-invitacion-reunion', {
             body: {
-              destinatarios: invitadosExternos.map(inv => ({
+              destinatarios: todosLosInvitados.map(inv => ({
                 email: inv.email,
                 nombre: inv.nombre
               })),
