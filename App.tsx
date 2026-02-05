@@ -83,17 +83,31 @@ const App: React.FC = () => {
     );
   }
 
-  // Acceso directo a sala de videollamada (URL: /sala/ID) - requiere sesión
-  if (directSalaId && session) {
-    return (
-      <MeetingRoom
-        salaId={directSalaId}
-        onLeave={() => {
-          setDirectSalaId(null);
-          window.history.pushState({}, '', '/');
-        }}
-      />
-    );
+  // Acceso directo a sala de videollamada (URL: /sala/ID)
+  if (directSalaId) {
+    // Si hay sesión, abrir la sala directamente
+    if (session) {
+      return (
+        <MeetingRoom
+          salaId={directSalaId}
+          onLeave={() => {
+            setDirectSalaId(null);
+            window.history.pushState({}, '', '/');
+          }}
+        />
+      );
+    }
+    // Si no hay sesión pero está inicializando, mostrar loading
+    if (!initialized) {
+      return (
+        <div className="fixed inset-0 z-[1000] bg-black flex flex-col items-center justify-center gap-6">
+          <div className="w-16 h-16 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin"></div>
+          <p className="text-[10px] font-black uppercase tracking-[0.4em] text-zinc-500">Cargando videollamada...</p>
+        </div>
+      );
+    }
+    // Si no hay sesión y ya inicializó, mostrar login
+    return <LoginScreen />;
   }
 
   // Si no hay sesión, siempre pantalla de login (excepto si estamos procesando invitación)
