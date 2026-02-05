@@ -466,14 +466,21 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
 }) => {
   const room = useRoomContext();
   const [remoteRecording, setRemoteRecording] = useState<{isRecording: boolean; by: string} | null>(null);
+  const [reactions, setReactions] = useState<{id: string; emoji: string; by: string}[]>([]);
 
-  // Obtener tracks de video de todos los participantes
+  // Obtener tracks de video de todos los participantes (solo Camera, no placeholders innecesarios)
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
     { onlySubscribed: false }
+  );
+
+  // Filtrar tracks válidos para evitar pantallas negras
+  const validTracks = tracks.filter(track => 
+    track.participant && 
+    (track.publication?.track || track.source === Track.Source.Camera)
   );
 
   // Broadcast estado de grabación a todos los participantes
@@ -490,7 +497,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
     room.localParticipant?.publishData(data, { reliable: true });
   }, [isRecording, room]);
 
-  // Escuchar estado de grabación de otros participantes
+  // Escuchar mensajes DataChannel (grabación y reacciones)
   useEffect(() => {
     if (!room) return;
 
@@ -505,6 +512,18 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           } else {
             setRemoteRecording(null);
           }
+        }
+        
+        // Manejar reacciones
+        if (message.type === 'reaction') {
+          const reactionId = `${Date.now()}-${Math.random()}`;
+          const participantName = participant?.name || participant?.identity || 'Participante';
+          setReactions(prev => [...prev, { id: reactionId, emoji: message.emoji, by: participantName }]);
+          
+          // Auto-remover después de 3 segundos
+          setTimeout(() => {
+            setReactions(prev => prev.filter(r => r.id !== reactionId));
+          }, 3000);
         }
       } catch (e) {
         // Ignorar mensajes no JSON
@@ -522,18 +541,110 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   const recordingBy = isRecording ? 'Tú' : remoteRecording?.by;
 
   return (
-    <div className="relative h-full w-full">
+    <div className="relative h-full w-full bg-zinc-950 overflow-hidden">
+      {/* Estilos globales para LiveKit */}
+      <style>{`
+        .lk-grid-layout {
+          height: 100% !important;
+          padding: 8px !important;
+          gap: 8px !important;
+          background: transparent !important;
+        }
+        .lk-participant-tile {
+          border-radius: 12px !important;
+          overflow: hidden !important;
+          background: #18181b !important;
+        }
+        .lk-participant-placeholder {
+          background: linear-gradient(135deg, #27272a 0%, #18181b 100%) !important;
+        }
+        .lk-participant-name {
+          background: rgba(0,0,0,0.6) !important;
+          backdrop-filter: blur(8px) !important;
+          padding: 4px 10px !important;
+          border-radius: 6px !important;
+          font-size: 12px !important;
+        }
+        /* Chat estilos */
+        .lk-chat-custom .lk-chat {
+          height: 100% !important;
+          display: flex !important;
+          flex-direction: column !important;
+          background: transparent !important;
+        }
+        .lk-chat-custom .lk-message-list,
+        .lk-chat-custom .lk-chat-messages {
+          flex: 1 !important;
+          overflow-y: auto !important;
+          padding: 12px !important;
+        }
+        .lk-chat-custom .lk-message,
+        .lk-chat-custom .lk-chat-entry {
+          margin-bottom: 12px !important;
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        .lk-chat-custom .lk-message-sender,
+        .lk-chat-custom .lk-chat-entry__name,
+        .lk-chat-custom .lk-participant-name {
+          font-weight: 600 !important;
+          color: #a5b4fc !important;
+          font-size: 11px !important;
+          margin-bottom: 4px !important;
+          display: block !important;
+        }
+        .lk-chat-custom .lk-message-body,
+        .lk-chat-custom .lk-chat-entry__message,
+        .lk-chat-custom .lk-message-text {
+          background: rgba(255,255,255,0.08) !important;
+          padding: 10px 14px !important;
+          border-radius: 12px !important;
+          color: white !important;
+          font-size: 14px !important;
+          word-break: break-word !important;
+          line-height: 1.4 !important;
+        }
+        .lk-chat-custom .lk-chat-form,
+        .lk-chat-custom .lk-message-form {
+          padding: 12px !important;
+          border-top: 1px solid rgba(255,255,255,0.1) !important;
+          background: transparent !important;
+        }
+        .lk-chat-custom .lk-chat-form input,
+        .lk-chat-custom .lk-message-form input,
+        .lk-chat-custom .lk-form-control {
+          width: 100% !important;
+          background: rgba(255,255,255,0.08) !important;
+          border: 1px solid rgba(255,255,255,0.1) !important;
+          border-radius: 10px !important;
+          padding: 12px 14px !important;
+          color: white !important;
+          font-size: 14px !important;
+        }
+        .lk-chat-custom input::placeholder {
+          color: rgba(255,255,255,0.4) !important;
+        }
+        .lk-chat-custom input:focus {
+          outline: none !important;
+          border-color: rgba(99, 102, 241, 0.5) !important;
+        }
+        .lk-chat-custom .lk-button,
+        .lk-chat-custom .lk-chat-form button {
+          display: none !important;
+        }
+      `}</style>
+
       {/* Grid de participantes */}
-      <div className={`h-full w-full ${showChat ? 'pr-80' : ''} transition-all duration-300`}>
-        <GridLayout tracks={tracks} style={{ height: '100%' }}>
+      <div className={`h-full w-full ${showChat ? 'pr-80' : ''} transition-all duration-300 pb-20`}>
+        <GridLayout tracks={validTracks} style={{ height: '100%' }}>
           <ParticipantTile />
         </GridLayout>
       </div>
 
-      {/* Panel de Chat con estilos mejorados */}
+      {/* Panel de Chat */}
       {showChat && (
-        <div className="absolute top-0 right-0 h-full w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-white/10 flex flex-col">
-          <div className="p-3 border-b border-white/10 flex items-center justify-between">
+        <div className="absolute top-0 right-0 h-full w-80 bg-zinc-900/95 backdrop-blur-xl border-l border-white/10 flex flex-col z-[100]">
+          <div className="p-3 border-b border-white/10 flex items-center justify-between shrink-0">
             <h3 className="text-white font-bold text-sm">Chat de la reunión</h3>
             <button 
               onClick={onToggleChat}
@@ -544,69 +655,34 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
               </svg>
             </button>
           </div>
-          <div className="flex-1 overflow-hidden lk-chat-custom">
-            <style>{`
-              .lk-chat-custom .lk-chat {
-                height: 100%;
-                display: flex;
-                flex-direction: column;
-                background: transparent;
-              }
-              .lk-chat-custom .lk-chat-messages {
-                flex: 1;
-                overflow-y: auto;
-                padding: 12px;
-              }
-              .lk-chat-custom .lk-chat-entry {
-                margin-bottom: 12px;
-              }
-              .lk-chat-custom .lk-chat-entry__name {
-                font-weight: 600;
-                color: #a5b4fc;
-                font-size: 12px;
-                margin-bottom: 4px;
-                display: block;
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 200px;
-              }
-              .lk-chat-custom .lk-chat-entry__message {
-                background: rgba(255,255,255,0.1);
-                padding: 8px 12px;
-                border-radius: 12px;
-                color: white;
-                font-size: 14px;
-                word-break: break-word;
-              }
-              .lk-chat-custom .lk-chat-form {
-                padding: 12px;
-                border-top: 1px solid rgba(255,255,255,0.1);
-              }
-              .lk-chat-custom .lk-chat-form input {
-                width: 100%;
-                background: rgba(255,255,255,0.1);
-                border: 1px solid rgba(255,255,255,0.1);
-                border-radius: 8px;
-                padding: 10px 12px;
-                color: white;
-                font-size: 14px;
-              }
-              .lk-chat-custom .lk-chat-form input::placeholder {
-                color: rgba(255,255,255,0.4);
-              }
-              .lk-chat-custom .lk-chat-form input:focus {
-                outline: none;
-                border-color: rgba(99, 102, 241, 0.5);
-              }
-              .lk-chat-custom .lk-chat-form button {
-                display: none;
-              }
-            `}</style>
+          <div className="flex-1 overflow-hidden lk-chat-custom min-h-0">
             <Chat style={{ height: '100%' }} />
           </div>
         </div>
       )}
+
+      {/* Reacciones flotantes */}
+      <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none z-[300]">
+        {reactions.map((reaction, index) => (
+          <div
+            key={reaction.id}
+            className="absolute animate-bounce text-6xl"
+            style={{
+              left: `${(index % 3 - 1) * 80}px`,
+              animation: 'floatUp 3s ease-out forwards',
+            }}
+          >
+            {reaction.emoji}
+          </div>
+        ))}
+      </div>
+      <style>{`
+        @keyframes floatUp {
+          0% { opacity: 1; transform: translateY(0) scale(1); }
+          50% { opacity: 1; transform: translateY(-50px) scale(1.2); }
+          100% { opacity: 0; transform: translateY(-120px) scale(0.8); }
+        }
+      `}</style>
 
       {/* Banner de grabación activa - visible para TODOS */}
       {showRecordingBanner && (
