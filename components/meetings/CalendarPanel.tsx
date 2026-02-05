@@ -319,6 +319,34 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         await supabase.from('reunion_participantes').insert(participantesData);
       }
 
+      // Enviar emails a invitados externos via Resend (si no usó Google Calendar)
+      if (!googleConnected && invitadosExternos.length > 0) {
+        try {
+          console.log('📧 Enviando invitaciones via Resend...');
+          await supabase.functions.invoke('enviar-invitacion-reunion', {
+            body: {
+              destinatarios: invitadosExternos.map(inv => ({
+                email: inv.email,
+                nombre: inv.nombre
+              })),
+              reunion: {
+                titulo: newMeeting.titulo.trim(),
+                descripcion: newMeeting.descripcion.trim(),
+                fecha_inicio: fechaInicio.toISOString(),
+                fecha_fin: fechaFin.toISOString(),
+                meeting_link: meetingLink,
+                organizador_nombre: currentUser.name || 'Organizador',
+                tipo_reunion: newMeeting.tipo_reunion
+              }
+            }
+          });
+          console.log('✅ Invitaciones enviadas via Resend');
+        } catch (emailErr) {
+          console.error('Error enviando emails:', emailErr);
+          // No bloquear si falla el email
+        }
+      }
+
       setShowScheduleModal(false);
       resetNewMeeting();
       loadMeetings();
