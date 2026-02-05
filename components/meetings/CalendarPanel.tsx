@@ -335,22 +335,72 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         }
       }
 
+      // Crear invitaciones con tokens únicos para invitados externos (acceso sin login)
+      const invitadosConLinks: { email: string; nombre: string; link: string }[] = [];
+      if (sala && todosLosInvitados.length > 0) {
+        console.log('🔗 Generando tokens para invitados externos...');
+        for (const inv of todosLosInvitados) {
+          try {
+            // Crear participante en la sala
+            const { data: participante } = await supabase
+              .from('participantes_sala')
+              .insert({
+                sala_id: sala.id,
+                nombre_invitado: inv.nombre,
+                email_invitado: inv.email,
+                tipo_participante: inv.empresa ? 'cliente' : 'invitado',
+                estado_participante: 'invitado',
+              })
+              .select()
+              .single();
+
+            if (participante) {
+              // Crear invitación con token único
+              const { data: invitacion } = await supabase
+                .from('invitaciones_reunion')
+                .insert({
+                  sala_id: sala.id,
+                  participante_id: participante.id,
+                  email: inv.email,
+                  nombre: inv.nombre,
+                  tipo_invitado: inv.empresa ? 'cliente' : 'invitado',
+                  creado_por: currentUser.id,
+                  expira_en: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+                })
+                .select()
+                .single();
+
+              if (invitacion?.token_unico) {
+                const linkPersonalizado = `${window.location.origin}/join/${invitacion.token_unico}`;
+                invitadosConLinks.push({ email: inv.email, nombre: inv.nombre, link: linkPersonalizado });
+                console.log(`✅ Token generado para ${inv.email}:`, linkPersonalizado);
+              }
+            }
+          } catch (err) {
+            console.error(`❌ Error creando invitación para ${inv.email}:`, err);
+            // Fallback: usar link de sala (requiere login)
+            invitadosConLinks.push({ email: inv.email, nombre: inv.nombre, link: meetingLink });
+          }
+        }
+      }
+
       // Enviar emails a invitados externos via Resend (si no usó Google Calendar)
-      if (!googleConnected && todosLosInvitados.length > 0) {
+      if (!googleConnected && invitadosConLinks.length > 0) {
         try {
-          console.log('📧 Enviando invitaciones via Resend...', todosLosInvitados);
+          console.log('📧 Enviando invitaciones via Resend...', invitadosConLinks);
           const { data: emailResult, error: emailError } = await supabase.functions.invoke('enviar-invitacion-reunion', {
             body: {
-              destinatarios: todosLosInvitados.map(inv => ({
+              destinatarios: invitadosConLinks.map(inv => ({
                 email: inv.email,
-                nombre: inv.nombre
+                nombre: inv.nombre,
+                link_personalizado: inv.link // Link único por invitado
               })),
               reunion: {
                 titulo: newMeeting.titulo.trim(),
                 descripcion: newMeeting.descripcion.trim(),
                 fecha_inicio: fechaInicio.toISOString(),
                 fecha_fin: fechaFin.toISOString(),
-                meeting_link: meetingLink,
+                meeting_link: meetingLink, // Fallback
                 organizador_nombre: currentUser.name || 'Organizador',
                 tipo_reunion: newMeeting.tipo_reunion
               }
