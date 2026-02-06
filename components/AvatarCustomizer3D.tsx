@@ -4,7 +4,7 @@ import React, { useState, useRef, Suspense } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
 import { useStore } from '@/store/useStore';
-import { ProceduralChibiAvatar } from './Avatar3DGLTF';
+import { GLTFAvatar } from './Avatar3DGLTF';
 import { UserAvatar } from './UserAvatar';
 import { supabase } from '../lib/supabase';
 
@@ -170,7 +170,13 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
             <directionalLight position={[-5, 3, -5]} intensity={0.3} />
             
             <group position={[0, -0.8, 0]}>
-              <ProceduralChibiAvatar config={localConfig} isMoving={false} direction="front" />
+              <GLTFAvatar
+                animationState="idle"
+                direction="front"
+                skinColor={localConfig.skinColor}
+                clothingColor={localConfig.clothingColor}
+                scale={1.2}
+              />
             </group>
             
             <OrbitControls enablePan={false} enableZoom={true} minDistance={2} maxDistance={5} />
