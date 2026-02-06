@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting } from '../../types';
@@ -91,8 +91,11 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     [newMeeting.tipo_reunion]
   );
 
-  const loadMeetings = useCallback(async () => {
-    if (!activeWorkspace?.id) return;
+  const loadMeetings = async () => {
+    if (!activeWorkspace?.id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
 
     const { data, error } = await supabase
@@ -109,12 +112,11 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       console.error('Error cargando reuniones:', error);
     }
     setLoading(false);
-  }, [activeWorkspace?.id]);
+  };
 
-  const loadMiembros = useCallback(async () => {
+  const loadMiembros = async () => {
     if (!activeWorkspace?.id || !currentUser?.id) return;
     
-    // Cargar miembros del espacio
     const { data } = await supabase
       .from('miembros_espacio')
       .select('usuario_id, rol')
@@ -130,7 +132,6 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       
       if (usuarios) setMiembrosEspacio(usuarios);
 
-      // Obtener cargo del usuario actual para RBAC (desde columna 'cargo' directamente)
       const { data: miembroData } = await supabase
         .from('miembros_espacio')
         .select('cargo')
@@ -143,7 +144,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         setCargoUsuario(miembroData.cargo as CargoLaboral);
       }
     }
-  }, [activeWorkspace?.id, currentUser?.id]);
+  };
 
   useEffect(() => {
     loadMeetings();
@@ -161,7 +162,8 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [activeWorkspace?.id, loadMeetings, loadMiembros]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspace?.id, currentUser?.id]);
 
   const createMeeting = async () => {
     console.log('🔵 createMeeting llamado', { newMeeting, activeWorkspace: activeWorkspace?.id, currentUser: currentUser?.id });
@@ -501,7 +503,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     setGoogleEvents([]);
   };
 
-  const syncGoogleEvents = useCallback(async () => {
+  const syncGoogleEvents = async () => {
     if (!googleCalendar.isConnected()) return;
     
     setSyncingGoogle(true);
@@ -515,7 +517,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       }
     }
     setSyncingGoogle(false);
-  }, []);
+  };
 
   useEffect(() => {
     const hash = window.location.hash;
@@ -528,13 +530,15 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
         syncGoogleEvents();
       }
     }
-  }, [syncGoogleEvents]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     if (googleConnected) {
       syncGoogleEvents();
     }
-  }, [googleConnected, syncGoogleEvents]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [googleConnected]);
 
   const formatTime = (dateStr: string) => {
     return new Date(dateStr).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' });
