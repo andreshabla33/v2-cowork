@@ -46,6 +46,16 @@ export const WorkspaceLayout: React.FC = () => {
   const onVibenToggle = () => setShowViben(prev => !prev);
   const isAdmin = userRoleInActiveWorkspace === 'super_admin' || userRoleInActiveWorkspace === 'admin';
 
+  // Aplicar reducedMotion globalmente al body
+  useEffect(() => {
+    const perf = getSettingsSection('performance');
+    if (perf.reducedMotion) {
+      document.documentElement.classList.add('reduce-motion');
+    } else {
+      document.documentElement.classList.remove('reduce-motion');
+    }
+  }, []);
+
   useEffect(() => {
     if (!activeWorkspace) setView('dashboard');
   }, [activeWorkspace, setView]);
@@ -106,7 +116,7 @@ export const WorkspaceLayout: React.FC = () => {
             direction: currentUser.direction,
             isMicOn: currentUser.isMicOn,
             isCameraOn: currentUser.isCameraOn,
-            status: privacy.showOnlineStatus ? currentUser.status : PresenceStatus.AWAY,
+            status: !privacy.showOnlineStatus ? PresenceStatus.AWAY : !privacy.showActivityStatus ? PresenceStatus.AVAILABLE : currentUser.status,
           });
         }
       });
@@ -133,7 +143,7 @@ export const WorkspaceLayout: React.FC = () => {
         direction: currentUser.direction,
         isMicOn: currentUser.isMicOn,
         isCameraOn: currentUser.isCameraOn,
-        status: privacy.showOnlineStatus ? currentUser.status : PresenceStatus.AWAY,
+        status: !privacy.showOnlineStatus ? PresenceStatus.AWAY : !privacy.showActivityStatus ? PresenceStatus.AVAILABLE : currentUser.status,
       });
     }
   }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, currentUser.status, session?.user?.id]);
