@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useStore } from '../store/useStore';
-import { AvatarPreview } from './Navbar';
+import { UserAvatar } from './UserAvatar';
 import { AvatarConfig, PresenceStatus } from '../types';
 import { loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 
@@ -251,11 +251,13 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         <div className="relative">
           <button 
             onClick={onToggleStatusPicker}
-            className={`w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 hover:border-white/20 transition-colors cursor-pointer ${isGameActive ? 'mb-0' : 'mr-1'}`}
+            className={`w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center border border-white/5 hover:border-white/20 transition-colors cursor-pointer ${isGameActive ? 'mb-0' : 'mr-1'}`}
           >
-            <div className="scale-75 mt-2">
-              <AvatarPreview config={avatarConfig} size="small" />
-            </div>
+            <UserAvatar
+              name={currentUser.name}
+              profilePhoto={currentUser.profilePhoto}
+              size="sm"
+            />
           </button>
           {/* Indicador de estado actual */}
           <div 

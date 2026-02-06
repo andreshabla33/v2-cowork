@@ -153,6 +153,7 @@ interface AvatarProps {
   camOn?: boolean;
   showVideoBubble?: boolean;
   message?: string | null;
+  onClickAvatar?: () => void;
 }
 
 // Labels de estado para mostrar al hacer clic
@@ -163,7 +164,7 @@ const STATUS_LABELS: Record<PresenceStatus, string> = {
   [PresenceStatus.DND]: 'No molestar',
 };
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar }) => {
   const [showStatusLabel, setShowStatusLabel] = useState(false);
   
   // Auto-ocultar el label después de 2 segundos
@@ -175,7 +176,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   }, [showStatusLabel]);
   
   return (
-    <group position={position}>
+    <group position={position} onClick={(e) => { if (isCurrentUser && onClickAvatar) { e.stopPropagation(); onClickAvatar(); } }}>
       {/* Avatar 3D GLTF desde Supabase */}
       <GLTFAvatar
         animationState={animationState}
@@ -351,9 +352,10 @@ interface PlayerProps {
   message?: string | null;
   orbitControlsRef: React.MutableRefObject<any>;
   reactions?: Array<{ id: string; emoji: string }>;
+  onClickAvatar?: () => void;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [] }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -487,6 +489,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         camOn={currentUser.isCameraOn}
         showVideoBubble={showVideoBubble}
         message={message}
+        onClickAvatar={onClickAvatar}
       />
       {/* Múltiples emojis flotantes estilo Gather */}
       {reactions.map((r, idx) => (
@@ -514,9 +517,10 @@ interface SceneProps {
   remoteMessages: Map<string, string>;
   localReactions: Array<{ id: string; emoji: string }>;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
+  onClickAvatar?: () => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -612,6 +616,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         message={localMessage} 
         orbitControlsRef={orbitControlsRef}
         reactions={localReactions}
+        onClickAvatar={onClickAvatar}
       />
       
       {/* Usuarios remotos */}
@@ -1084,7 +1089,7 @@ const ICE_SERVERS = [
 ];
 
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameHubOpen = false, isPlayingGame = false }) => {
-  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session } = useStore();
+  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session, setActiveSubTab } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -2149,6 +2154,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             remoteMessages={remoteMessages}
             localReactions={localReactions}
             remoteReaction={remoteReaction}
+            onClickAvatar={() => setActiveSubTab('avatar')}
           />
         </Suspense>
       </Canvas>
