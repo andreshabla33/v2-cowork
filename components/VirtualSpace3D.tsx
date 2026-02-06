@@ -24,51 +24,80 @@ const WORLD_SIZE = 100;
 const PROXIMITY_RADIUS = 180; // 180px para detectar proximidad
 const TELEPORT_DISTANCE = 15; // Distancia 3D para activar teletransportación
 
-// Sonido de teletransportación (síntesis estilo Goku)
+// Sonido de teletransportación (estilo LOL - mágico/etéreo)
 const playTeleportSound = () => {
   try {
     const ctx = new AudioContext();
     const now = ctx.currentTime;
     
-    // Sweep ascendente (desaparición)
+    // Tono mágico ascendente (shimmer)
     const osc1 = ctx.createOscillator();
     const gain1 = ctx.createGain();
     osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(200, now);
-    osc1.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
-    gain1.gain.setValueAtTime(0.3, now);
-    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc1.frequency.setValueAtTime(400, now);
+    osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.25);
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.linearRampToValueAtTime(0.3, now + 0.1);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
     osc1.connect(gain1).connect(ctx.destination);
     osc1.start(now);
-    osc1.stop(now + 0.2);
+    osc1.stop(now + 0.35);
 
-    // Ruido blanco (whoosh)
-    const bufferSize = ctx.sampleRate * 0.3;
+    // Armónico (octava superior para brillo mágico)
+    const osc1b = ctx.createOscillator();
+    const gain1b = ctx.createGain();
+    osc1b.type = 'sine';
+    osc1b.frequency.setValueAtTime(800, now);
+    osc1b.frequency.exponentialRampToValueAtTime(2400, now + 0.25);
+    gain1b.gain.setValueAtTime(0.08, now);
+    gain1b.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc1b.connect(gain1b).connect(ctx.destination);
+    osc1b.start(now);
+    osc1b.stop(now + 0.3);
+
+    // Whoosh suave (ruido filtrado)
+    const bufferSize = ctx.sampleRate * 0.5;
     const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
     const data = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.15;
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.1;
     const noise = ctx.createBufferSource();
     const noiseGain = ctx.createGain();
+    const noiseFilter = ctx.createBiquadFilter();
+    noiseFilter.type = 'bandpass';
+    noiseFilter.frequency.setValueAtTime(2000, now);
+    noiseFilter.Q.setValueAtTime(1.5, now);
     noise.buffer = noiseBuffer;
-    noiseGain.gain.setValueAtTime(0.2, now);
-    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
-    noise.connect(noiseGain).connect(ctx.destination);
+    noiseGain.gain.setValueAtTime(0.15, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+    noise.connect(noiseFilter).connect(noiseGain).connect(ctx.destination);
     noise.start(now + 0.05);
 
-    // Sweep descendente (aparición)
+    // Tono descendente de llegada (resolución mágica)
     const osc2 = ctx.createOscillator();
     const gain2 = ctx.createGain();
-    osc2.type = 'sine';
-    osc2.frequency.setValueAtTime(2000, now + 0.2);
-    osc2.frequency.exponentialRampToValueAtTime(300, now + 0.4);
-    gain2.gain.setValueAtTime(0.01, now + 0.2);
-    gain2.gain.linearRampToValueAtTime(0.25, now + 0.25);
-    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1500, now + 0.3);
+    osc2.frequency.exponentialRampToValueAtTime(500, now + 0.55);
+    gain2.gain.setValueAtTime(0.01, now + 0.3);
+    gain2.gain.linearRampToValueAtTime(0.2, now + 0.35);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
     osc2.connect(gain2).connect(ctx.destination);
-    osc2.start(now + 0.2);
-    osc2.stop(now + 0.45);
+    osc2.start(now + 0.3);
+    osc2.stop(now + 0.6);
 
-    setTimeout(() => ctx.close(), 600);
+    // Nota final de "aterrizaje" (impacto suave)
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.type = 'sine';
+    osc3.frequency.setValueAtTime(250, now + 0.5);
+    osc3.frequency.exponentialRampToValueAtTime(150, now + 0.7);
+    gain3.gain.setValueAtTime(0.15, now + 0.5);
+    gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.75);
+    osc3.connect(gain3).connect(ctx.destination);
+    osc3.start(now + 0.5);
+    osc3.stop(now + 0.75);
+
+    setTimeout(() => ctx.close(), 900);
   } catch (e) { /* Audio no disponible */ }
 };
 
@@ -492,36 +521,126 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
   return null;
 };
 // ============== JUGADOR CONTROLABLE CON ANIMACIONES ==============
-// ============== EFECTO VISUAL TELETRANSPORTACIÓN ==============
+// ============== EFECTO VISUAL TELETRANSPORTACIÓN (Estilo LOL Simplificado) ==============
 const TeleportEffect: React.FC<{ position: [number, number, number]; phase: 'out' | 'in' }> = ({ position, phase }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const groupRef = useRef<THREE.Group>(null);
+  const beamRef = useRef<THREE.Mesh>(null);
+  const beamMatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const ring1Ref = useRef<THREE.Mesh>(null);
+  const ring1MatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const ring2Ref = useRef<THREE.Mesh>(null);
+  const ring2MatRef = useRef<THREE.MeshBasicMaterial>(null);
+  const flashRef = useRef<THREE.PointLight>(null);
   const startTime = useRef(Date.now());
 
   useFrame(() => {
-    if (!meshRef.current || !materialRef.current) return;
     const elapsed = (Date.now() - startTime.current) / 1000;
-    const duration = 0.35;
+    const duration = phase === 'out' ? 0.4 : 0.45;
     const t = Math.min(elapsed / duration, 1);
 
-    if (phase === 'out') {
-      // Anillo que se expande y desvanece
-      meshRef.current.scale.setScalar(1 + t * 3);
-      materialRef.current.opacity = 0.8 * (1 - t);
-    } else {
-      // Anillo que se contrae y aparece
-      meshRef.current.scale.setScalar(4 - t * 3);
-      materialRef.current.opacity = 0.8 * t * (1 - t * 0.5);
+    // === BEAM VERTICAL (rayo de luz central) ===
+    if (beamRef.current && beamMatRef.current) {
+      if (phase === 'out') {
+        // Aparece rápido, se estira, luego se desvanece
+        const scaleX = Math.max(0.01, 0.8 * (1 - t * t));
+        const scaleY = 0.5 + t * 8;
+        beamRef.current.scale.set(scaleX, scaleY, scaleX);
+        beamMatRef.current.opacity = t < 0.7 ? 0.9 : 0.9 * (1 - (t - 0.7) / 0.3);
+      } else {
+        // Aparece desde arriba, se contrae
+        const scaleX = 0.01 + 0.7 * t * (1 - t * 0.6);
+        const scaleY = 8 - t * 6;
+        beamRef.current.scale.set(scaleX, Math.max(0.1, scaleY), scaleX);
+        beamMatRef.current.opacity = t < 0.3 ? t / 0.3 * 0.9 : 0.9 * (1 - (t - 0.3) / 0.7);
+      }
+    }
+
+    // === ANILLO 1 (expansión principal) ===
+    if (ring1Ref.current && ring1MatRef.current) {
+      if (phase === 'out') {
+        const ringScale = 1 + t * 4;
+        ring1Ref.current.scale.setScalar(ringScale);
+        ring1MatRef.current.opacity = 0.7 * (1 - t * t);
+      } else {
+        // Anillos se contraen hacia el centro (estilo LOL arrival)
+        const ringScale = 5 * (1 - t);
+        ring1Ref.current.scale.setScalar(Math.max(0.1, ringScale));
+        ring1MatRef.current.opacity = 0.6 * t * (1 - t);
+      }
+    }
+
+    // === ANILLO 2 (con delay, más grande) ===
+    if (ring2Ref.current && ring2MatRef.current) {
+      const delayed = Math.max(0, (elapsed - 0.08) / duration);
+      const t2 = Math.min(delayed, 1);
+      if (phase === 'out') {
+        ring2Ref.current.scale.setScalar(0.5 + t2 * 5);
+        ring2MatRef.current.opacity = 0.5 * (1 - t2);
+      } else {
+        ring2Ref.current.scale.setScalar(Math.max(0.1, 6 * (1 - t2)));
+        ring2MatRef.current.opacity = 0.4 * t2 * (1 - t2);
+      }
+    }
+
+    // === FLASH DE LUZ ===
+    if (flashRef.current) {
+      if (phase === 'out') {
+        // Flash intenso al inicio, se apaga
+        flashRef.current.intensity = t < 0.2 ? 12 * (t / 0.2) : 12 * (1 - (t - 0.2) / 0.8);
+      } else {
+        // Flash al aparecer
+        flashRef.current.intensity = t < 0.15 ? 15 * (t / 0.15) : 15 * Math.max(0, 1 - (t - 0.15) / 0.5);
+      }
     }
   });
 
   return (
-    <group position={position}>
-      <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
-        <ringGeometry args={[0.5, 1.2, 32]} />
-        <meshBasicMaterial ref={materialRef} color="#818cf8" transparent opacity={0.8} side={THREE.DoubleSide} />
+    <group ref={groupRef} position={position}>
+      {/* Beam vertical (rayo de luz central estilo LOL) */}
+      <mesh ref={beamRef} position={[0, 2.5, 0]}>
+        <cylinderGeometry args={[0.15, 0.15, 1, 16, 1, true]} />
+        <meshBasicMaterial
+          ref={beamMatRef}
+          color="#a5b4fc"
+          transparent
+          opacity={0.9}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
       </mesh>
-      <pointLight color="#818cf8" intensity={phase === 'out' ? 5 : 8} distance={6} />
+
+      {/* Anillo 1 - principal */}
+      <mesh ref={ring1Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
+        <ringGeometry args={[0.4, 0.7, 48]} />
+        <meshBasicMaterial
+          ref={ring1MatRef}
+          color="#818cf8"
+          transparent
+          opacity={0.7}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Anillo 2 - secundario con delay */}
+      <mesh ref={ring2Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
+        <ringGeometry args={[0.6, 0.85, 48]} />
+        <meshBasicMaterial
+          ref={ring2MatRef}
+          color="#c7d2fe"
+          transparent
+          opacity={0.5}
+          side={THREE.DoubleSide}
+          depthWrite={false}
+          blending={THREE.AdditiveBlending}
+        />
+      </mesh>
+
+      {/* Flash de luz puntual (simula bloom) */}
+      <pointLight ref={flashRef} color="#a5b4fc" intensity={0} distance={10} />
+      <pointLight color="#818cf8" intensity={phase === 'out' ? 3 : 5} distance={4} />
     </group>
   );
 };
