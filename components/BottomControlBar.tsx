@@ -106,7 +106,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   isGameActive = false,
   isGameHubOpen = false,
 }) => {
-  const { currentUser, updateStatus, toggleMiniMode } = useStore();
+  const { currentUser, updateStatus } = useStore();
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
   
   const currentStatus = currentUser.status || PresenceStatus.AVAILABLE;
@@ -654,18 +654,6 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
             inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
             icon={<IconGamepad />}
             tooltip="Mini Juegos"
-          />
-        )}
-
-        {/* Mini Mode - Minimizar */}
-        {!isGameActive && (
-          <ControlButton 
-            onClick={toggleMiniMode} 
-            isActive={false} 
-            activeColor="bg-cyan-500 text-white" 
-            inactiveColor="bg-transparent text-white/70 hover:bg-white/10 hover:text-white"
-            icon={<IconMiniMode />}
-            tooltip="Mini Mode"
           />
         )}
 

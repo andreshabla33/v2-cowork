@@ -21,7 +21,7 @@ import { getSettingsSection } from '../lib/userSettings';
 import { MiniModeOverlay } from './MiniModeOverlay';
 
 export const WorkspaceLayout: React.FC = () => {
-  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
+  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace, setMiniMode, isMiniMode } = useStore();
   const [showViben, setShowViben] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGameHub, setShowGameHub] = useState(false);
@@ -29,6 +29,17 @@ export const WorkspaceLayout: React.FC = () => {
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
   const presenceChannelRef = useRef<any>(null);
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Mini Mode: auto-show al salir del espacio virtual, auto-hide al volver
+  useEffect(() => {
+    const miniSettings = getSettingsSection('minimode');
+    if (!miniSettings.enableMiniMode) return;
+    if (activeSubTab !== 'space') {
+      setMiniMode(true);
+    } else {
+      setMiniMode(false);
+    }
+  }, [activeSubTab]);
 
   // Suscribirse a cambios de idioma
   useEffect(() => {
