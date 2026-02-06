@@ -8,10 +8,11 @@ interface MeetingRoom {
   descripcion?: string;
   creador_id: string;
   es_privada: boolean;
+  password_hash?: string | null;
   max_participantes: number;
   activa: boolean;
   creado_en: string;
-  participantes?: { usuario_id: string; usuario?: { nombre: string } }[];
+  participantes?: { usuario_id: string | null; usuario?: { nombre: string } | null; nombre_invitado?: string | null }[];
   creador?: { nombre: string };
 }
 
@@ -38,14 +39,21 @@ export const MeetingRooms: React.FC<{ onJoinRoom?: (roomId: string) => void }> =
 
   const loadRooms = async () => {
     if (!activeWorkspace?.id) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('salas_reunion')
-      .select(`*, creador:usuarios!salas_reunion_creador_id_fkey(nombre), participantes:participantes_sala(usuario_id, usuario:usuarios(nombre))`)
+      .select(`*, creador:usuarios!salas_reunion_creador_id_fkey(nombre), participantes:participantes_sala(usuario_id, nombre_invitado, usuario:usuarios!participantes_sala_usuario_id_fkey(nombre))`)
       .eq('espacio_id', activeWorkspace.id)
       .eq('activa', true)
       .order('creado_en', { ascending: false });
     
-    if (data) setRooms(data);
+    if (error) {
+      console.error('Error loading rooms:', error);
+      return;
+    }
+    if (data) {
+      console.log('Rooms loaded:', data.length, data);
+      setRooms(data);
+    }
   };
 
   const createRoom = async () => {
@@ -79,6 +87,7 @@ export const MeetingRooms: React.FC<{ onJoinRoom?: (roomId: string) => void }> =
       return;
     }
 
+    console.log('Joining room:', roomId, 'user:', currentUser.id);
     const { error } = await supabase.from('participantes_sala').upsert({
       sala_id: roomId,
       usuario_id: currentUser.id,
@@ -86,21 +95,40 @@ export const MeetingRooms: React.FC<{ onJoinRoom?: (roomId: string) => void }> =
       cam_activa: false
     }, { onConflict: 'sala_id,usuario_id' });
 
-    if (!error) {
+    if (error) {
+      console.error('Error joining room:', error);
+      alert('Error al unirse: ' + error.message);
+    } else {
+      console.log('Joined room successfully');
       setShowJoinModal(null);
       setPassword('');
       onJoinRoom?.(roomId);
+      loadRooms();
     }
   };
 
   const leaveRoom = async (roomId: string) => {
-    await supabase.from('participantes_sala').delete().eq('sala_id', roomId).eq('usuario_id', currentUser.id);
-    loadRooms();
+    console.log('Leaving room:', roomId, 'user:', currentUser.id);
+    const { error } = await supabase.from('participantes_sala').delete().eq('sala_id', roomId).eq('usuario_id', currentUser.id);
+    if (error) {
+      console.error('Error leaving room:', error);
+      alert('Error al salir: ' + error.message);
+    } else {
+      console.log('Left room successfully');
+      loadRooms();
+    }
   };
 
   const endRoom = async (roomId: string) => {
-    await supabase.from('salas_reunion').update({ activa: false, finalizado_en: new Date().toISOString() }).eq('id', roomId);
-    loadRooms();
+    console.log('Ending room:', roomId);
+    const { error } = await supabase.from('salas_reunion').update({ activa: false, finalizado_en: new Date().toISOString() }).eq('id', roomId);
+    if (error) {
+      console.error('Error ending room:', error);
+      alert('Error al terminar: ' + error.message);
+    } else {
+      console.log('Room ended successfully');
+      loadRooms();
+    }
   };
 
   const isInRoom = (room: MeetingRoom) => room.participantes?.some(p => p.usuario_id === currentUser.id);
