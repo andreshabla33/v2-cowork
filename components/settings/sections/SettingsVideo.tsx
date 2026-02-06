@@ -35,9 +35,10 @@ export const SettingsVideo: React.FC<SettingsVideoProps> = ({
   useEffect(() => {
     const loadDevices = async () => {
       try {
-        await navigator.mediaDevices.getUserMedia({ video: true });
+        const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
         const devices = await navigator.mediaDevices.enumerateDevices();
         setCameras(devices.filter(d => d.kind === 'videoinput'));
+        tempStream.getTracks().forEach(t => t.stop());
       } catch (err) {
         console.error('Error loading video devices:', err);
       }

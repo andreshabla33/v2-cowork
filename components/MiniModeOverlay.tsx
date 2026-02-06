@@ -35,6 +35,7 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
 
   // Drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
     if (!overlayRef.current) return;
     const rect = overlayRef.current.getBoundingClientRect();
     dragOffset.current = { x: e.clientX - rect.left, y: e.clientY - rect.top };
@@ -44,7 +45,10 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
   useEffect(() => {
     if (!dragging) return;
     const handleMove = (e: MouseEvent) => {
-      setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+      e.preventDefault();
+      requestAnimationFrame(() => {
+        setPos({ x: e.clientX - dragOffset.current.x, y: e.clientY - dragOffset.current.y });
+      });
     };
     const handleUp = () => setDragging(false);
     window.addEventListener('mousemove', handleMove);
@@ -241,18 +245,21 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
               </svg>
             </button>
             {showStatusPicker && (
-              <div className="absolute bottom-full mb-1 left-0 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl min-w-[140px]">
-                {STATUS_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    onClick={() => { updateStatus(opt.value); setShowStatusPicker(false); }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-white/10 transition-all ${currentStatus === opt.value ? 'bg-white/[0.06]' : ''}`}
-                  >
-                    <div className={`w-2.5 h-2.5 rounded-full ${opt.color}`} />
-                    <span className="text-[10px] font-medium text-white/80">{opt.label}</span>
-                  </button>
-                ))}
-              </div>
+              <>
+                <div className="fixed inset-0 z-[9998]" onClick={() => setShowStatusPicker(false)} />
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl overflow-hidden shadow-2xl z-[9999]" style={{ minWidth: '150px' }}>
+                  {STATUS_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value}
+                      onClick={() => { updateStatus(opt.value); setShowStatusPicker(false); }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-left hover:bg-white/10 transition-all ${currentStatus === opt.value ? 'bg-violet-600/20' : ''}`}
+                    >
+                      <div className={`w-2.5 h-2.5 rounded-full ${opt.color}`} />
+                      <span className="text-[10px] font-medium text-white/80">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
 
