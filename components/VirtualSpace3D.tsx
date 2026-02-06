@@ -16,9 +16,10 @@ import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type Camera
 import { VideoWithBackground } from './VideoWithBackground';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from './BottomControlBar';
 import { AvatarCustomizer3D } from './AvatarCustomizer3D';
+import { getUserSettings, getSettingsSection, sendDesktopNotification, requestDesktopNotificationPermission } from '../lib/userSettings';
 // GameHub ahora se importa en WorkspaceLayout
 
-// Constantes
+// Constantes (defaults, pueden ser sobreescritas por settings del usuario en VirtualSpace3D)
 const MOVE_SPEED = 4;
 const RUN_SPEED = 8;
 const WORLD_SIZE = 100;
@@ -952,9 +953,11 @@ interface SceneProps {
   onDoubleClickFloor?: (point: THREE.Vector3) => void;
   teleportTarget?: { x: number; z: number } | null;
   onTeleportDone?: () => void;
+  showFloorGrid?: boolean;
+  showNamesAboveAvatars?: boolean;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -994,19 +997,21 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       {/* Cámara que sigue al jugador */}
       <CameraFollow orbitControlsRef={orbitControlsRef} />
       
-      <Grid
-        args={[WORLD_SIZE * 2, WORLD_SIZE * 2]}
-        position={[WORLD_SIZE / 2, 0, WORLD_SIZE / 2]}
-        cellSize={1}
-        cellThickness={0.5}
-        cellColor={gridColor}
-        sectionSize={5}
-        sectionThickness={1}
-        sectionColor={gridColor}
-        fadeDistance={100}
-        fadeStrength={1}
-        followCamera={false}
-      />
+      {showFloorGrid && (
+        <Grid
+          args={[WORLD_SIZE * 2, WORLD_SIZE * 2]}
+          position={[WORLD_SIZE / 2, 0, WORLD_SIZE / 2]}
+          cellSize={1}
+          cellThickness={0.5}
+          cellColor={gridColor}
+          sectionSize={5}
+          sectionThickness={1}
+          sectionColor={gridColor}
+          fadeDistance={100}
+          fadeStrength={1}
+          followCamera={false}
+        />
+      )}
       
       {/* Piso sólido */}
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[WORLD_SIZE / 2, -0.01, WORLD_SIZE / 2]} receiveShadow>
@@ -1549,6 +1554,62 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number } | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
   
+  // ========== Settings del usuario (leídos de localStorage/SettingsModal) ==========
+  const [userSettingsVersion, setUserSettingsVersion] = useState(0);
+  const space3dSettings = useMemo(() => getSettingsSection('space3d'), [userSettingsVersion]);
+  const meetingsSettings = useMemo(() => getSettingsSection('meetings'), [userSettingsVersion]);
+  const notifSettings = useMemo(() => getSettingsSection('notifications'), [userSettingsVersion]);
+  const performanceSettings = useMemo(() => getSettingsSection('performance'), [userSettingsVersion]);
+  
+  // Velocidades y radios basados en settings del usuario (factor sobre las constantes globales)
+  const userMoveSpeed = useMemo(() => {
+    const factor = space3dSettings.movementSpeed / 5; // 5 es el default, escala lineal
+    return MOVE_SPEED * factor;
+  }, [space3dSettings.movementSpeed]);
+  
+  const userRunSpeed = useMemo(() => {
+    const factor = space3dSettings.movementSpeed / 5;
+    return RUN_SPEED * factor;
+  }, [space3dSettings.movementSpeed]);
+  
+  const userProximityRadius = useMemo(() => {
+    return space3dSettings.proximityRadius || PROXIMITY_RADIUS;
+  }, [space3dSettings.proximityRadius]);
+  
+  // Escuchar cambios de settings (cuando el usuario cambia algo en SettingsModal)
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'user_settings') {
+        setUserSettingsVersion(v => v + 1);
+      }
+    };
+    window.addEventListener('storage', handleStorageChange);
+    
+    // También escuchar cambios en el mismo tab via intervalo corto
+    const interval = setInterval(() => {
+      const current = localStorage.getItem('user_settings');
+      if (current) {
+        const hash = current.length; // Simple change detection
+        setUserSettingsVersion(prev => {
+          if (prev !== hash) return hash;
+          return prev;
+        });
+      }
+    }, 2000);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
+    };
+  }, []);
+  
+  // Solicitar permiso de notificaciones desktop al montar
+  useEffect(() => {
+    if (notifSettings.desktopNotifications) {
+      requestDesktopNotificationPermission();
+    }
+  }, [notifSettings.desktopNotifications]);
+  
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
   
@@ -1630,7 +1691,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       // HISTÉRESIS: 
       // Si ya estaba conectado, usamos un radio mayor (1.2x) para desconectar.
       // Esto evita que la conexión oscile cuando se está en el borde.
-      const threshold = wasInCall ? PROXIMITY_RADIUS * 1.2 : PROXIMITY_RADIUS;
+      const threshold = wasInCall ? userProximityRadius * 1.2 : userProximityRadius;
       
       const inProximity = dist < threshold;
       
@@ -1638,10 +1699,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
          nextConnectedUsers.add(u.id);
          // Log solo al entrar
          if (!wasInCall) {
-           console.log(`[PROXIMITY ENTER] User ${u.name} entered. Dist: ${dist.toFixed(1)} < ${PROXIMITY_RADIUS}`);
+           console.log(`[PROXIMITY ENTER] User ${u.name} entered. Dist: ${dist.toFixed(1)} < ${userProximityRadius}`);
          }
       } else if (wasInCall) {
-         console.log(`[PROXIMITY EXIT] User ${u.name} exited. Dist: ${dist.toFixed(1)} > ${threshold.toFixed(1)} (Radius: ${PROXIMITY_RADIUS})`);
+         console.log(`[PROXIMITY EXIT] User ${u.name} exited. Dist: ${dist.toFixed(1)} > ${threshold.toFixed(1)} (Radius: ${userProximityRadius})`);
       }
       
       return inProximity;
@@ -1658,7 +1719,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     
     connectedUsersRef.current = nextConnectedUsers;
     return users;
-  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id, currentUser.isScreenSharing]);
+  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id, currentUser.isScreenSharing, userProximityRadius]);
 
   const hasActiveCall = usersInCall.length > 0;
   
@@ -1718,7 +1779,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   useEffect(() => {
     remoteStreams.forEach((remoteStream, oderId) => {
       const distance = userDistances.get(oderId) || PROXIMITY_RADIUS;
-      const volume = Math.max(0.1, 1 - (distance / PROXIMITY_RADIUS));
+      const volume = Math.max(0.1, 1 - (distance / userProximityRadius));
       
       // Aplicar volumen a los elementos de audio
       const audioElements = document.querySelectorAll(`video[data-user-id="${oderId}"]`);
@@ -1726,7 +1787,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         (el as HTMLVideoElement).volume = volume;
       });
     });
-  }, [remoteStreams, userDistances]);
+  }, [remoteStreams, userDistances, userProximityRadius]);
   
   // Función para enviar wave a un usuario
   const handleWaveUser = useCallback((userId: string) => {
@@ -1739,11 +1800,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     }
   }, [session?.user?.id, currentUser.name]);
 
-  // Activar mic/cam cuando hay usuarios cerca
+  // Activar mic/cam cuando hay usuarios cerca (respetando settings de reuniones)
   useEffect(() => {
     if (hasActiveCall) {
-      if (!currentUser.isMicOn) toggleMic();
-      if (!currentUser.isCameraOn) toggleCamera();
+      // Respetar configuración de "mic apagado al entrar" y "cámara apagada al entrar"
+      if (!meetingsSettings.autoMuteOnJoin && !currentUser.isMicOn) toggleMic();
+      if (!meetingsSettings.autoCameraOffOnJoin && !currentUser.isCameraOn) toggleCamera();
+      
+      // Notificación desktop cuando alguien se acerca
+      if (notifSettings.nearbyUserSound) {
+        sendDesktopNotification('Usuario cercano', `${usersInCall[0]?.name || 'Alguien'} está cerca de ti`);
+      }
     } else {
       // Apagar todo cuando no hay usuarios cerca
       if (currentUser.isPrivate) setPrivacy(false);
@@ -2055,6 +2122,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             newMap.set(payload.from, payload.message);
             return newMap;
           });
+          
+          // Notificación desktop para mensajes de chat
+          const ns = getSettingsSection('notifications');
+          if (ns.newMessageSound) {
+            sendDesktopNotification(`💬 ${payload.fromName}`, payload.message);
+          }
+          // Notificación de mención
+          if (ns.mentionNotifications && payload.message?.includes(`@${currentUser.name}`)) {
+            sendDesktopNotification(`📢 Mención de ${payload.fromName}`, payload.message);
+          }
+          
           // Limpiar mensaje después de 5s
           setTimeout(() => {
             setRemoteMessages(prev => {
@@ -2613,6 +2691,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             onReachTarget={() => setMoveTarget(null)}
             teleportTarget={teleportTarget}
             onTeleportDone={() => setTeleportTarget(null)}
+            showFloorGrid={space3dSettings.showFloorGrid}
+            showNamesAboveAvatars={space3dSettings.showNamesAboveAvatars}
             onDoubleClickFloor={(point) => {
               // Calcular distancia desde posición actual del avatar
               const playerX = (currentUser.x || 400) / 16;

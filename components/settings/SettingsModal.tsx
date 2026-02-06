@@ -166,10 +166,34 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     }
   }, []);
 
-  // Guardar settings en localStorage
+  // Guardar settings en localStorage + sincronizar con keys que lee VirtualSpace3D
   const saveSettings = (newSettings: typeof settings) => {
     setSettings(newSettings);
     localStorage.setItem(STORAGE_KEY, JSON.stringify(newSettings));
+    
+    // Sincronizar Audio settings con cowork_audio_settings (leído por VirtualSpace3D)
+    try {
+      const audioSync = {
+        selectedMicrophoneId: newSettings.audio.selectedMicrophoneId,
+        selectedSpeakerId: newSettings.audio.selectedSpeakerId,
+        noiseReduction: newSettings.audio.noiseReduction,
+        echoCancellation: newSettings.audio.echoCancellation,
+        autoGainControl: newSettings.audio.autoGainControl,
+      };
+      localStorage.setItem('cowork_audio_settings', JSON.stringify(audioSync));
+      
+      // Sincronizar Video/Camera settings con cowork_camera_settings
+      const cameraSync = {
+        selectedCameraId: newSettings.video.selectedCameraId,
+        hideSelfView: newSettings.video.hideSelfView,
+        mirrorVideo: newSettings.video.mirrorVideo,
+        backgroundEffect: 'none',
+        backgroundImage: null,
+      };
+      localStorage.setItem('cowork_camera_settings', JSON.stringify(cameraSync));
+    } catch (e) {
+      console.error('Error syncing settings:', e);
+    }
   };
 
   // Sincronizar tema
