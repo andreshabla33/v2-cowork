@@ -353,9 +353,11 @@ interface PlayerProps {
   orbitControlsRef: React.MutableRefObject<any>;
   reactions?: Array<{ id: string; emoji: string }>;
   onClickAvatar?: () => void;
+  moveTarget?: { x: number; z: number } | null;
+  onReachTarget?: () => void;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -420,16 +422,54 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
     // Velocidad según si corre o camina
     const speed = isRunning ? RUN_SPEED : MOVE_SPEED;
 
-    // Movimiento en 2D (corregido para vista isométrica)
-    if (keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp')) { dy = speed * delta; newDirection = 'up'; }
-    if (keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown')) { dy = -speed * delta; newDirection = 'front'; }
-    if (keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft')) { dx = -speed * delta; newDirection = 'left'; }
-    if (keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight')) { dx = speed * delta; newDirection = 'right'; }
+    // Movimiento por teclado
+    const keyW = keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp');
+    const keyS = keysPressed.current.has('KeyS') || keysPressed.current.has('ArrowDown');
+    const keyA = keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft');
+    const keyD = keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight');
+    const hasKeyboardInput = keyW || keyS || keyA || keyD;
 
-    // Normalizar diagonal
-    if (dx !== 0 && dy !== 0) {
-      dx *= 0.707;
-      dy *= 0.707;
+    if (hasKeyboardInput) {
+      // Teclado cancela cualquier movimiento por doble clic
+      if (moveTarget && onReachTarget) onReachTarget();
+
+      if (keyW) { dy = speed * delta; newDirection = 'up'; }
+      if (keyS) { dy = -speed * delta; newDirection = 'front'; }
+      if (keyA) { dx = -speed * delta; newDirection = 'left'; }
+      if (keyD) { dx = speed * delta; newDirection = 'right'; }
+
+      // Normalizar diagonal
+      if (dx !== 0 && dy !== 0) {
+        dx *= 0.707;
+        dy *= 0.707;
+      }
+    } else if (moveTarget) {
+      // Movimiento automático hacia el destino (doble clic estilo Gather)
+      const tx = moveTarget.x;
+      const tz = moveTarget.z;
+      const cx = positionRef.current.x;
+      const cz = positionRef.current.z;
+      const distX = tx - cx;
+      const distZ = tz - cz;
+      const dist = Math.sqrt(distX * distX + distZ * distZ);
+
+      if (dist < 0.15) {
+        // Llegó al destino
+        if (onReachTarget) onReachTarget();
+      } else {
+        // Normalizar dirección y aplicar velocidad
+        const moveSpeed = MOVE_SPEED * delta;
+        const step = Math.min(moveSpeed, dist);
+        dx = (distX / dist) * step;
+        dy = -(distZ / dist) * step; // invertido porque dy positivo = -z
+
+        // Determinar dirección visual
+        if (Math.abs(distX) > Math.abs(distZ)) {
+          newDirection = distX > 0 ? 'right' : 'left';
+        } else {
+          newDirection = distZ < 0 ? 'front' : 'up';
+        }
+      }
     }
 
     const moving = dx !== 0 || dy !== 0;
@@ -441,7 +481,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       
       // Actualizar animación según movimiento
       if (animationState !== 'cheer' && animationState !== 'dance' && animationState !== 'sit') {
-        setAnimationState(isRunning ? 'run' : 'walk');
+        setAnimationState(hasKeyboardInput && isRunning ? 'run' : 'walk');
       }
     } else if (animationState === 'walk' || animationState === 'run') {
       setAnimationState('idle');
@@ -454,8 +494,6 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       groupRef.current.position.x = positionRef.current.x;
       groupRef.current.position.z = positionRef.current.z;
     }
-
-    if (newDirection !== direction) setDirection(newDirection);
 
     // Actualizar posición para CameraFollow (única fuente de verdad)
     (camera as any).userData.playerPosition = { x: positionRef.current.x, z: positionRef.current.z };
@@ -518,9 +556,12 @@ interface SceneProps {
   localReactions: Array<{ id: string; emoji: string }>;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
   onClickAvatar?: () => void;
+  moveTarget?: { x: number; z: number } | null;
+  onReachTarget?: () => void;
+  onDoubleClickFloor?: (point: THREE.Vector3) => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -580,15 +621,28 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         <meshStandardMaterial color={themeColors[theme] || themeColors.dark} />
       </mesh>
       
-      {/* Suelo base (para clicks) - Bajado para evitar Z-fighting */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} onClick={(e) => {
-        // Lógica de movimiento por click
-        const point = e.point;
-        setPosition(Math.round(point.x * 16), Math.round(point.z * 16), 'front', false, true);
+      {/* Suelo base (para doble clic - movimiento estilo Gather) */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} onDoubleClick={(e) => {
+        e.stopPropagation();
+        if (onDoubleClickFloor) onDoubleClickFloor(e.point);
       }}>
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial visible={false} />
       </mesh>
+
+      {/* Marcador visual del destino (estilo Gather) */}
+      {moveTarget && (
+        <group position={[moveTarget.x, 0.05, moveTarget.z]}>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[0.3, 0.5, 32]} />
+            <meshBasicMaterial color="#6366f1" transparent opacity={0.6} />
+          </mesh>
+          <mesh rotation={[-Math.PI / 2, 0, 0]}>
+            <circleGeometry args={[0.2, 32]} />
+            <meshBasicMaterial color="#6366f1" transparent opacity={0.3} />
+          </mesh>
+        </group>
+      )}
 
       {/* Mesas y objetos (Demo) */}
       <mesh position={[10, 0.5, 10]} castShadow receiveShadow>
@@ -617,6 +671,8 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         orbitControlsRef={orbitControlsRef}
         reactions={localReactions}
         onClickAvatar={onClickAvatar}
+        moveTarget={moveTarget}
+        onReachTarget={onReachTarget}
       />
       
       {/* Usuarios remotos */}
@@ -1094,6 +1150,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
+  const [moveTarget, setMoveTarget] = useState<{ x: number; z: number } | null>(null);
   
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
@@ -2155,6 +2212,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             localReactions={localReactions}
             remoteReaction={remoteReaction}
             onClickAvatar={() => setActiveSubTab('avatar')}
+            moveTarget={moveTarget}
+            onReachTarget={() => setMoveTarget(null)}
+            onDoubleClickFloor={(point) => setMoveTarget({ x: point.x, z: point.z })}
           />
         </Suspense>
       </Canvas>
