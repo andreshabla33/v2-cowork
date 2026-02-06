@@ -546,6 +546,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       console.log('Cannot DM yourself');
       return;
     }
+    // Respetar setting de privacidad: allowDirectMessages
+    const privacyS = getSettingsSection('privacy');
+    if (!privacyS.allowDirectMessages) {
+      alert('Has desactivado los mensajes directos en tu configuración de privacidad.');
+      return;
+    }
     
     // Buscar si ya existe un chat directo entre estos dos usuarios
     const { data: existingChats } = await supabase

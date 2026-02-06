@@ -72,6 +72,13 @@ export interface UserSettings {
     spatialAudio: boolean;
     proximityRadius: number;
   };
+  calendar: {
+    googleConnected: boolean;
+    syncEnabled: boolean;
+    defaultReminder: number;
+    showGoogleEvents: boolean;
+    autoCreateGoogleEvent: boolean;
+  };
 }
 
 const defaultSettings: UserSettings = {
@@ -141,6 +148,13 @@ const defaultSettings: UserSettings = {
     showNamesAboveAvatars: true,
     spatialAudio: true,
     proximityRadius: 150
+  },
+  calendar: {
+    googleConnected: false,
+    syncEnabled: true,
+    defaultReminder: 15,
+    showGoogleEvents: true,
+    autoCreateGoogleEvent: true
   }
 };
 

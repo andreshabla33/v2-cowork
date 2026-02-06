@@ -250,12 +250,15 @@ const STATUS_LABELS: Record<PresenceStatus, string> = {
 const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar, mirrorVideo: mirrorVideoProp, hideSelfView: hideSelfViewProp, showName: showNameProp }) => {
   const [showStatusLabel, setShowStatusLabel] = useState(false);
   
-  // Leer video settings y space3d settings desde localStorage (sin necesidad de props)
+  // Leer video settings, space3d settings y performance settings desde localStorage
   const videoSettings = useMemo(() => getSettingsSection('video'), []);
   const space3dS = useMemo(() => getSettingsSection('space3d'), []);
+  const perfS = useMemo(() => getSettingsSection('performance'), []);
   const mirrorVideo = mirrorVideoProp ?? videoSettings.mirrorVideo ?? true;
   const hideSelfView = hideSelfViewProp ?? videoSettings.hideSelfView ?? false;
   const showName = showNameProp ?? space3dS.showNamesAboveAvatars ?? true;
+  // Si animaciones desactivadas, forzar idle
+  const effectiveAnimState = perfS.showAvatarAnimations === false ? 'idle' as AnimationState : animationState;
   
   // Auto-ocultar el label después de 2 segundos
   useEffect(() => {
@@ -269,7 +272,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
     <group position={position} onClick={(e) => { if (isCurrentUser && onClickAvatar) { e.stopPropagation(); onClickAvatar(); } }}>
       {/* Avatar 3D GLTF desde Supabase */}
       <GLTFAvatar
-        animationState={animationState}
+        animationState={effectiveAnimState}
         direction={direction}
         scale={1.2}
       />

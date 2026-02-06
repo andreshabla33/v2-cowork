@@ -3,6 +3,7 @@ import { useStore } from '../../store/useStore';
 import { supabase } from '../../lib/supabase';
 import { ScheduledMeeting } from '../../types';
 import { googleCalendar, GoogleCalendarEvent } from '../../lib/googleCalendar';
+import { getSettingsSection } from '../../lib/userSettings';
 import { MeetingRoom, InviteLinkGenerator } from './videocall';
 import { CargoLaboral } from './recording/types/analysis';
 import { 
@@ -200,9 +201,10 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       }
     }
 
-    // Crear evento en Google Calendar si está conectado
-    // NOTA: Ahora usa el link interno, NO Google Meet
-    if (googleConnected) {
+    // Crear evento en Google Calendar si está conectado Y el setting lo permite
+    const calSettings = getSettingsSection('calendar');
+    const shouldCreateGoogle = calSettings.autoCreateGoogleEvent !== false;
+    if (googleConnected && shouldCreateGoogle) {
       try {
         const googleEvent = await googleCalendar.createEvent({
           summary: newMeeting.titulo.trim(),
@@ -435,7 +437,7 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       hora_inicio: '',
       hora_fin: '',
       participantes: [],
-      recordatorio_minutos: 15,
+      recordatorio_minutos: getSettingsSection('calendar').defaultReminder || 15,
       tipo_reunion: primerTipoDisponible
     });
     // Limpiar invitados externos
@@ -536,6 +538,13 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
   useEffect(() => {
     if (googleConnected) {
       syncGoogleEvents();
+      
+      // Auto-sync periódico si syncEnabled está activado
+      const calS = getSettingsSection('calendar');
+      if (calS.syncEnabled !== false) {
+        const interval = setInterval(syncGoogleEvents, 5 * 60 * 1000); // cada 5 min
+        return () => clearInterval(interval);
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [googleConnected]);
@@ -591,6 +600,10 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
     m.titulo.toLowerCase().includes(searchQuery.toLowerCase()) ||
     m.descripcion?.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  // Filtrar eventos de Google según setting showGoogleEvents
+  const calSettingsForFilter = getSettingsSection('calendar');
+  const visibleGoogleEvents = (calSettingsForFilter.showGoogleEvents !== false) ? googleEvents : [];
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
