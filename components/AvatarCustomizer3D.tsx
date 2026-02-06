@@ -416,7 +416,7 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
                   {ACCESSORIES.map((acc) => (
                     <button
                       key={acc.id}
-                      onClick={() => setLocalConfig({ ...localConfig, accessory: acc.id })}
+                      onClick={() => setLocalConfig({ ...localConfig, accessory: acc.id as any })}
                       className={`py-3 rounded-xl text-center transition-all border-2 ${
                         localConfig.accessory === acc.id ? 'bg-indigo-600 border-indigo-500 text-white' : 'bg-white/5 border-white/10 text-white/60'
                       }`}
