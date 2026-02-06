@@ -1,7 +1,8 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { generateChatResponse } from '../services/geminiService';
 import { useStore } from '../store/useStore';
+import { supabase } from '../lib/supabase';
 import { TaskStatus, Task } from '../types';
 
 interface Message {
@@ -23,8 +24,34 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
   const [isTyping, setIsTyping] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const { tasks, currentUser, addTask } = useStore();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const { tasks, currentUser, addTask, activeWorkspace, onlineUsers } = useStore();
   const abortControllerRef = useRef<boolean>(false);
+  const [channels, setChannels] = useState<string[]>([]);
+
+  // Cargar canales del usuario
+  useEffect(() => {
+    const loadChannels = async () => {
+      if (!activeWorkspace?.id || !currentUser?.id) return;
+      const { data } = await supabase
+        .from('chat_grupos')
+        .select('nombre')
+        .eq('espacio_id', activeWorkspace.id);
+      if (data) setChannels(data.map((g: any) => g.nombre));
+    };
+    loadChannels();
+  }, [activeWorkspace?.id, currentUser?.id]);
+
+  // Click outside para minimizar
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) && !isMinimized) {
+        setIsMinimized(true);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isMinimized]);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -87,9 +114,12 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
 
     try {
       const context = {
-        tasks: tasks.map(t => `${t.title} (${t.status})`).join(', '),
+        tasks: tasks.map(t => `${t.title} (${t.status})`).join(', ') || 'Ninguna',
         userName: currentUser.name,
-        role: currentUser.role
+        role: currentUser.role,
+        workspaceName: activeWorkspace?.name || 'No especificado',
+        channels: channels.length > 0 ? channels.join(', ') : 'Ninguno',
+        onlineMembers: onlineUsers.length > 0 ? onlineUsers.map((u: any) => u.name || u.user_name).join(', ') : 'Solo tú'
       };
       
       const response = await generateChatResponse(userMsg, context);
@@ -144,7 +174,7 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
   };
 
   return (
-    <div className={`flex flex-col rounded-2xl overflow-hidden transition-all duration-300 ease-in-out w-full border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] ${isMinimized ? 'h-[52px]' : 'h-[520px] max-h-[80vh]'}`}>
+    <div ref={containerRef} className={`flex flex-col rounded-2xl overflow-hidden transition-all duration-300 ease-in-out w-full border border-white/10 shadow-[0_20px_60px_rgba(0,0,0,0.6)] ${isMinimized ? 'h-[52px]' : 'h-[520px] max-h-[80vh]'}`}>
       {/* Header - Estilo consistente con el resto de la app */}
       <div 
         onClick={() => setIsMinimized(!isMinimized)}
