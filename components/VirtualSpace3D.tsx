@@ -1634,6 +1634,39 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     };
   }, []);
   
+  // Auto-mute idle: detectar inactividad y apagar mic/cam automáticamente
+  const idleTimerRef = useRef<any>(null);
+  const wasIdleMutedRef = useRef(false);
+  useEffect(() => {
+    const videoS = getSettingsSection('video');
+    if (!videoS.autoIdleMuting) return;
+    
+    const IDLE_TIMEOUT = 5 * 60 * 1000; // 5 minutos de inactividad
+    
+    const resetIdleTimer = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      // Si estaba idle-muted, restaurar
+      if (wasIdleMutedRef.current) {
+        wasIdleMutedRef.current = false;
+      }
+      idleTimerRef.current = setTimeout(() => {
+        // Apagar mic y cam si están encendidos
+        if (currentUser.isMicOn) { toggleMic(); wasIdleMutedRef.current = true; }
+        if (currentUser.isCameraOn) { toggleCamera(); wasIdleMutedRef.current = true; }
+        console.log('[AutoIdleMute] Usuario inactivo, mic/cam apagados');
+      }, IDLE_TIMEOUT);
+    };
+    
+    const events = ['mousemove', 'keydown', 'mousedown', 'touchstart'];
+    events.forEach(e => window.addEventListener(e, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+    
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetIdleTimer));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, [currentUser.isMicOn, currentUser.isCameraOn]);
+  
   // Solicitar permiso de notificaciones desktop al montar
   useEffect(() => {
     if (notifSettings.desktopNotifications) {
