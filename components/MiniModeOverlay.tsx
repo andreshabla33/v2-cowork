@@ -17,6 +17,124 @@ const statusColorMap: Record<string, string> = {
   [PresenceStatus.DND]: 'bg-violet-500',
 };
 
+const statusHexMap: Record<string, string> = {
+  [PresenceStatus.AVAILABLE]: '#22c55e',
+  [PresenceStatus.BUSY]: '#ef4444',
+  [PresenceStatus.AWAY]: '#f59e0b',
+  [PresenceStatus.DND]: '#8b5cf6',
+};
+
+// ========== MINI MAPA CANVAS ==========
+const MAP_W = 280;
+const MAP_H = 130;
+const SPACE_SIZE = 2000; // Tamaño del espacio virtual
+
+const MiniMapCanvas: React.FC<{ currentUser: any; onlineUsers: any[] }> = ({ currentUser, onlineUsers }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = MAP_W * dpr;
+    canvas.height = MAP_H * dpr;
+    ctx.scale(dpr, dpr);
+
+    // Fondo oscuro
+    ctx.fillStyle = '#0a0a0f';
+    ctx.fillRect(0, 0, MAP_W, MAP_H);
+
+    // Grid sutil
+    ctx.strokeStyle = 'rgba(99, 102, 241, 0.08)';
+    ctx.lineWidth = 0.5;
+    const gridStep = 20;
+    for (let x = 0; x <= MAP_W; x += gridStep) {
+      ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, MAP_H); ctx.stroke();
+    }
+    for (let y = 0; y <= MAP_H; y += gridStep) {
+      ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(MAP_W, y); ctx.stroke();
+    }
+
+    // Función para mapear coordenadas del espacio al canvas
+    const toCanvas = (x: number, y: number) => ({
+      cx: (x / SPACE_SIZE) * MAP_W,
+      cy: (y / SPACE_SIZE) * MAP_H,
+    });
+
+    // Radio de proximidad visual (círculo punteado alrededor del usuario actual)
+    const me = toCanvas(currentUser.x || 500, currentUser.y || 500);
+    const proxRadius = (300 / SPACE_SIZE) * MAP_W; // ~300 unidades de proximidad
+    ctx.strokeStyle = 'rgba(139, 92, 246, 0.2)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath();
+    ctx.ellipse(me.cx, me.cy, proxRadius, proxRadius * (MAP_W / MAP_H) * 0.45, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Dibujar usuarios online (dots)
+    onlineUsers.forEach(u => {
+      const p = toCanvas(u.x || 500, u.y || 500);
+      const color = statusHexMap[u.status] || '#22c55e';
+      // Glow
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 6;
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(p.cx, p.cy, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.shadowBlur = 0;
+      // Nombre pequeño
+      ctx.fillStyle = 'rgba(255,255,255,0.5)';
+      ctx.font = '7px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(u.name?.split(' ')[0] || '', p.cx, p.cy - 5);
+    });
+
+    // Dibujar usuario actual (más grande, con anillo)
+    ctx.shadowColor = '#818cf8';
+    ctx.shadowBlur = 10;
+    ctx.fillStyle = '#818cf8';
+    ctx.beginPath();
+    ctx.arc(me.cx, me.cy, 4.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+    // Anillo blanco
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(me.cx, me.cy, 4.5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Nombre
+    ctx.fillStyle = '#c4b5fd';
+    ctx.font = 'bold 7px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentUser.name?.split(' ')[0] || 'Tú', me.cx, me.cy - 7);
+
+    // Indicador de cámara si está encendida
+    if (currentUser.isCameraOn) {
+      ctx.fillStyle = '#22c55e';
+      ctx.beginPath();
+      ctx.arc(me.cx + 6, me.cy - 6, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+  }, [currentUser.x, currentUser.y, currentUser.isCameraOn, currentUser.name, currentUser.status, onlineUsers]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      width={MAP_W}
+      height={MAP_H}
+      style={{ width: MAP_W, height: MAP_H }}
+      className="rounded-none"
+    />
+  );
+};
+
 export const MiniModeOverlay: React.FC = () => {
   const { isMiniMode, currentUser, onlineUsers, toggleMic, toggleCamera, setActiveSubTab, updateStatus } = useStore();
   const miniSettings = getSettingsSection('minimode');
@@ -170,22 +288,15 @@ export const MiniModeOverlay: React.FC = () => {
             </div>
           </div>
 
-          {/* Online users strip */}
-          {onlineUsers.length > 0 && (
-            <div className="px-3 py-2 border-t border-white/[0.05] flex items-center gap-2">
-              <div className="flex -space-x-1.5">
-                {onlineUsers.slice(0, 5).map(u => (
-                  <div key={u.id} className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white" title={u.name}>
-                    {u.name?.[0]?.toUpperCase()}
-                  </div>
-                ))}
-                {onlineUsers.length > 5 && (
-                  <div className="w-5 h-5 rounded-full bg-zinc-800 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white/50">+{onlineUsers.length - 5}</div>
-                )}
-              </div>
-              <span className="text-[8px] text-white/30">{onlineUsers.length} en el espacio</span>
+          {/* Mini Mapa del espacio */}
+          <div className="border-t border-white/[0.05] relative">
+            <MiniMapCanvas currentUser={currentUser} onlineUsers={onlineUsers} />
+            {/* Badge de usuarios online */}
+            <div className="absolute top-1.5 right-1.5 flex items-center gap-1 bg-black/60 backdrop-blur-sm rounded-full px-1.5 py-0.5">
+              <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-[7px] text-white/50 font-medium">{onlineUsers.length} online</span>
             </div>
-          )}
+          </div>
 
           {/* Controls bar */}
           <div className="flex items-center gap-1.5 px-3 py-2 border-t border-white/[0.05] rounded-b-2xl">
