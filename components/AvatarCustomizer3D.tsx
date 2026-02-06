@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 
 interface AvatarCustomizer3DProps {
   compact?: boolean;
+  onClose?: () => void;
 }
 
 const AVATAR_PRESETS = [
@@ -42,7 +43,7 @@ const ACCESSORIES = [
   { id: 'headphones', name: 'Auriculares', icon: '🎧' },
 ];
 
-export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact = false }) => {
+export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact = false, onClose }) => {
   const { currentUser, updateAvatar, session } = useStore();
   const [saved, setSaved] = useState(false);
   const [activeTab, setActiveTab] = useState<'profile' | 'presets' | 'customize'>('profile');
@@ -136,7 +137,7 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
         currentUser: { ...state.currentUser, name: displayName.trim() }
       }));
       setSaved(true);
-      setTimeout(() => setSaved(false), 2000);
+      setTimeout(() => { setSaved(false); if (onClose) onClose(); }, 1200);
     } catch (err) {
       console.error('Error updating name:', err);
     }
@@ -145,7 +146,7 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
   const handleSave = async () => {
     await updateAvatar(localConfig as any);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+    setTimeout(() => { setSaved(false); if (onClose) onClose(); }, 1200);
   };
 
   const handlePresetSelect = (preset: typeof AVATAR_PRESETS[0]) => {
@@ -194,12 +195,12 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
           </div>
         )}
 
-        {/* Foto de perfil superpuesta */}
-        <div className="absolute top-4 left-4 flex items-center gap-3 bg-black/60 backdrop-blur-xl rounded-2xl p-2.5 pr-4 border border-white/10">
-          <UserAvatar name={currentUser.name} profilePhoto={profilePhoto} size="lg" showStatus status={currentUser.status} />
+        {/* Info del usuario - compacta en la esquina inferior */}
+        <div className="absolute bottom-3 right-3 flex items-center gap-2 bg-black/50 backdrop-blur-md rounded-xl p-2 pr-3 border border-white/5">
+          <UserAvatar name={currentUser.name} profilePhoto={profilePhoto} size="sm" showStatus status={currentUser.status} />
           <div>
-            <p className="text-xs font-bold text-white">{currentUser.name}</p>
-            <p className="text-[10px] text-white/50">{currentUser.role}</p>
+            <p className="text-[10px] font-bold text-white/80">{displayName || currentUser.name}</p>
+            <p className="text-[8px] text-white/40">{currentUser.cargo || currentUser.departamento || 'Colaborador'}</p>
           </div>
         </div>
         
@@ -320,7 +321,7 @@ export const AvatarCustomizer3D: React.FC<AvatarCustomizer3DProps> = ({ compact 
                   <UserAvatar name={currentUser.name} profilePhoto={profilePhoto} size="md" showStatus status={currentUser.status} />
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white truncate">{displayName || currentUser.name}</p>
-                    <p className="text-[10px] text-white/40">{currentUser.cargo || currentUser.role}</p>
+                    <p className="text-[10px] text-white/40">{currentUser.cargo || currentUser.departamento || 'Colaborador'}</p>
                   </div>
                   <span className="text-[9px] text-white/30">12:00</span>
                 </div>

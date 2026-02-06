@@ -2862,13 +2862,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       {showAvatarModal && (
         <div 
           className="fixed inset-0 z-[300] flex items-center justify-center"
-          onClick={(e) => { if (e.target === e.currentTarget) setShowAvatarModal(false); }}
-          onKeyDown={(e) => { if (e.key === 'Escape') setShowAvatarModal(false); }}
+          onClick={(e) => { e.stopPropagation(); if (e.target === e.currentTarget) setShowAvatarModal(false); }}
+          onKeyDown={(e) => { e.stopPropagation(); if (e.key === 'Escape') setShowAvatarModal(false); }}
+          onKeyUp={(e) => e.stopPropagation()}
           tabIndex={-1}
           ref={(el) => el?.focus()}
         >
           {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowAvatarModal(false)} />
           
           {/* Modal */}
           <div className="relative w-[95vw] max-w-[900px] h-[85vh] max-h-[680px] bg-zinc-900/95 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
@@ -2897,7 +2898,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
 
             {/* Body - AvatarCustomizer3D */}
             <div className="flex-1 overflow-hidden">
-              <AvatarCustomizer3D compact={false} />
+              <AvatarCustomizer3D compact={false} onClose={() => setShowAvatarModal(false)} />
             </div>
           </div>
         </div>
