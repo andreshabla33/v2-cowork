@@ -9,6 +9,7 @@ import { ChatToast, ToastNotification } from './ChatToast';
 import { MeetingRooms } from './MeetingRooms';
 import { UserAvatar } from './UserAvatar';
 import { PresenceStatus } from '../types';
+import { getSettingsSection } from '../lib/userSettings';
 
 // Helper para obtener color del estado
 const getStatusColor = (status?: PresenceStatus) => {
@@ -63,14 +64,18 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   const globalNotifChannelRef = useRef<any>(null);
   const notificationSoundRef = useRef<HTMLAudioElement | null>(null);
 
-  // Inicializar sonido de notificaciÃ³n
+  // Inicializar sonido de notificación
   useEffect(() => {
     notificationSoundRef.current = new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3');
-    notificationSoundRef.current.volume = 0.3;
+    const audioS = getSettingsSection('audio');
+    notificationSoundRef.current.volume = (audioS.sfxVolume / 100) * 0.5; // sfxVolume escala 0-100
   }, []);
 
   const playNotificationSound = () => {
+    const audioS = getSettingsSection('audio');
+    if (!audioS.chatSounds) return; // Respetar setting de sonidos de chat
     if (notificationSoundRef.current) {
+      notificationSoundRef.current.volume = (audioS.sfxVolume / 100) * 0.5;
       notificationSoundRef.current.currentTime = 0;
       notificationSoundRef.current.play().catch(() => {});
     }

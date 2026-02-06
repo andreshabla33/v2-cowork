@@ -473,13 +473,31 @@ interface RemoteUsersProps {
 const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, remoteMessages, remoteReaction }) => {
   const { currentUser } = useStore();
   
+  // Limitar videos simultáneos según settings de rendimiento
+  const perfSettings = useMemo(() => getSettingsSection('performance'), []);
+  const maxStreams = perfSettings.maxVideoStreams || 8;
+  
+  // Ordenar usuarios por distancia y solo dar stream a los N más cercanos
+  const usersWithStreamLimit = useMemo(() => {
+    const sorted = users
+      .filter(u => u.id !== currentUser.id)
+      .map(u => {
+        const dist = Math.sqrt(Math.pow((u.x || 0) - (currentUser.x || 0), 2) + Math.pow((u.y || 0) - (currentUser.y || 0), 2));
+        return { user: u, dist };
+      })
+      .sort((a, b) => a.dist - b.dist);
+    
+    const allowedIds = new Set(sorted.slice(0, maxStreams).map(s => s.user.id));
+    return { sorted, allowedIds };
+  }, [users, currentUser.x, currentUser.y, maxStreams]);
+  
   return (
     <>
-      {users.filter(u => u.id !== currentUser.id).map(u => (
+      {usersWithStreamLimit.sorted.map(({ user: u }) => (
         <RemoteAvatarInterpolated
           key={u.id}
           user={u}
-          remoteStream={remoteStreams.get(u.id) || null}
+          remoteStream={usersWithStreamLimit.allowedIds.has(u.id) ? (remoteStreams.get(u.id) || null) : null}
           showVideoBubble={showVideoBubble}
           message={remoteMessages.get(u.id)}
           reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}

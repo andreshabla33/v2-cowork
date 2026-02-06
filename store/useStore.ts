@@ -2,6 +2,7 @@
 import { create } from 'zustand';
 import { User, Role, Task, TaskStatus, ChatMessage, ThemeType, Workspace, SpaceItem, AvatarConfig, Departamento, PresenceStatus } from '../types';
 import { supabase } from '../lib/supabase';
+import { getSettingsSection } from '../lib/userSettings';
 
 interface Notification {
   id: string;
@@ -207,8 +208,16 @@ export const useStore = create<AppState>((set, get) => ({
             set({ view: 'dashboard' });
           }
         } else {
-          console.log("initialize: Going to dashboard");
-          set({ view: 'dashboard' });
+          // Si skipWelcomeScreen está activado y hay workspaces, ir directo al primero
+          const generalSettings = getSettingsSection('general');
+          if (generalSettings.skipWelcomeScreen && workspaces.length > 0) {
+            console.log("initialize: Skipping welcome, going to first workspace");
+            get().setActiveWorkspace(workspaces[0], (workspaces[0] as any).userRole);
+            set({ view: 'workspace' });
+          } else {
+            console.log("initialize: Going to dashboard");
+            set({ view: 'dashboard' });
+          }
         }
       } else {
         console.log("initialize: No session, going to dashboard");
