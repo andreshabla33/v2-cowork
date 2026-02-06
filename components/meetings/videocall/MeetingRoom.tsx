@@ -272,19 +272,33 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
 
   // Funciones de grabación
   const startRecording = useCallback(async () => {
-    if (!currentUser || !activeWorkspace?.id) return;
-    
     try {
-      // Obtener stream de video/audio local
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: true, 
-        audio: true 
-      });
+      console.log('🎬 Iniciando grabación...', { currentUser: !!currentUser, activeWorkspace: !!activeWorkspace?.id, tokenInvitacion: !!tokenInvitacion });
+      
+      // Obtener stream de audio/video usando displayMedia + audio del navegador
+      let stream: MediaStream;
+      
+      try {
+        // Intentar capturar la pestaña del navegador (mejor calidad para grabación de reunión)
+        stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: 'browser' } as any,
+          audio: true,
+        });
+      } catch (displayErr) {
+        console.warn('getDisplayMedia no disponible, usando getUserMedia:', displayErr);
+        // Fallback: capturar cámara y micrófono local
+        stream = await navigator.mediaDevices.getUserMedia({ 
+          video: true, 
+          audio: true 
+        });
+      }
       
       // Configurar MediaRecorder
       const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
         ? 'video/webm;codecs=vp9,opus'
-        : 'video/webm';
+        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
+          ? 'video/webm;codecs=vp8,opus'
+          : 'video/webm';
       
       const recorder = new MediaRecorder(stream, {
         mimeType,
@@ -302,27 +316,22 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
       };
       
       recorder.onstop = async () => {
+        // Detener todos los tracks del stream capturado
+        stream.getTracks().forEach(t => t.stop());
         await processRecording();
       };
+      
+      // Si el usuario detiene compartir pantalla desde el navegador, detener grabación
+      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+        if (mediaRecorderRef.current?.state === 'recording') {
+          stopRecording();
+        }
+      });
       
       mediaRecorderRef.current = recorder;
       recordingStartTimeRef.current = Date.now();
       
-      // Registrar en Supabase
-      await supabase.from('grabaciones').insert({
-        id: grabacionIdRef.current,
-        espacio_id: activeWorkspace.id,
-        creado_por: currentUser.id,
-        estado: 'grabando',
-        inicio_grabacion: new Date().toISOString(),
-        tipo: tipoReunion === 'equipo' ? 'equipo' : tipoReunion === 'deal' ? 'deals' : 'rrhh_entrevista',
-        tiene_video: true,
-        tiene_audio: true,
-        formato: 'webm',
-        sala_id: salaId,
-      });
-      
-      // Iniciar grabación
+      // Iniciar grabación PRIMERO (no bloquear por Supabase)
       recorder.start(1000);
       setIsRecording(true);
       
@@ -334,11 +343,32 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
       
       console.log('🔴 Grabación de videollamada iniciada');
       
+      // Registrar en Supabase (no bloqueante, solo si es usuario autenticado)
+      if (currentUser && activeWorkspace?.id) {
+        supabase.from('grabaciones').insert({
+          id: grabacionIdRef.current,
+          espacio_id: activeWorkspace.id,
+          creado_por: currentUser.id,
+          estado: 'grabando',
+          inicio_grabacion: new Date().toISOString(),
+          tipo: tipoReunion === 'equipo' ? 'equipo' : tipoReunion === 'deal' ? 'deals' : 'rrhh_entrevista',
+          tiene_video: true,
+          tiene_audio: true,
+          formato: 'webm',
+          sala_id: salaId,
+        }).then(({ error: insertErr }) => {
+          if (insertErr) console.warn('⚠️ No se pudo registrar grabación en DB:', insertErr.message);
+        });
+      }
+      
     } catch (err: any) {
       console.error('Error iniciando grabación:', err);
-      alert('Error al iniciar grabación: ' + err.message);
+      // No mostrar alert si el usuario simplemente canceló el diálogo de compartir pantalla
+      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
+        alert('Error al iniciar grabación: ' + err.message);
+      }
     }
-  }, [currentUser, activeWorkspace?.id, tipoReunion, salaId]);
+  }, [currentUser, activeWorkspace?.id, tipoReunion, salaId, tokenInvitacion]);
 
   const stopRecording = useCallback(async () => {
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
@@ -357,41 +387,55 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   }, []);
 
   const processRecording = useCallback(async () => {
-    if (!currentUser || !activeWorkspace?.id) return;
-    
     try {
       const blob = new Blob(recordingChunksRef.current, { type: 'video/webm' });
       const duration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
       
-      // Actualizar grabación en Supabase
-      await supabase.from('grabaciones').update({
-        estado: 'completado',
-        duracion_segundos: duration,
-        fin_grabacion: new Date().toISOString(),
-        archivo_nombre: `Videollamada ${tipoReunion} - ${new Date().toLocaleDateString('es-ES')}`,
-      }).eq('id', grabacionIdRef.current);
+      // Siempre descargar localmente el archivo
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Reunion_${tipoReunion}_${new Date().toISOString().slice(0,10)}.webm`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
       
-      // Notificar al usuario
-      await supabase.from('notificaciones').insert({
-        usuario_id: currentUser.id,
-        espacio_id: activeWorkspace.id,
-        tipo: 'grabacion_lista',
-        titulo: '📹 Grabación de videollamada lista',
-        mensaje: `La grabación de tu ${tipoReunion === 'deal' ? 'reunión con cliente' : tipoReunion === 'entrevista' ? 'entrevista' : 'reunión de equipo'} está disponible`,
-        entidad_tipo: 'grabacion',
-        entidad_id: grabacionIdRef.current,
-      });
+      console.log('💾 Grabación descargada localmente:', a.download);
+      
+      // Si es usuario autenticado, registrar en Supabase
+      if (currentUser && activeWorkspace?.id) {
+        await supabase.from('grabaciones').update({
+          estado: 'completado',
+          duracion_segundos: duration,
+          fin_grabacion: new Date().toISOString(),
+          archivo_nombre: `Videollamada ${tipoReunion} - ${new Date().toLocaleDateString('es-ES')}`,
+        }).eq('id', grabacionIdRef.current);
+        
+        // Notificar al usuario
+        await supabase.from('notificaciones').insert({
+          usuario_id: currentUser.id,
+          espacio_id: activeWorkspace.id,
+          tipo: 'grabacion_lista',
+          titulo: '📹 Grabación de videollamada lista',
+          mensaje: `La grabación de tu ${tipoReunion === 'deal' ? 'reunión con cliente' : tipoReunion === 'entrevista' ? 'entrevista' : 'reunión de equipo'} está disponible`,
+          entidad_tipo: 'grabacion',
+          entidad_id: grabacionIdRef.current,
+        });
+      }
       
       console.log('✅ Grabación procesada y guardada');
       
     } catch (err: any) {
       console.error('Error procesando grabación:', err);
       
-      // Marcar grabación como error
-      await supabase.from('grabaciones').update({
-        estado: 'error',
-        error_mensaje: err.message || 'Error en procesamiento',
-      }).eq('id', grabacionIdRef.current);
+      // Marcar grabación como error (solo si usuario autenticado)
+      if (currentUser && activeWorkspace?.id) {
+        await supabase.from('grabaciones').update({
+          estado: 'error',
+          error_mensaje: err.message || 'Error en procesamiento',
+        }).eq('id', grabacionIdRef.current);
+      }
     }
   }, [currentUser, activeWorkspace?.id, tipoReunion]);
 
