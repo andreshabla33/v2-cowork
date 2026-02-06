@@ -375,7 +375,7 @@ export const WorkspaceLayout: React.FC = () => {
           {/* VirtualSpace3D siempre montado pero oculto cuando no está activo
               Esto mantiene el stream y conexiones WebRTC activas */}
           <div className={activeSubTab === 'space' ? 'h-full w-full' : 'hidden'}>
-            <VirtualSpace3D theme={theme} />
+            <VirtualSpace3D theme={theme} isGameActive={showGameHub} />
           </div>
           {activeSubTab !== 'space' && (
             <div className="h-full w-full overflow-y-auto animate-in fade-in duration-500">

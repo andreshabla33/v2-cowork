@@ -1048,6 +1048,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
 // ============== COMPONENTE PRINCIPAL ==============
 interface VirtualSpace3DProps {
   theme?: string;
+  isGameActive?: boolean;
 }
 
 // ICE Servers para WebRTC - Servidores STUN/TURN actualizados
@@ -1081,7 +1082,7 @@ const ICE_SERVERS = [
   },
 ];
 
-const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
+const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameActive = false }) => {
   const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
@@ -2272,6 +2273,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark' }) => {
             }
           }
         }}
+        isGameActive={isGameActive}
       />
 
       {/* Input de Chat Flotante - Minimalista */}

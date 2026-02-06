@@ -67,6 +67,7 @@ interface BottomControlBarProps {
   currentStream?: MediaStream | null;
   onCameraSettingsChange?: (settings: CameraSettings) => void;
   onOpenGameHub?: () => void;
+  isGameActive?: boolean;
 }
 
 // Configuración de estados con iconos y colores (estilo 2026)
@@ -101,6 +102,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   onCameraSettingsChange,
   onAudioSettingsChange,
   onOpenGameHub,
+  isGameActive = false,
 }) => {
   const { currentUser, updateStatus } = useStore();
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
@@ -232,15 +234,19 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   };
 
   return (
-    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-[200] flex items-end gap-2" onClick={(e) => e.stopPropagation()}>
-      {/* Barra Principal Glassmorphism 2026 - Más compacta con mejor efecto glass */}
-      <div className="flex items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300 hover:bg-black/30 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]">
+    <div className={`absolute z-[200] transition-all duration-500 ease-out ${
+      isGameActive 
+        ? 'left-3 top-1/2 -translate-y-1/2 flex flex-col items-start gap-2' 
+        : 'bottom-6 left-1/2 -translate-x-1/2 flex items-end gap-2'
+    }`} onClick={(e) => e.stopPropagation()}>
+      {/* Barra Principal Glassmorphism 2026 - Adaptativa: horizontal (normal) / vertical (juego) */}
+      <div className={`${isGameActive ? 'flex flex-col' : 'flex'} items-center gap-1.5 p-1.5 rounded-2xl bg-black/20 backdrop-blur-2xl border border-white/10 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-500 hover:bg-black/30 hover:border-white/20 hover:shadow-[0_8px_32px_rgba(0,0,0,0.4)]`}>
         
         {/* Foto de usuario con indicador de estado */}
         <div className="relative">
           <button 
             onClick={onToggleStatusPicker}
-            className="w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 mr-1 hover:border-white/20 transition-colors cursor-pointer"
+            className={`w-9 h-9 rounded-xl overflow-hidden bg-indigo-500/20 flex items-center justify-center border border-white/5 hover:border-white/20 transition-colors cursor-pointer ${isGameActive ? 'mb-0' : 'mr-1'}`}
           >
             <div className="scale-75 mt-2">
               <AvatarPreview config={avatarConfig} size="small" />
@@ -280,6 +286,17 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
         {/* Micrófono con dropdown - Estilo Gather 2026 */}
         <div className="relative" ref={audioMenuRef}>
+          {isGameActive ? (
+            <button
+              onClick={onToggleMic}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                isMicOn ? 'bg-zinc-700 text-white' : 'bg-red-500/90 text-white animate-pulse-slow'
+              }`}
+              title={isMicOn ? "Silenciar" : "Activar micrófono"}
+            >
+              <IconMic on={isMicOn} />
+            </button>
+          ) : (
           <div className="flex items-center">
             <button
               onClick={onToggleMic}
@@ -302,6 +319,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
               </svg>
             </button>
           </div>
+          )}
 
           {/* Menú de configuración de audio estilo Gather */}
           {showAudioMenu && (
@@ -419,6 +437,17 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
         {/* Cámara con dropdown */}
         <div className="relative" ref={cameraMenuRef}>
+          {isGameActive ? (
+            <button
+              onClick={onToggleCam}
+              className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                isCamOn ? 'bg-zinc-700 text-white' : 'bg-red-500/90 text-white animate-pulse-slow'
+              }`}
+              title={isCamOn ? "Apagar cámara" : "Activar cámara"}
+            >
+              <IconCam on={isCamOn} />
+            </button>
+          ) : (
           <div className="flex items-center">
             <button
               onClick={onToggleCam}
@@ -441,6 +470,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
               </svg>
             </button>
           </div>
+          )}
 
           {/* Menú de configuración de cámara estilo Gather */}
           {showCameraMenu && (
@@ -568,9 +598,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           )}
         </div>
 
-        {showShareButton && (
+        {showShareButton && !isGameActive && (
           <>
-            <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+            <div className={`${isGameActive ? 'h-px w-6' : 'w-px h-6'} bg-white/10 mx-0.5`}></div>
 
             {/* Compartir Pantalla */}
             <ControlButton 
@@ -584,7 +614,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           </>
         )}
 
-        <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+        <div className={`${isGameActive ? 'h-px w-6' : 'w-px h-6'} bg-white/10 mx-0.5`}></div>
 
         {/* Chat */}
         <ControlButton 
@@ -608,8 +638,8 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           />
         </div>
 
-        {/* Mini Juegos */}
-        {onOpenGameHub && (
+        {/* Mini Juegos - Ocultar si ya estamos en un juego */}
+        {onOpenGameHub && !isGameActive && (
           <ControlButton 
             onClick={onOpenGameHub} 
             isActive={false} 
@@ -620,9 +650,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           />
         )}
 
-        {showRecordingButton && (
+        {showRecordingButton && !isGameActive && (
           <>
-            <div className="w-px h-6 bg-white/10 mx-0.5"></div>
+            <div className={`${isGameActive ? 'h-px w-6' : 'w-px h-6'} bg-white/10 mx-0.5`}></div>
 
             {isRecording ? (
               /* Indicador de grabación activa - Minimalista estilo 2026 */
@@ -661,8 +691,12 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
       {/* Emoji Picker Popup - Minimalista (NO cierra al hacer clic para spam rápido) */}
       {showEmojis && (
-        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 animate-emoji-popup">
-          <div className="px-2 py-1.5 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 flex gap-0.5">
+        <div className={`absolute animate-emoji-popup ${
+          isGameActive 
+            ? 'left-full top-1/2 -translate-y-1/2 ml-2' 
+            : 'bottom-full left-1/2 -translate-x-1/2 mb-2'
+        }`}>
+          <div className={`px-2 py-1.5 bg-black/80 backdrop-blur-xl rounded-xl border border-white/10 ${isGameActive ? 'flex flex-col gap-0.5' : 'flex gap-0.5'}`}>
             {emojis.map((emoji) => (
               <button
                 key={emoji}
