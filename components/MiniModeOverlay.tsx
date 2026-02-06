@@ -3,11 +3,7 @@ import { useStore } from '../store/useStore';
 import { getSettingsSection } from '../lib/userSettings';
 import { PresenceStatus } from '../types';
 
-interface MiniModeOverlayProps {
-  stream?: MediaStream | null;
-  remoteStreams?: Map<string, MediaStream>;
-  lastMessages?: Array<{ from: string; text: string; time: number }>;
-}
+interface MiniModeOverlayProps {}
 
 const POSITION_MAP: Record<string, { bottom?: string; top?: string; left?: string; right?: string }> = {
   'bottom-right': { bottom: '24px', right: '24px' },
@@ -23,11 +19,7 @@ const STATUS_OPTIONS = [
   { value: PresenceStatus.DND, label: 'No molestar', color: 'bg-violet-500', icon: '🟣' },
 ];
 
-export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
-  stream,
-  remoteStreams,
-  lastMessages = [],
-}) => {
+export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
   const { isMiniMode, setMiniMode, currentUser, onlineUsers, toggleMic, toggleCamera, setActiveSubTab, updateStatus } = useStore();
   const miniSettings = getSettingsSection('minimode');
 
@@ -35,6 +27,8 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
   const [collapsed, setCollapsed] = useState(false);
   // Status picker
   const [showStatusPicker, setShowStatusPicker] = useState(false);
+  // Stream propio de cámara para preview
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
 
   // Dragging state
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
@@ -43,8 +37,41 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Expanded sections
-  const [showChat, setShowChat] = useState(miniSettings.showChatInMini);
   const [showVideo, setShowVideo] = useState(miniSettings.showVideoInMini);
+
+  // Obtener stream de cámara cuando está encendida y mini mode visible
+  useEffect(() => {
+    if (!isMiniMode || !currentUser.isCameraOn || !showVideo) {
+      if (localStream) {
+        localStream.getTracks().forEach(t => t.stop());
+        setLocalStream(null);
+      }
+      return;
+    }
+
+    let cancelled = false;
+    const getStream = async () => {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        if (!cancelled) setLocalStream(s);
+        else s.getTracks().forEach(t => t.stop());
+      } catch (e) {
+        console.warn('[MiniMode] No se pudo obtener stream de cámara:', e);
+      }
+    };
+    getStream();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isMiniMode, currentUser.isCameraOn, showVideo]);
+
+  // Limpiar stream al desmontar
+  useEffect(() => {
+    return () => {
+      if (localStream) localStream.getTracks().forEach(t => t.stop());
+    };
+  }, []);
 
   // Drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -78,8 +105,6 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
   const posStyle = pos
     ? { left: `${pos.x}px`, top: `${pos.y}px` }
     : POSITION_MAP[miniSettings.miniModePosition] || POSITION_MAP['bottom-right'];
-
-  const firstRemoteStream = remoteStreams ? Array.from(remoteStreams.values())[0] : null;
 
   const statusColors: Record<string, string> = {
     [PresenceStatus.AVAILABLE]: 'bg-green-500',
@@ -168,9 +193,9 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
             )}
             {miniSettings.showChatInMini && (
               <button
-                onClick={() => setShowChat(!showChat)}
-                className={`p-1.5 rounded-lg transition-all ${showChat ? 'bg-violet-600/30 text-violet-400' : 'bg-white/5 text-white/30'} hover:bg-white/10`}
-                title="Chat"
+                onClick={() => setActiveSubTab('chat')}
+                className="p-1.5 rounded-lg transition-all bg-white/5 text-white/30 hover:bg-blue-600/30 hover:text-blue-400"
+                title="Ir al Chat"
               >
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -193,13 +218,18 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
         {/* Video section */}
         {showVideo && (
           <div className="relative bg-black/50">
-            {firstRemoteStream ? (
-              <VideoPreview stream={firstRemoteStream} />
-            ) : stream ? (
-              <VideoPreview stream={stream} muted />
-            ) : (
+            {localStream ? (
+              <VideoPreview stream={localStream} muted />
+            ) : currentUser.isCameraOn ? (
               <div className="h-28 flex items-center justify-center">
-                <p className="text-[10px] text-white/20 font-medium">Sin video activo</p>
+                <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+              </div>
+            ) : (
+              <div className="h-28 flex flex-col items-center justify-center gap-1.5">
+                <svg className="w-5 h-5 text-white/15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+                <p className="text-[9px] text-white/20 font-medium">Cámara apagada</p>
               </div>
             )}
             {onlineUsers.length > 0 && (
@@ -216,18 +246,6 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = ({
                 )}
               </div>
             )}
-          </div>
-        )}
-
-        {/* Chat section */}
-        {showChat && lastMessages.length > 0 && (
-          <div className="px-3 py-2 max-h-20 overflow-y-auto border-t border-white/[0.05]">
-            {lastMessages.slice(-3).map((msg, i) => (
-              <div key={i} className="mb-1 last:mb-0">
-                <span className="text-[9px] font-bold text-violet-400">{msg.from}: </span>
-                <span className="text-[9px] text-white/60">{msg.text.length > 50 ? msg.text.slice(0, 50) + '...' : msg.text}</span>
-              </div>
-            ))}
           </div>
         )}
 
