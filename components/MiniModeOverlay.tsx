@@ -27,51 +27,11 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
   const [collapsed, setCollapsed] = useState(false);
   // Status picker
   const [showStatusPicker, setShowStatusPicker] = useState(false);
-  // Stream propio de cámara para preview
-  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-
   // Dragging state
   const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
   const dragOffset = useRef({ x: 0, y: 0 });
   const overlayRef = useRef<HTMLDivElement>(null);
-
-  // Expanded sections
-  const [showVideo, setShowVideo] = useState(miniSettings.showVideoInMini);
-
-  // Obtener stream de cámara cuando está encendida y mini mode visible
-  useEffect(() => {
-    if (!isMiniMode || !currentUser.isCameraOn || !showVideo) {
-      if (localStream) {
-        localStream.getTracks().forEach(t => t.stop());
-        setLocalStream(null);
-      }
-      return;
-    }
-
-    let cancelled = false;
-    const getStream = async () => {
-      try {
-        const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        if (!cancelled) setLocalStream(s);
-        else s.getTracks().forEach(t => t.stop());
-      } catch (e) {
-        console.warn('[MiniMode] No se pudo obtener stream de cámara:', e);
-      }
-    };
-    getStream();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isMiniMode, currentUser.isCameraOn, showVideo]);
-
-  // Limpiar stream al desmontar
-  useEffect(() => {
-    return () => {
-      if (localStream) localStream.getTracks().forEach(t => t.stop());
-    };
-  }, []);
 
   // Drag handlers
   const handleMouseDown = useCallback((e: React.MouseEvent) => {
@@ -98,6 +58,12 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
   // Volver al espacio virtual
   const handleGoToSpace = () => {
     setActiveSubTab('space');
+  };
+
+  // Ir al chat (cierra mini mode porque cambia a tab chat que ya está fuera de space)
+  const handleGoToChat = () => {
+    setActiveSubTab('chat');
+    setCollapsed(true); // Colapsar para que se vea el chat debajo
   };
 
   if (!isMiniMode || !miniSettings.enableMiniMode) return null;
@@ -157,7 +123,7 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
       style={{
         ...posStyle,
         position: 'fixed',
-        width: showVideo ? '300px' : '260px',
+        width: '280px',
       }}
     >
       <div className="rounded-2xl overflow-hidden border border-white/10 bg-black/75 backdrop-blur-2xl shadow-2xl shadow-black/50">
@@ -180,28 +146,16 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            {miniSettings.showVideoInMini && (
-              <button
-                onClick={() => setShowVideo(!showVideo)}
-                className={`p-1.5 rounded-lg transition-all ${showVideo ? 'bg-violet-600/30 text-violet-400' : 'bg-white/5 text-white/30'} hover:bg-white/10`}
-                title="Video"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </button>
-            )}
-            {miniSettings.showChatInMini && (
-              <button
-                onClick={() => setActiveSubTab('chat')}
-                className="p-1.5 rounded-lg transition-all bg-white/5 text-white/30 hover:bg-blue-600/30 hover:text-blue-400"
-                title="Ir al Chat"
-              >
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                </svg>
-              </button>
-            )}
+            {/* Ir al chat */}
+            <button
+              onClick={handleGoToChat}
+              className="p-1.5 rounded-lg transition-all bg-white/5 text-white/30 hover:bg-blue-600/30 hover:text-blue-400"
+              title="Ir al Chat"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </button>
             {/* Colapsar a bolita */}
             <button
               onClick={() => setCollapsed(true)}
@@ -215,37 +169,22 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
           </div>
         </div>
 
-        {/* Video section */}
-        {showVideo && (
-          <div className="relative bg-black/50">
-            {localStream ? (
-              <VideoPreview stream={localStream} muted />
-            ) : currentUser.isCameraOn ? (
-              <div className="h-28 flex items-center justify-center">
-                <div className="w-5 h-5 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            ) : (
-              <div className="h-28 flex flex-col items-center justify-center gap-1.5">
-                <svg className="w-5 h-5 text-white/15" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-                <p className="text-[9px] text-white/20 font-medium">Cámara apagada</p>
-              </div>
-            )}
-            {onlineUsers.length > 0 && (
-              <div className="absolute bottom-2 left-2 flex -space-x-1.5">
-                {onlineUsers.slice(0, 5).map(u => (
-                  <div key={u.id} className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white" title={u.name}>
-                    {u.name?.[0]?.toUpperCase()}
-                  </div>
-                ))}
-                {onlineUsers.length > 5 && (
-                  <div className="w-5 h-5 rounded-full bg-zinc-800 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white/50">
-                    +{onlineUsers.length - 5}
-                  </div>
-                )}
-              </div>
-            )}
+        {/* Online users + status strip */}
+        {onlineUsers.length > 0 && (
+          <div className="px-3 py-2 border-b border-white/[0.05] flex items-center gap-2">
+            <div className="flex -space-x-1.5">
+              {onlineUsers.slice(0, 5).map(u => (
+                <div key={u.id} className="w-5 h-5 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white" title={u.name}>
+                  {u.name?.[0]?.toUpperCase()}
+                </div>
+              ))}
+              {onlineUsers.length > 5 && (
+                <div className="w-5 h-5 rounded-full bg-zinc-800 border-2 border-black flex items-center justify-center text-[6px] font-bold text-white/50">
+                  +{onlineUsers.length - 5}
+                </div>
+              )}
+            </div>
+            <span className="text-[8px] text-white/30">{onlineUsers.length} en el espacio</span>
           </div>
         )}
 
@@ -333,27 +272,6 @@ export const MiniModeOverlay: React.FC<MiniModeOverlayProps> = () => {
         </div>
       </div>
     </div>
-  );
-};
-
-// Video preview sub-component
-const VideoPreview: React.FC<{ stream: MediaStream; muted?: boolean }> = ({ stream, muted }) => {
-  const videoRef = useRef<HTMLVideoElement>(null);
-
-  useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
-    }
-  }, [stream]);
-
-  return (
-    <video
-      ref={videoRef}
-      autoPlay
-      playsInline
-      muted={muted}
-      className="w-full h-28 object-cover"
-    />
   );
 };
 
