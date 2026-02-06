@@ -231,6 +231,10 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
       back: Math.PI,
       front: 0,
       down: 0,
+      'front-left': -Math.PI / 4,
+      'front-right': Math.PI / 4,
+      'up-left': -Math.PI * 3 / 4,
+      'up-right': Math.PI * 3 / 4,
     };
     
     const targetRotation = rotations[direction] || 0;

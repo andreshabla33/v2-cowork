@@ -528,9 +528,18 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, cx + (distX / dist) * step));
         positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, cz + (distZ / dist) * step));
 
-        // Determinar dirección visual del avatar
+        // Determinar dirección visual del avatar (8 direcciones)
         // En la escena: +Z = hacia la cámara (front), -Z = alejándose (up)
-        if (Math.abs(distX) > Math.abs(distZ)) {
+        const absX = Math.abs(distX);
+        const absZ = Math.abs(distZ);
+        const ratio = Math.min(absX, absZ) / Math.max(absX, absZ);
+        const isDiagonal = ratio > 0.4; // Si ambos ejes tienen magnitud similar → diagonal
+
+        if (isDiagonal) {
+          const fb = distZ > 0 ? 'front' : 'up';
+          const lr = distX > 0 ? 'right' : 'left';
+          newDirection = `${fb}-${lr}`;
+        } else if (absX > absZ) {
           newDirection = distX > 0 ? 'right' : 'left';
         } else {
           newDirection = distZ > 0 ? 'front' : 'up';
