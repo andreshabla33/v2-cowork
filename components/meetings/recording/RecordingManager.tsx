@@ -149,18 +149,57 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     }
   }, [stream, processingState.step, processingState.message, updateState]);
 
-  // Buscar elemento de video
+  // Buscar o crear elemento de video para análisis conductual
+  const hiddenVideoRef = useRef<HTMLVideoElement | null>(null);
+  
   const findVideoElement = useCallback((): HTMLVideoElement | null => {
     if (!stream) return null;
     
+    // Primero buscar en el DOM un video con nuestro stream
     const videoElements = document.querySelectorAll('video');
     for (const video of videoElements) {
       if (video.srcObject === stream) {
         return video as HTMLVideoElement;
       }
     }
-    return null;
+    
+    // En LiveKit los videos se renderizan internamente,
+    // así que creamos un video oculto para el análisis facial/corporal
+    if (!hiddenVideoRef.current) {
+      const hiddenVideo = document.createElement('video');
+      hiddenVideo.style.position = 'absolute';
+      hiddenVideo.style.width = '1px';
+      hiddenVideo.style.height = '1px';
+      hiddenVideo.style.opacity = '0.01';
+      hiddenVideo.style.pointerEvents = 'none';
+      hiddenVideo.style.zIndex = '-1';
+      hiddenVideo.setAttribute('playsinline', 'true');
+      hiddenVideo.setAttribute('autoplay', 'true');
+      hiddenVideo.muted = true;
+      document.body.appendChild(hiddenVideo);
+      hiddenVideoRef.current = hiddenVideo;
+    }
+    
+    // Asignar el stream al video oculto
+    if (hiddenVideoRef.current.srcObject !== stream) {
+      hiddenVideoRef.current.srcObject = stream;
+      hiddenVideoRef.current.play().catch(() => {});
+    }
+    
+    console.log('🎥 Video oculto creado para análisis conductual');
+    return hiddenVideoRef.current;
   }, [stream]);
+
+  // Limpiar video oculto al desmontar
+  useEffect(() => {
+    return () => {
+      if (hiddenVideoRef.current) {
+        hiddenVideoRef.current.srcObject = null;
+        hiddenVideoRef.current.remove();
+        hiddenVideoRef.current = null;
+      }
+    };
+  }, []);
 
   // Iniciar grabación
   const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true, evaluadoId?: string) => {
