@@ -37,7 +37,7 @@ export const generateChatResponse = async (prompt: string, context: any) => {
       model: "gemini-3-flash-preview",
       contents: prompt,
       config: {
-        systemInstruction: `Eres Viben, el asistente de IA del espacio de trabajo virtual "Cowork". 
+        systemInstruction: `Eres Mónica, la asistente de IA del espacio de trabajo virtual "Cowork". 
         Contexto actual del espacio:
         Usuario: ${context.userName}
         Rol: ${context.role}

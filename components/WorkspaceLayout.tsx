@@ -366,7 +366,7 @@ export const WorkspaceLayout: React.FC = () => {
               }`} />
               <span className="relative flex items-center gap-2">
                 <span className={`w-2 h-2 rounded-full animate-pulse ${theme === 'arcade' ? 'bg-black' : 'bg-white'}`} />
-                Viben AI
+                Mónica AI
               </span>
             </button>
           </div>

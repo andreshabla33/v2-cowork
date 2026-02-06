@@ -5,7 +5,7 @@ import { useStore } from '../store/useStore';
 import { TaskStatus, Task } from '../types';
 
 interface Message {
-  role: 'user' | 'viben';
+  role: 'user' | 'monica';
   text: string;
   timestamp: number;
 }
@@ -14,7 +14,7 @@ interface VibenAssistantProps {
   onClose: () => void;
 }
 
-const STORAGE_KEY = 'viben_chat_history';
+const STORAGE_KEY = 'monica_chat_history';
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
@@ -39,8 +39,8 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
           setMessages(validMessages);
         } else {
           setMessages([{ 
-            role: 'viben', 
-            text: '¡Hola! Soy Viben. ¿En qué puedo ayudarte hoy?', 
+            role: 'monica', 
+            text: '¡Hola! Soy Mónica, tu asistente de IA. ¿En qué puedo ayudarte hoy?', 
             timestamp: now 
           }]);
         }
@@ -49,8 +49,8 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
       }
     } else {
       setMessages([{ 
-        role: 'viben', 
-        text: '¡Hola! Soy Viben. ¿En qué puedo ayudarte hoy?', 
+        role: 'monica', 
+        text: '¡Hola! Soy Mónica, tu asistente de IA. ¿En qué puedo ayudarte hoy?', 
         timestamp: now 
       }]);
     }
@@ -112,7 +112,7 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
             addTask(newTask);
             
             const confirmationMsg: Message = {
-              role: 'viben',
+              role: 'monica',
               text: `✅ He creado la tarea: "${newTask.title}".`,
               timestamp: Date.now()
             };
@@ -121,13 +121,13 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
         }
       } else {
         const textResponse = response.text || "Lo siento, no pude procesar tu solicitud.";
-        const newVibenMessage: Message = { role: 'viben', text: textResponse, timestamp: Date.now() };
+        const newVibenMessage: Message = { role: 'monica', text: textResponse, timestamp: Date.now() };
         setMessages(prev => [...prev, newVibenMessage]);
       }
     } catch (error) {
       if (abortControllerRef.current) return;
       const errorMessage: Message = { 
-        role: 'viben', 
+        role: 'monica', 
         text: 'Lo siento, tuve un problema. Intenta de nuevo.', 
         timestamp: Date.now() 
       };
@@ -150,7 +150,7 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
         <div className="relative flex items-center gap-2.5">
           <div className="w-7 h-7 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center text-sm border border-white/20">✨</div>
           <div>
-            <h3 className="text-[11px] font-black leading-tight text-white uppercase tracking-wider">Viben Assistant</h3>
+            <h3 className="text-[11px] font-black leading-tight text-white uppercase tracking-wider">Mónica AI</h3>
             <p className="text-[8px] text-white/70 uppercase font-bold flex items-center gap-1">
               <span className="w-1.5 h-1.5 bg-emerald-400 rounded-full animate-pulse" />
               Online
