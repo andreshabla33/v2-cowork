@@ -75,7 +75,16 @@ export const MiniModeOverlay: React.FC = () => {
   const handleStatusClick = () => {
     if (statusBtnRef.current) {
       const rect = statusBtnRef.current.getBoundingClientRect();
-      setPickerPos({ x: rect.left + rect.width / 2, y: rect.top });
+      const pickerH = 4 * 40; // ~4 opciones x 40px
+      const pickerW = 150;
+      // Calcular posición: arriba del botón, centrado
+      let x = rect.left + rect.width / 2 - pickerW / 2;
+      let y = rect.top - pickerH - 8;
+      // Clamp para no salirse de la ventana
+      if (x < 8) x = 8;
+      if (x + pickerW > window.innerWidth - 8) x = window.innerWidth - pickerW - 8;
+      if (y < 8) y = rect.bottom + 8; // Si no cabe arriba, ponerlo abajo
+      setPickerPos({ x, y });
     }
     setShowStatusPicker(!showStatusPicker);
   };
@@ -227,7 +236,7 @@ export const MiniModeOverlay: React.FC = () => {
           <div className="fixed inset-0 z-[10000]" onClick={() => setShowStatusPicker(false)} />
           <div
             className="fixed z-[10001] bg-black/95 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl"
-            style={{ left: pickerPos.x, top: pickerPos.y, transform: 'translate(-50%, -100%) translateY(-8px)', minWidth: 150 }}
+            style={{ left: pickerPos.x, top: pickerPos.y, width: 150 }}
           >
             {STATUS_OPTIONS.map(opt => (
               <button
