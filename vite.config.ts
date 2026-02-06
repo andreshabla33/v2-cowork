@@ -4,6 +4,7 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, '.', '');
+    const openrouterKey = env.OPENROUTER_API_KEY || process.env.OPENROUTER_API_KEY || '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';
     return {
       server: {
         port: 3000,
@@ -13,7 +14,7 @@ export default defineConfig(({ mode }) => {
       define: {
         'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY),
         'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
-        'process.env.OPENROUTER_API_KEY': JSON.stringify(env.OPENROUTER_API_KEY || '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')
+        'process.env.OPENROUTER_API_KEY': JSON.stringify(openrouterKey)
       },
       resolve: {
         alias: {
