@@ -1450,6 +1450,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
 
             {/* Footer Actions */}
             <div className="p-3 lg:p-2 border-t border-white/10 flex gap-2">
+              {/* Botón Cerrar - siempre visible */}
+              <button
+                onClick={() => setSelectedMeeting(null)}
+                className="px-3 py-2 lg:py-1.5 bg-white/10 hover:bg-white/20 rounded-lg lg:rounded-md text-xs font-bold transition-all"
+              >
+                Cerrar
+              </button>
+
               {selectedMeeting.sala_id && (
                 <button
                   onClick={() => {
@@ -1467,12 +1475,14 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
               {isCreator(selectedMeeting) && (
                 <button
                   onClick={() => {
-                    deleteMeeting(selectedMeeting.id, selectedMeeting.google_event_id);
-                    setSelectedMeeting(null);
+                    if (window.confirm('¿Estás seguro de que deseas cancelar esta reunión? Se eliminará permanentemente.')) {
+                      deleteMeeting(selectedMeeting.id, selectedMeeting.google_event_id);
+                      setSelectedMeeting(null);
+                    }
                   }}
                   className="px-3 py-2 lg:py-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg lg:rounded-md text-xs font-bold transition-all"
                 >
-                  Cancelar
+                  Eliminar
                 </button>
               )}
             </div>
