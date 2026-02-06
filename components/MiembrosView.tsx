@@ -4,6 +4,7 @@ import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import { Role } from '../types';
 import { ModalInvitarUsuario } from './invitaciones/ModalInvitarUsuario';
+import { UserAvatar } from './UserAvatar';
 
 export const MiembrosView: React.FC = () => {
   const { activeWorkspace, userRoleInActiveWorkspace, theme } = useStore();
@@ -87,9 +88,11 @@ export const MiembrosView: React.FC = () => {
                   <tr key={m.id} className={`${isArcade ? 'hover:bg-[#00ff41]/5' : 'hover:bg-white/[0.02]'} transition-colors`}>
                     <td className="p-6">
                       <div className="flex items-center gap-4">
-                        <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black shadow-xl ${isArcade ? 'bg-[#00ff41] text-black' : 'bg-indigo-600 text-white'}`}>
-                          {m.usuario?.nombre?.charAt(0).toUpperCase()}
-                        </div>
+                        <UserAvatar
+                          name={m.usuario?.nombre || ''}
+                          profilePhoto={m.usuario?.avatar_url}
+                          size="md"
+                        />
                         <div>
                           <p className={`text-sm font-black uppercase tracking-widest ${isArcade ? 'text-[#00ff41]' : 'text-white'}`}>{m.usuario?.nombre}</p>
                           <p className={`text-[10px] font-bold ${isArcade ? 'text-[#00ff41]/40' : 'text-zinc-500'}`}>{m.usuario?.email}</p>

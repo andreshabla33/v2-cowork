@@ -7,6 +7,7 @@ import { ModalCrearGrupo } from './chat/ModalCrearGrupo';
 import { AgregarMiembros } from './chat/AgregarMiembros';
 import { ChatToast, ToastNotification } from './ChatToast';
 import { MeetingRooms } from './MeetingRooms';
+import { UserAvatar } from './UserAvatar';
 import { PresenceStatus } from '../types';
 
 // Helper para obtener color del estado
@@ -126,7 +127,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         if (otrosIds.length > 0) {
           const { data: usuarios } = await supabase
             .from('usuarios')
-            .select('id, nombre, email')
+            .select('id, nombre, email, avatar_url')
             .in('id', otrosIds);
           
           console.log('Usuarios encontrados:', usuarios);
@@ -814,10 +815,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                   onClick={() => { console.log('Opening DM with:', u); openDirectChat(u); }}
                   className="w-full text-left px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-white/5 transition-all flex items-center gap-3 cursor-pointer opacity-50 hover:opacity-100"
                 >
-                  <div className="relative">
-                    <div className="w-5 h-5 rounded-full bg-indigo-500/20 flex items-center justify-center text-[8px] font-black">{u.nombre?.charAt(0)}</div>
-                    <div className={`absolute -bottom-0.5 -right-0.5 w-2 h-2 rounded-full border border-[#19171d] ${isOnline ? getStatusColor(onlineUsers.find(ou => ou.id === u.id)?.status) : 'bg-zinc-500'}`} />
-                  </div>
+                  <UserAvatar
+                    name={u.nombre || ''}
+                    profilePhoto={u.avatar_url}
+                    size="xs"
+                    showStatus
+                    status={isOnline ? onlineUsers.find(ou => ou.id === u.id)?.status : undefined}
+                  />
                   <span className="truncate flex-1">{u.nombre}</span>
                 </button>
               );}) : (
@@ -926,8 +930,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
             <div key={m.id} className={`group hover:bg-white/[0.02] px-4 py-1 -mx-4 rounded-lg transition-colors ${showHeader ? 'mt-4' : 'mt-0.5'}`}>
               <div className="flex gap-3">
                 {showHeader ? (
-                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center text-[11px] font-bold text-white shrink-0 ${m.usuario_id === currentUser.id ? 'bg-indigo-600' : 'bg-gradient-to-br from-zinc-600 to-zinc-700'}`}>
-                    {m.usuario?.nombre?.charAt(0).toUpperCase()}
+                  <div className="shrink-0">
+                    <UserAvatar
+                      name={m.usuario?.nombre || ''}
+                      profilePhoto={m.usuario_id === currentUser.id ? currentUser.profilePhoto : miembrosEspacio.find((u: any) => u.id === m.usuario_id)?.avatar_url}
+                      size="sm"
+                    />
                   </div>
                 ) : (
                   <div className="w-9 shrink-0 flex items-center justify-center">
@@ -1017,9 +1025,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                 onClick={() => insertMention(user)}
                 className="w-full text-left px-3 py-2 rounded-lg hover:bg-indigo-500/20 transition-colors flex items-center gap-3"
               >
-                <div className="w-6 h-6 rounded-full bg-indigo-500/20 flex items-center justify-center text-[10px] font-bold">
-                  {user.nombre?.charAt(0)}
-                </div>
+                <UserAvatar name={user.nombre || ''} profilePhoto={user.avatar_url} size="xs" />
                 <span className="text-[13px] font-medium">@{user.nombre}</span>
               </button>
             ))}

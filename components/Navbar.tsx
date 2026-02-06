@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { ThemeType, AvatarConfig } from '../types';
 import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
+import { UserAvatar } from './UserAvatar';
 
 export const AvatarPreview: React.FC<{
   config: AvatarConfig, 
@@ -108,9 +109,14 @@ export const Navbar: React.FC<NavbarProps> = ({ activeTab, setActiveTab, onViben
         </button>
 
         <div className={`flex items-center gap-3 pl-4 border-l ${theme === 'light' ? 'border-zinc-200' : 'border-white/10'}`}>
-          <div onClick={() => setActiveTab('avatar')} className={`w-10 h-10 rounded-full border-2 p-0.5 overflow-hidden shadow-lg flex items-center justify-center cursor-pointer hover:scale-110 transition-transform ${theme === 'arcade' ? 'border-[#00ff41]/50 bg-black' : 'border-indigo-500/50 bg-zinc-900'}`}>
-            <AvatarPreview config={currentUser.avatarConfig!} size="small" />
-          </div>
+          <UserAvatar
+            name={currentUser.name}
+            profilePhoto={currentUser.profilePhoto}
+            size="md"
+            showStatus
+            status={currentUser.status}
+            onClick={() => setActiveTab('avatar')}
+          />
         </div>
       </div>
     </nav>

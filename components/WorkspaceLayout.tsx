@@ -10,6 +10,7 @@ import { CalendarPanel } from './meetings/CalendarPanel';
 import { GrabacionesHistorial } from './meetings/recording/GrabacionesHistorial';
 import { VibenAssistant } from './VibenAssistant';
 import { AvatarPreview } from './Navbar';
+import { UserAvatar } from './UserAvatar';
 import { StatusSelector } from './StatusSelector';
 import { GameHub, GameInvitationNotification } from './games';
 import { SettingsModal } from './settings/SettingsModal';
@@ -269,12 +270,14 @@ export const WorkspaceLayout: React.FC = () => {
           </button>
           
           {/* Avatar del usuario - Más compacto */}
-          <div 
+          <UserAvatar
+            name={currentUser.name}
+            profilePhoto={currentUser.profilePhoto}
+            size="sm"
+            showStatus
+            status={currentUser.status}
             onClick={() => setActiveSubTab('avatar')}
-            className={`w-8 h-8 rounded-lg overflow-hidden cursor-pointer hover:ring-2 transition-all relative group ${theme === 'arcade' ? 'ring-[#00ff41]/50 hover:ring-[#00ff41]' : 'ring-white/20 hover:ring-white/50'}`}
-          >
-            <AvatarPreview config={currentUser.avatarConfig!} size="small" />
-          </div>
+          />
         </div>
       </aside>
 
