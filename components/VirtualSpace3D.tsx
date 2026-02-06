@@ -15,6 +15,7 @@ import { ChatService } from '../services/chatService';
 import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type CameraSettings } from './CameraSettingsMenu';
 import { VideoWithBackground } from './VideoWithBackground';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from './BottomControlBar';
+import { AvatarCustomizer3D } from './AvatarCustomizer3D';
 // GameHub ahora se importa en WorkspaceLayout
 
 // Constantes
@@ -1546,6 +1547,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
   const [moveTarget, setMoveTarget] = useState<{ x: number; z: number } | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number } | null>(null);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
   
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
@@ -2606,7 +2608,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             remoteMessages={remoteMessages}
             localReactions={localReactions}
             remoteReaction={remoteReaction}
-            onClickAvatar={() => setActiveSubTab('avatar')}
+            onClickAvatar={() => setShowAvatarModal(true)}
             moveTarget={moveTarget}
             onReachTarget={() => setMoveTarget(null)}
             teleportTarget={teleportTarget}
@@ -2855,6 +2857,51 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       />
       
       {/* GameHub ahora se controla desde la barra superior en WorkspaceLayout */}
+
+      {/* Modal de Avatar/Perfil (estilo Gather - glassmorphism) */}
+      {showAvatarModal && (
+        <div 
+          className="fixed inset-0 z-[300] flex items-center justify-center"
+          onClick={(e) => { if (e.target === e.currentTarget) setShowAvatarModal(false); }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setShowAvatarModal(false); }}
+          tabIndex={-1}
+          ref={(el) => el?.focus()}
+        >
+          {/* Backdrop */}
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
+          
+          {/* Modal */}
+          <div className="relative w-[95vw] max-w-[900px] h-[85vh] max-h-[680px] bg-zinc-900/95 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl shadow-black/50 flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-white/10">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-xl bg-indigo-600/20 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white">Mi Perfil y Avatar</h2>
+                  <p className="text-[10px] text-white/40">Personaliza tu apariencia en el espacio</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowAvatarModal(false)}
+                className="w-8 h-8 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors group"
+              >
+                <svg className="w-4 h-4 text-white/40 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Body - AvatarCustomizer3D */}
+            <div className="flex-1 overflow-hidden">
+              <AvatarCustomizer3D compact={false} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
