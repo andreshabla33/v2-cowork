@@ -22,6 +22,55 @@ const MOVE_SPEED = 4;
 const RUN_SPEED = 8;
 const WORLD_SIZE = 100;
 const PROXIMITY_RADIUS = 180; // 180px para detectar proximidad
+const TELEPORT_DISTANCE = 15; // Distancia 3D para activar teletransportación
+
+// Sonido de teletransportación (síntesis estilo Goku)
+const playTeleportSound = () => {
+  try {
+    const ctx = new AudioContext();
+    const now = ctx.currentTime;
+    
+    // Sweep ascendente (desaparición)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(200, now);
+    osc1.frequency.exponentialRampToValueAtTime(2000, now + 0.15);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc1.connect(gain1).connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.2);
+
+    // Ruido blanco (whoosh)
+    const bufferSize = ctx.sampleRate * 0.3;
+    const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.15;
+    const noise = ctx.createBufferSource();
+    const noiseGain = ctx.createGain();
+    noise.buffer = noiseBuffer;
+    noiseGain.gain.setValueAtTime(0.2, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+    noise.connect(noiseGain).connect(ctx.destination);
+    noise.start(now + 0.05);
+
+    // Sweep descendente (aparición)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(2000, now + 0.2);
+    osc2.frequency.exponentialRampToValueAtTime(300, now + 0.4);
+    gain2.gain.setValueAtTime(0.01, now + 0.2);
+    gain2.gain.linearRampToValueAtTime(0.25, now + 0.25);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.45);
+    osc2.connect(gain2).connect(ctx.destination);
+    osc2.start(now + 0.2);
+    osc2.stop(now + 0.45);
+
+    setTimeout(() => ctx.close(), 600);
+  } catch (e) { /* Audio no disponible */ }
+};
 
 // --- Iconos ---
 
@@ -276,15 +325,43 @@ const RemoteAvatarInterpolated: React.FC<{
   const targetPos = useRef({ x: user.x / 16, z: user.y / 16 });
   const currentPos = useRef({ x: user.x / 16, z: user.y / 16 });
   const [isMoving, setIsMoving] = useState(false);
+  const [remoteTeleport, setRemoteTeleport] = useState<{ phase: 'out' | 'in'; origin: [number, number, number]; dest: [number, number, number] } | null>(null);
 
   // Actualizar posición destino cuando cambia
   useEffect(() => {
-    targetPos.current = { x: user.x / 16, z: user.y / 16 };
+    const newX = user.x / 16;
+    const newZ = user.y / 16;
+    const dx = newX - currentPos.current.x;
+    const dz = newZ - currentPos.current.z;
+    const jumpDist = Math.sqrt(dx * dx + dz * dz);
+
+    if (jumpDist > TELEPORT_DISTANCE * 0.8) {
+      // Salto grande detectado → teleport visual
+      const origin: [number, number, number] = [currentPos.current.x, 0, currentPos.current.z];
+      const dest: [number, number, number] = [newX, 0, newZ];
+      
+      setRemoteTeleport({ phase: 'out', origin, dest });
+      playTeleportSound();
+      
+      setTimeout(() => {
+        currentPos.current = { x: newX, z: newZ };
+        targetPos.current = { x: newX, z: newZ };
+        if (groupRef.current) {
+          groupRef.current.position.x = newX;
+          groupRef.current.position.z = newZ;
+        }
+        setRemoteTeleport(prev => prev ? { ...prev, phase: 'in' } : null);
+        
+        setTimeout(() => setRemoteTeleport(null), 400);
+      }, 300);
+    } else {
+      targetPos.current = { x: newX, z: newZ };
+    }
   }, [user.x, user.y]);
 
   // Interpolar suavemente hacia la posición destino
   useFrame(() => {
-    if (!groupRef.current) return;
+    if (!groupRef.current || remoteTeleport) return;
 
     const dx = targetPos.current.x - currentPos.current.x;
     const dz = targetPos.current.z - currentPos.current.z;
@@ -311,23 +388,35 @@ const RemoteAvatarInterpolated: React.FC<{
     }
   });
 
+  const isHiddenByTeleport = remoteTeleport?.phase === 'out';
+
   return (
-    <group ref={groupRef} position={[currentPos.current.x, 0, currentPos.current.z]}>
-      <Avatar
-        position={new THREE.Vector3(0, 0, 0)}
-        config={user.avatarConfig}
-        name={user.name}
-        status={user.status}
-        isCurrentUser={false}
-        animationState={isMoving ? 'walk' : 'idle'}
-        direction={user.direction}
-        reaction={reaction}
-        videoStream={remoteStream}
-        camOn={user.isCameraOn}
-        showVideoBubble={showVideoBubble}
-        message={message}
-      />
-    </group>
+    <>
+      <group ref={groupRef} position={[currentPos.current.x, 0, currentPos.current.z]}>
+        {!isHiddenByTeleport && (
+          <Avatar
+            position={new THREE.Vector3(0, 0, 0)}
+            config={user.avatarConfig}
+            name={user.name}
+            status={user.status}
+            isCurrentUser={false}
+            animationState={isMoving ? 'walk' : 'idle'}
+            direction={user.direction}
+            reaction={reaction}
+            videoStream={remoteStream}
+            camOn={user.isCameraOn}
+            showVideoBubble={showVideoBubble}
+            message={message}
+          />
+        )}
+      </group>
+      {remoteTeleport?.phase === 'out' && (
+        <TeleportEffect position={remoteTeleport.origin} phase="out" />
+      )}
+      {remoteTeleport?.phase === 'in' && (
+        <TeleportEffect position={remoteTeleport.dest} phase="in" />
+      )}
+    </>
   );
 };
 
@@ -403,6 +492,40 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
   return null;
 };
 // ============== JUGADOR CONTROLABLE CON ANIMACIONES ==============
+// ============== EFECTO VISUAL TELETRANSPORTACIÓN ==============
+const TeleportEffect: React.FC<{ position: [number, number, number]; phase: 'out' | 'in' }> = ({ position, phase }) => {
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
+  const startTime = useRef(Date.now());
+
+  useFrame(() => {
+    if (!meshRef.current || !materialRef.current) return;
+    const elapsed = (Date.now() - startTime.current) / 1000;
+    const duration = 0.35;
+    const t = Math.min(elapsed / duration, 1);
+
+    if (phase === 'out') {
+      // Anillo que se expande y desvanece
+      meshRef.current.scale.setScalar(1 + t * 3);
+      materialRef.current.opacity = 0.8 * (1 - t);
+    } else {
+      // Anillo que se contrae y aparece
+      meshRef.current.scale.setScalar(4 - t * 3);
+      materialRef.current.opacity = 0.8 * t * (1 - t * 0.5);
+    }
+  });
+
+  return (
+    <group position={position}>
+      <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
+        <ringGeometry args={[0.5, 1.2, 32]} />
+        <meshBasicMaterial ref={materialRef} color="#818cf8" transparent opacity={0.8} side={THREE.DoubleSide} />
+      </mesh>
+      <pointLight color="#818cf8" intensity={phase === 'out' ? 5 : 8} distance={6} />
+    </group>
+  );
+};
+
 interface PlayerProps {
   currentUser: User;
   setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
@@ -414,9 +537,11 @@ interface PlayerProps {
   onClickAvatar?: () => void;
   moveTarget?: { x: number; z: number } | null;
   onReachTarget?: () => void;
+  teleportTarget?: { x: number; z: number } | null;
+  onTeleportDone?: () => void;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget, teleportTarget, onTeleportDone }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -429,6 +554,53 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   const lastSyncTime = useRef(0);
   const autoMoveTimeRef = useRef(0);
   const { camera } = useThree();
+  
+  // Teletransportación
+  const [teleportPhase, setTeleportPhase] = useState<'none' | 'out' | 'in'>('none');
+  const [teleportOrigin, setTeleportOrigin] = useState<[number, number, number] | null>(null);
+  const [teleportDest, setTeleportDest] = useState<[number, number, number] | null>(null);
+  const teleportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Manejar teleport cuando llega un teleportTarget
+  useEffect(() => {
+    if (!teleportTarget) return;
+    
+    const originPos: [number, number, number] = [positionRef.current.x, 0, positionRef.current.z];
+    const destPos: [number, number, number] = [teleportTarget.x, 0, teleportTarget.z];
+    
+    // Fase 1: Desaparición
+    setTeleportOrigin(originPos);
+    setTeleportDest(destPos);
+    setTeleportPhase('out');
+    playTeleportSound();
+    
+    // Fase 2: Mover al destino después de 300ms
+    teleportTimerRef.current = setTimeout(() => {
+      positionRef.current.x = teleportTarget.x;
+      positionRef.current.z = teleportTarget.z;
+      if (groupRef.current) {
+        groupRef.current.position.x = teleportTarget.x;
+        groupRef.current.position.z = teleportTarget.z;
+      }
+      // Sincronizar posición inmediatamente
+      setPosition(teleportTarget.x * 16, teleportTarget.z * 16, 'front', false, false);
+      (camera as any).userData.playerPosition = { x: teleportTarget.x, z: teleportTarget.z };
+      
+      setTeleportPhase('in');
+      
+      // Fase 3: Limpiar efecto
+      setTimeout(() => {
+        setTeleportPhase('none');
+        setTeleportOrigin(null);
+        setTeleportDest(null);
+        if (onTeleportDone) onTeleportDone();
+      }, 400);
+    }, 300);
+    
+    return () => {
+      if (teleportTimerRef.current) clearTimeout(teleportTimerRef.current);
+    };
+  }, [teleportTarget]);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -599,31 +771,44 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   });
 
   return (
-    <group ref={groupRef} position={[positionRef.current.x, 0, positionRef.current.z]}>
-      <Avatar
-        position={new THREE.Vector3(0, 0, 0)}
-        config={currentUser.avatarConfig}
-        name={currentUser.name}
-        status={currentUser.status}
-        isCurrentUser={true}
-        animationState={animationState}
-        direction={direction}
-        reaction={reactions.length > 0 ? reactions[reactions.length - 1].emoji : null}
-        videoStream={stream}
-        camOn={currentUser.isCameraOn}
-        showVideoBubble={showVideoBubble}
-        message={message}
-        onClickAvatar={onClickAvatar}
-      />
-      {/* Múltiples emojis flotantes estilo Gather */}
-      {reactions.map((r, idx) => (
-        <Html key={r.id} position={[0.3 * (idx % 3 - 1), 3.2 + (idx * 0.3), 0]} center distanceFactor={8} zIndexRange={[200, 0]}>
-          <div className="animate-emoji-float text-4xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
-            {r.emoji}
-          </div>
-        </Html>
-      ))}
-    </group>
+    <>
+      <group ref={groupRef} position={[positionRef.current.x, 0, positionRef.current.z]}>
+        {/* Ocultar avatar durante fase 'out' del teleport */}
+        {teleportPhase !== 'out' && (
+          <Avatar
+            position={new THREE.Vector3(0, 0, 0)}
+            config={currentUser.avatarConfig}
+            name={currentUser.name}
+            status={currentUser.status}
+            isCurrentUser={true}
+            animationState={animationState}
+            direction={direction}
+            reaction={reactions.length > 0 ? reactions[reactions.length - 1].emoji : null}
+            videoStream={stream}
+            camOn={currentUser.isCameraOn}
+            showVideoBubble={showVideoBubble}
+            message={message}
+            onClickAvatar={onClickAvatar}
+          />
+        )}
+        {/* Múltiples emojis flotantes estilo Gather */}
+        {reactions.map((r, idx) => (
+          <Html key={r.id} position={[0.3 * (idx % 3 - 1), 3.2 + (idx * 0.3), 0]} center distanceFactor={8} zIndexRange={[200, 0]}>
+            <div className="animate-emoji-float text-4xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
+              {r.emoji}
+            </div>
+          </Html>
+        ))}
+      </group>
+
+      {/* Efectos de teletransportación */}
+      {teleportPhase === 'out' && teleportOrigin && (
+        <TeleportEffect position={teleportOrigin} phase="out" />
+      )}
+      {teleportPhase === 'in' && teleportDest && (
+        <TeleportEffect position={teleportDest} phase="in" />
+      )}
+    </>
   );
 };
 
@@ -645,9 +830,11 @@ interface SceneProps {
   moveTarget?: { x: number; z: number } | null;
   onReachTarget?: () => void;
   onDoubleClickFloor?: (point: THREE.Vector3) => void;
+  teleportTarget?: { x: number; z: number } | null;
+  onTeleportDone?: () => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -759,6 +946,8 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         onClickAvatar={onClickAvatar}
         moveTarget={moveTarget}
         onReachTarget={onReachTarget}
+        teleportTarget={teleportTarget}
+        onTeleportDone={onTeleportDone}
       />
       
       {/* Usuarios remotos */}
@@ -1237,6 +1426,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [cargoUsuario, setCargoUsuario] = useState<string>('colaborador');
   const [moveTarget, setMoveTarget] = useState<{ x: number; z: number } | null>(null);
+  const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number } | null>(null);
   
   // Estado de configuración de cámara (compartido entre BottomControlBar y VideoHUD)
   const [cameraSettings, setCameraSettings] = useState<CameraSettings>(loadCameraSettings);
@@ -2300,7 +2490,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             onClickAvatar={() => setActiveSubTab('avatar')}
             moveTarget={moveTarget}
             onReachTarget={() => setMoveTarget(null)}
-            onDoubleClickFloor={(point) => setMoveTarget({ x: point.x, z: point.z })}
+            teleportTarget={teleportTarget}
+            onTeleportDone={() => setTeleportTarget(null)}
+            onDoubleClickFloor={(point) => {
+              // Calcular distancia desde posición actual del avatar
+              const playerX = (currentUser.x || 400) / 16;
+              const playerZ = (currentUser.y || 400) / 16;
+              const dx = point.x - playerX;
+              const dz = point.z - playerZ;
+              const dist = Math.sqrt(dx * dx + dz * dz);
+
+              if (dist > TELEPORT_DISTANCE) {
+                // Distancia larga → teletransportación estilo Goku
+                setMoveTarget(null);
+                setTeleportTarget({ x: point.x, z: point.z });
+              } else {
+                // Distancia corta → caminar/correr
+                setTeleportTarget(null);
+                setMoveTarget({ x: point.x, z: point.z });
+              }
+            }}
           />
         </Suspense>
       </Canvas>
