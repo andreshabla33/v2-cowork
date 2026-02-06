@@ -456,6 +456,42 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     });
   };
 
+  // Eliminar canal (solo admin/super_admin o creador)
+  const handleDeleteChannel = async (grupoId: string, grupoNombre: string) => {
+    const confirmado = window.confirm(`¿Estás seguro de eliminar el canal "${grupoNombre}"? Se eliminarán todos los mensajes.`);
+    if (!confirmado) return;
+
+    // Eliminar mensajes del canal
+    await supabase.from('mensajes_chat').delete().eq('grupo_id', grupoId);
+    // Eliminar miembros del canal
+    await supabase.from('miembros_grupo').delete().eq('grupo_id', grupoId);
+    // Eliminar el canal
+    const { error } = await supabase.from('grupos_chat').delete().eq('id', grupoId);
+    if (error) {
+      console.error('❌ Error eliminando canal:', error);
+      alert('Error al eliminar el canal: ' + error.message);
+      return;
+    }
+    // Actualizar estado local
+    setGrupos(prev => prev.filter(g => g.id !== grupoId));
+    // Si el canal eliminado era el activo, seleccionar otro
+    if (grupoActivo === grupoId) {
+      const restantes = grupos.filter(g => g.id !== grupoId && g.tipo !== 'directo');
+      if (restantes.length > 0) {
+        setGrupoActivo(restantes[0].id);
+      } else {
+        setGrupoActivo('');
+      }
+    }
+  };
+
+  const canDeleteChannel = (grupo: ChatGroup) => {
+    if (!userRoleInActiveWorkspace) return false;
+    const isAdmin = ['admin', 'super_admin'].includes(userRoleInActiveWorkspace);
+    const isCreator = grupo.creado_por === currentUser.id;
+    return isAdmin || isCreator;
+  };
+
   const handleChannelSelect = (id: string) => {
     setGrupoActivo(id);
     setUnreadByChannel(prev => ({ ...prev, [id]: 0 })); // Limpiar no leÃ­dos del canal
@@ -667,19 +703,29 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
               {grupos.filter(g => g.tipo !== 'directo').map(g => {
                 const unreadCount = unreadByChannel[g.id] || 0;
                 return (
-                <button 
-                  key={g.id} 
-                  onClick={() => handleChannelSelect(g.id)} 
-                  className={`w-full text-left px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${grupoActivo === g.id ? s.activeItem : (unreadCount > 0 ? 'opacity-100 bg-white/5' : 'opacity-50 hover:opacity-100 hover:bg-white/5')}`}
-                >
-                  <span className="opacity-40">{g.tipo === 'privado' ? '🔒' : '#'}</span>
-                  <span className="truncate flex-1">{g.nombre}</span>
-                  {unreadCount > 0 && (
-                    <span className="w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center animate-pulse">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
+                <div key={g.id} className="group/channel relative flex items-center">
+                  <button 
+                    onClick={() => handleChannelSelect(g.id)} 
+                    className={`w-full text-left px-4 py-1.5 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all flex items-center gap-2 ${grupoActivo === g.id ? s.activeItem : (unreadCount > 0 ? 'opacity-100 bg-white/5' : 'opacity-50 hover:opacity-100 hover:bg-white/5')}`}
+                  >
+                    <span className="opacity-40">{g.tipo === 'privado' ? '🔒' : '#'}</span>
+                    <span className="truncate flex-1">{g.nombre}</span>
+                    {unreadCount > 0 && (
+                      <span className="w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center animate-pulse">
+                        {unreadCount > 9 ? '9+' : unreadCount}
+                      </span>
+                    )}
+                  </button>
+                  {canDeleteChannel(g) && (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteChannel(g.id, g.nombre); }}
+                      className="absolute right-2 opacity-0 group-hover/channel:opacity-60 hover:!opacity-100 p-1 rounded-lg hover:bg-red-500/20 text-red-400 transition-all"
+                      title="Eliminar canal"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
                   )}
-                </button>
+                </div>
               );})}
             </div>
           </div>
