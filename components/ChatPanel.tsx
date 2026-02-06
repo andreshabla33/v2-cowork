@@ -193,14 +193,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           const menciones = payload.new.menciones || [];
           const isMentioned = menciones.includes(currentUser.id);
           
-          console.log('ðŸ”” Toast notification:', senderData.nombre, payload.new.contenido, isMentioned ? '(MENCIONADO)' : '');
+          console.log('🔔 Toast notification:', senderData.nombre, payload.new.contenido, isMentioned ? '(MENCIONADO)' : '');
           
           // Reproducir sonido de notificaciÃ³n
           playNotificationSound();
           
           addToastNotification(
             senderData.nombre,
-            isMentioned ? `ðŸ“¢ Te mencionÃ³: ${payload.new.contenido}` : payload.new.contenido,
+            isMentioned ? `📢 Te mencionó: ${payload.new.contenido}` : payload.new.contenido,
             payload.new.grupo_id,
             isDirect ? undefined : grupoData?.nombre,
             isDirect
@@ -335,7 +335,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   };
 
   // Emojis comunes
-  const emojis = ['ðŸ˜€', 'ðŸ˜‚', 'ðŸ¥°', 'ðŸ˜Ž', 'ðŸ¤”', 'ðŸ‘', 'ðŸ‘Ž', 'â¤ï¸', 'ðŸ”¥', 'ðŸŽ‰', 'âœ…', 'ðŸ’¯', 'ðŸš€', 'ðŸ’¡', 'â­'];
+  const emojis = ['😀', '😂', '🥰', '😎', '🤔', '👍', '👎', '❤️', '🔥', '🎉', '✅', '💯', '🚀', '💡', '⭐'];
 
   // Detectar menciones en el texto (@usuario)
   const detectMentions = (text: string): string[] => {
@@ -534,7 +534,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           nombre: `${currentUser.id}|${targetUser.id}`,
           tipo: 'directo',
           creado_por: currentUser.id,
-          icono: 'ðŸ’¬'
+          icono: '💬'
         })
         .select()
         .single();
@@ -601,7 +601,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       await supabase.from('mensajes_chat').insert({
         grupo_id: grupoActivo,
         usuario_id: currentUser.id,
-        contenido: `ðŸ“Ž [${file.name}](${urlData.publicUrl})`,
+        contenido: `📎 [${file.name}](${urlData.publicUrl})`,
         tipo: 'archivo'
       });
     }
@@ -838,7 +838,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       <div className={`px-8 py-5 border-b border-white/5 flex items-center justify-between shrink-0 shadow-sm`}>
          <div className="flex items-center gap-4">
             <span className={`text-2xl opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
-              {grupoActivoData?.tipo === 'directo' ? 'ðŸ’¬' : (grupoActivoData?.tipo === 'privado' ? 'ðŸ”’' : '#')}
+              {grupoActivoData?.tipo === 'directo' ? '💬' : (grupoActivoData?.tipo === 'privado' ? '🔒' : '#')}
             </span>
             <div>
               <h3 className={`font-black text-sm uppercase tracking-widest truncate ${theme === 'arcade' ? 'text-[#00ff41] neon-text' : ''}`}>
@@ -865,7 +865,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       <div ref={mensajesRef} className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
         {mensajes.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center opacity-20 select-none">
-             <span className="text-6xl mb-4">ðŸ’¬</span>
+             <span className="text-6xl mb-4">💬</span>
              <p className="font-black uppercase tracking-[0.3em] text-[10px]">{t('chat.noMessages')}</p>
           </div>
         ) : mensajes.map((m, idx) => {
@@ -900,7 +900,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                     </div>
                   )}
                   {m.tipo === 'archivo' && m.contenido.includes('](') ? (() => {
-                    const match = m.contenido.match(/ðŸ“Ž \[(.+?)\]\((.+?)\)/);
+                    const match = m.contenido.match(/📎 \[(.+?)\]\((.+?)\)/);
                     if (match) {
                       const [, fileName, fileUrl] = match;
                       const isImage = /\.(jpg|jpeg|png|gif|webp)$/i.test(fileName);
