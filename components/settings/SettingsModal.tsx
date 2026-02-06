@@ -71,14 +71,8 @@ const defaultSettings = {
     autoIdleMuting: true
   },
   meetings: {
-    enableRecordingForMembers: false,
     autoMuteOnJoin: false,
     autoCameraOffOnJoin: false,
-    showTranscription: true,
-    aiSummaryEnabled: true,
-    maxParticipants: 25,
-    waitingRoomEnabled: false,
-    allowScreenShare: true
   },
   notifications: {
     desktopNotifications: true,
@@ -340,6 +334,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 settings={settings.meetings}
                 onSettingsChange={(meetings) => saveSettings({ ...settings, meetings })}
                 isAdmin={isAdmin}
+                workspaceId={workspaceId}
               />
             )}
             {activeTab === 'notifications' && (

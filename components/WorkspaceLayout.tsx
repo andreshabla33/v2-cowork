@@ -18,6 +18,7 @@ import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
 import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
 import { getSettingsSection } from '../lib/userSettings';
+import { cargarMetricasEspacio } from '../lib/metricasAnalisis';
 import { MiniModeOverlay } from './MiniModeOverlay';
 
 export const WorkspaceLayout: React.FC = () => {
@@ -71,6 +72,13 @@ export const WorkspaceLayout: React.FC = () => {
   useEffect(() => {
     if (!activeWorkspace) setView('dashboard');
   }, [activeWorkspace, setView]);
+
+  // Cargar métricas de análisis conductual del espacio (Supabase → cache en memoria)
+  useEffect(() => {
+    if (activeWorkspace?.id) {
+      cargarMetricasEspacio(activeWorkspace.id);
+    }
+  }, [activeWorkspace?.id]);
 
   // Realtime Presence CENTRALIZADO - único lugar que maneja presencia
   useEffect(() => {

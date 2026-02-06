@@ -7,6 +7,7 @@ import React, { useMemo } from 'react';
 import {
   TipoGrabacion,
   CONFIGURACIONES_GRABACION,
+  getConfiguracionConMetricasCustom,
   ResultadoAnalisis,
   AnalisisRRHH,
   AnalisisDeals,
@@ -61,7 +62,12 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
   onClose,
   onExport,
 }) => {
-  const config = CONFIGURACIONES_GRABACION[resultado.tipo_grabacion] || CONFIG_DEFAULT;
+  const configBase = CONFIGURACIONES_GRABACION[resultado.tipo_grabacion] || CONFIG_DEFAULT;
+  // Usar métricas custom del espacio (desde cache Supabase) con fallback a defaults
+  const tipoDetallado = resultado.tipo_grabacion === 'rrhh' ? 'rrhh_entrevista' : resultado.tipo_grabacion;
+  const configCustom = getConfiguracionConMetricasCustom(tipoDetallado as any);
+  const config = { ...configBase, metricas: configCustom.metricas };
+  const metricasActivas = new Set(config.metricas);
   
   const formatDuration = (seconds: number): string => {
     const mins = Math.floor(seconds / 60);
@@ -150,8 +156,26 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
             </div>
           )}
 
-          {/* Cohesión y Participación - Siempre visible */}
-          {stats && (
+          {/* Métricas evaluadas - Badge informativo */}
+          {config.metricas.length > 0 && (
+            <div className="px-4 pt-3">
+              <div className="flex flex-wrap gap-1">
+                {config.metricas.slice(0, 8).map(m => (
+                  <span key={m} className="px-2 py-0.5 rounded-full bg-white/5 border border-white/10 text-[9px] text-zinc-400">
+                    {m.replace(/_/g, ' ')}
+                  </span>
+                ))}
+                {config.metricas.length > 8 && (
+                  <span className="px-2 py-0.5 rounded-full bg-white/5 text-[9px] text-zinc-500">
+                    +{config.metricas.length - 8} más
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Cohesión y Participación - visible si engagement_grupal o dinamica_grupal activas */}
+          {stats && (metricasActivas.has('engagement_grupal') || metricasActivas.has('dinamica_grupal') || metricasActivas.has('engagement_por_tema') || metricasActivas.has('engagement_por_pregunta')) && (
             <div className="p-4 border-b border-white/10">
               <div className="bg-gradient-to-r from-purple-600/20 to-violet-600/20 rounded-xl p-4">
                 <div className="flex items-center justify-between">
@@ -172,38 +196,44 @@ export const AnalysisDashboard: React.FC<AnalysisDashboardProps> = ({
             </div>
           )}
 
-          {/* Predicciones - Generadas desde stats */}
-          {stats && (
+          {/* Predicciones - visible si alguna métrica de predicción está activa */}
+          {stats && (metricasActivas.has('prediccion_adopcion_ideas') || metricasActivas.has('prediccion_fit_cultural') || metricasActivas.has('prediccion_probabilidad_cierre')) && (
             <div className="p-4 border-b border-white/10">
               <h4 className="text-white font-semibold mb-3 flex items-center gap-2 text-sm">
                 <span>🎯</span> Predicciones
               </h4>
               <div className="grid grid-cols-3 gap-2">
-                <PredictionCardCompact
-                  title="Adopción de Ideas"
-                  probability={stats.avgEngagement}
-                  confidence={resultado.confianza_general}
-                  factor={stats.avgEngagement > 0.6 ? 'Equipo receptivo' : 'Requiere seguimiento'}
-                />
-                <PredictionCardCompact
-                  title="Necesidad de Seguimiento"
-                  probability={1 - stats.avgEngagement}
-                  confidence={resultado.confianza_general * 0.9}
-                  factor={stats.avgEngagement < 0.5 ? 'Atención dispersa' : 'Reunión fluida'}
-                />
-                <PredictionCardCompact
-                  title="Riesgo de Conflicto"
-                  probability={stats.dominantEmotion === 'angry' ? 0.7 : stats.dominantEmotion === 'neutral' ? 0.3 : 0.4}
-                  confidence={resultado.confianza_general * 0.8}
-                  factor={stats.dominantEmotion === 'angry' ? 'Tensión detectada' : 'Ambiente estable'}
-                  inverted
-                />
+                {metricasActivas.has('prediccion_adopcion_ideas') && (
+                  <PredictionCardCompact
+                    title="Adopción de Ideas"
+                    probability={stats.avgEngagement}
+                    confidence={resultado.confianza_general}
+                    factor={stats.avgEngagement > 0.6 ? 'Equipo receptivo' : 'Requiere seguimiento'}
+                  />
+                )}
+                {(metricasActivas.has('momentos_desconexion') || metricasActivas.has('momentos_incomodidad') || metricasActivas.has('momentos_preocupacion')) && (
+                  <PredictionCardCompact
+                    title="Necesidad de Seguimiento"
+                    probability={1 - stats.avgEngagement}
+                    confidence={resultado.confianza_general * 0.9}
+                    factor={stats.avgEngagement < 0.5 ? 'Atención dispersa' : 'Reunión fluida'}
+                  />
+                )}
+                {(metricasActivas.has('dinamica_grupal') || metricasActivas.has('señales_objecion')) && (
+                  <PredictionCardCompact
+                    title="Riesgo de Conflicto"
+                    probability={stats.dominantEmotion === 'angry' ? 0.7 : stats.dominantEmotion === 'neutral' ? 0.3 : 0.4}
+                    confidence={resultado.confianza_general * 0.8}
+                    factor={stats.dominantEmotion === 'angry' ? 'Tensión detectada' : 'Ambiente estable'}
+                    inverted
+                  />
+                )}
               </div>
             </div>
           )}
 
-          {/* Participación por usuario si hay datos */}
-          {resultado.analisis && (resultado.analisis as AnalisisEquipo).participacion?.length > 0 && (
+          {/* Participación por usuario - visible si participacion_por_persona activa */}
+          {metricasActivas.has('participacion_por_persona') && resultado.analisis && (resultado.analisis as AnalisisEquipo).participacion?.length > 0 && (
             <div className="p-4 border-b border-white/10">
               <h4 className="text-white font-semibold mb-3 flex items-center gap-2 text-sm">
                 <span>👥</span> Participación

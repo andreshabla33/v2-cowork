@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { SettingToggle } from '../components/SettingToggle';
 import { SettingSection } from '../components/SettingSection';
 import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
+import { useStore } from '../../../store/useStore';
+import {
+  TipoAnalisis as TipoAnalisisService,
+  getTodasMetricasCached,
+  guardarMetricasEspacio,
+  METRICAS_DEFAULT,
+} from '../../../lib/metricasAnalisis';
 
 // ==================== CATÁLOGO DE MÉTRICAS ====================
 
@@ -88,15 +95,20 @@ interface SettingsMeetingsProps {
   settings: MeetingsSettings;
   onSettingsChange: (settings: MeetingsSettings) => void;
   isAdmin: boolean;
+  workspaceId?: string;
 }
 
 export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
   settings,
   onSettingsChange,
-  isAdmin
+  isAdmin,
+  workspaceId,
 }) => {
+  const { currentUser } = useStore();
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
   const [expandedTipo, setExpandedTipo] = useState<TipoAnalisis | null>(null);
+  const [metricasEspacio, setMetricasEspacio] = useState<Record<TipoAnalisis, string[]> | null>(null);
+  const [saving, setSaving] = useState<TipoAnalisis | null>(null);
 
   useEffect(() => {
     const unsubscribe = subscribeToLanguageChange(() => {
@@ -105,32 +117,43 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
     return unsubscribe;
   }, []);
 
+  // Cargar métricas del espacio desde cache de Supabase
+  useEffect(() => {
+    if (workspaceId) {
+      const cached = getTodasMetricasCached(workspaceId);
+      setMetricasEspacio(cached);
+    }
+  }, [workspaceId]);
+
   const updateSetting = <K extends keyof MeetingsSettings>(key: K, value: MeetingsSettings[K]) => {
     onSettingsChange({ ...settings, [key]: value });
   };
 
-  // Obtener métricas activas para un tipo (con fallback a defaults del catálogo)
+  // Obtener métricas activas para un tipo (desde Supabase cache)
   const getMetricasActivas = (tipo: TipoAnalisis): string[] => {
-    return settings.analisisMetricas?.[tipo] || CATALOGO_METRICAS[tipo].slice(0, 6).map(m => m.id);
+    return metricasEspacio?.[tipo] || METRICAS_DEFAULT[tipo as TipoAnalisisService];
   };
 
-  // Toggle una métrica para un tipo
-  const toggleMetrica = (tipo: TipoAnalisis, metricaId: string) => {
+  // Toggle una métrica para un tipo — guarda en Supabase
+  const toggleMetrica = useCallback(async (tipo: TipoAnalisis, metricaId: string) => {
     const actuales = getMetricasActivas(tipo);
     const nuevas = actuales.includes(metricaId)
       ? actuales.filter(m => m !== metricaId)
       : [...actuales, metricaId];
-    
-    updateSetting('analisisMetricas', {
-      ...(settings.analisisMetricas || {
-        rrhh_entrevista: CATALOGO_METRICAS.rrhh_entrevista.slice(0, 6).map(m => m.id),
-        rrhh_one_to_one: CATALOGO_METRICAS.rrhh_one_to_one.slice(0, 6).map(m => m.id),
-        deals: CATALOGO_METRICAS.deals.slice(0, 6).map(m => m.id),
-        equipo: CATALOGO_METRICAS.equipo.slice(0, 6).map(m => m.id),
-      }),
+
+    // Actualizar UI inmediatamente (optimistic)
+    setMetricasEspacio(prev => ({
+      ...(prev || METRICAS_DEFAULT),
       [tipo]: nuevas,
-    });
-  };
+    }));
+
+    // Guardar en Supabase
+    if (workspaceId && currentUser?.id) {
+      setSaving(tipo);
+      await guardarMetricasEspacio(workspaceId, tipo as TipoAnalisisService, nuevas, currentUser.id);
+      setSaving(null);
+    }
+  }, [metricasEspacio, workspaceId, currentUser?.id]);
 
   return (
     <div>
@@ -215,7 +238,10 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
                       </div>
                       <div className="text-left">
                         <p className="text-sm font-semibold text-white">{config.label}</p>
-                        <p className="text-[10px] text-zinc-500">{activas.length} de {metricas.length} métricas activas</p>
+                        <p className="text-[10px] text-zinc-500">
+                          {activas.length} de {metricas.length} métricas activas
+                          {saving === tipo && <span className="ml-1 text-violet-400 animate-pulse">guardando...</span>}
+                        </p>
                       </div>
                     </div>
                     <div className="flex items-center gap-2">

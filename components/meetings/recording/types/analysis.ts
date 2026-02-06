@@ -275,26 +275,26 @@ export const CONFIGURACIONES_GRABACION: Record<TipoGrabacion, ConfiguracionGraba
 };
 
 /**
- * Obtiene la configuración de grabación con métricas customizadas desde settings del usuario.
- * Si el usuario tiene métricas personalizadas en localStorage (via SettingsMeetings),
- * las usa en vez de las hardcodeadas.
+ * Obtiene la configuración de grabación con métricas customizadas.
+ * Prioridad: cache Supabase (por espacio) → defaults hardcodeados.
+ * El cache se llena al cargar el espacio via cargarMetricasEspacio().
  * @param tipo - Tipo de grabación detallado
- * @returns ConfiguracionGrabacion con métricas del usuario o defaults
+ * @param espacioId - ID del espacio activo (opcional, mejora cache hit)
+ * @returns ConfiguracionGrabacion con métricas del espacio o defaults
  */
-export function getConfiguracionConMetricasCustom(tipo: TipoGrabacionDetallado): ConfiguracionGrabacion {
+export function getConfiguracionConMetricasCustom(tipo: TipoGrabacionDetallado, espacioId?: string): ConfiguracionGrabacion {
   const config = { ...CONFIGURACIONES_GRABACION_DETALLADO[tipo] };
   
   try {
-    const raw = localStorage.getItem('user_settings');
-    if (raw) {
-      const settings = JSON.parse(raw);
-      const metricasCustom = settings?.meetings?.analisisMetricas?.[tipo];
-      if (Array.isArray(metricasCustom) && metricasCustom.length > 0) {
-        config.metricas = metricasCustom;
-      }
+    // Importación dinámica para evitar dependencia circular
+    // getMetricasCached es síncrono y lee del cache en memoria
+    const { getMetricasCached } = require('../../../lib/metricasAnalisis');
+    const metricasCustom = getMetricasCached(tipo, espacioId);
+    if (Array.isArray(metricasCustom) && metricasCustom.length > 0) {
+      config.metricas = metricasCustom;
     }
   } catch {
-    // Fallback a métricas por defecto si hay error
+    // Fallback a métricas por defecto si hay error (primera carga, etc.)
   }
   
   return config;
