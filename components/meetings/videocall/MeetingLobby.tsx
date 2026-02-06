@@ -49,6 +49,7 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
             .select(`
               nombre,
               email,
+              expira_en,
               sala:salas_reunion(
                 nombre,
                 tipo,
@@ -57,12 +58,16 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
               )
             `)
             .eq('token_unico', tokenInvitacion)
-            .eq('usado', false)
             .single();
 
           if (invError || !invitacion) {
             console.error('Error buscando invitación:', invError);
             throw new Error('Invitación no válida o expirada');
+          }
+
+          // Verificar expiración por fecha, no por campo "usado"
+          if (invitacion.expira_en && new Date(invitacion.expira_en) < new Date()) {
+            throw new Error('La invitación ha expirado');
           }
 
           setNombre(invitacion.nombre || '');
