@@ -106,6 +106,8 @@ export const WorkspaceLayout: React.FC = () => {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           const privacy = getSettingsSection('privacy');
+          // Si sharePresenceWithTeam está desactivado, no hacer track (invisible para el equipo)
+          if (privacy.sharePresenceWithTeam === false) return;
           await channel.track({
             user_id: session.user.id,
             name: currentUser.name,
@@ -123,19 +125,33 @@ export const WorkspaceLayout: React.FC = () => {
 
     presenceChannelRef.current = channel;
 
-    // Registrar conexión al espacio para tracking de tiempo
+    // Registrar conexión al espacio para tracking de tiempo (solo si activityHistory está habilitado)
     let conexionId: string | null = null;
-    const registrarConexion = async () => {
-      try {
-        const { data } = await supabase
-          .from('registro_conexiones')
-          .insert({ usuario_id: session.user.id, espacio_id: activeWorkspace.id })
-          .select('id')
-          .single();
-        if (data) conexionId = data.id;
-      } catch (e) { console.warn('Error registrando conexión:', e); }
-    };
-    registrarConexion();
+    const privacyForConn = getSettingsSection('privacy');
+    if (privacyForConn.activityHistoryEnabled !== false) {
+      const registrarConexion = async () => {
+        try {
+          const { data } = await supabase
+            .from('registro_conexiones')
+            .insert({ usuario_id: session.user.id, espacio_id: activeWorkspace.id })
+            .select('id')
+            .single();
+          if (data) conexionId = data.id;
+          
+          // Limpiar registros antiguos según retención configurada
+          const retDays = privacyForConn.activityRetentionDays;
+          if (retDays && retDays > 0) {
+            const cutoff = new Date(Date.now() - retDays * 24 * 60 * 60 * 1000).toISOString();
+            supabase.from('registro_conexiones')
+              .delete()
+              .eq('usuario_id', session.user.id)
+              .lt('conectado_en', cutoff)
+              .then(() => {});
+          }
+        } catch (e) { console.warn('Error registrando conexión:', e); }
+      };
+      registrarConexion();
+    }
 
     // Al cerrar pestaña, registrar desconexión via fetch keepalive (soporta headers)
     const handleBeforeUnload = () => {
@@ -174,6 +190,7 @@ export const WorkspaceLayout: React.FC = () => {
   useEffect(() => {
     if (presenceChannelRef.current && session?.user?.id && presenceChannelRef.current.state === 'joined') {
       const privacy = getSettingsSection('privacy');
+      if (privacy.sharePresenceWithTeam === false) return;
       presenceChannelRef.current.track({
         user_id: session.user.id,
         name: currentUser.name,
