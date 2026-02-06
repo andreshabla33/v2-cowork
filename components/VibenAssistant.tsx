@@ -4,6 +4,7 @@ import { generateChatResponse } from '../services/geminiService';
 import { useStore } from '../store/useStore';
 import { supabase } from '../lib/supabase';
 import { TaskStatus, Task } from '../types';
+import { loadProductivityContext, loadBehaviorContext, buildEnrichedPrompt, ProductivityContext, BehaviorContext } from '../services/monicaContextService';
 
 interface Message {
   role: 'user' | 'monica';
@@ -28,6 +29,8 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
   const { tasks, currentUser, addTask, activeWorkspace, onlineUsers } = useStore();
   const abortControllerRef = useRef<boolean>(false);
   const [channels, setChannels] = useState<string[]>([]);
+  const [enrichedContext, setEnrichedContext] = useState<string>('');
+  const contextLoadedRef = useRef<boolean>(false);
 
   // Cargar canales del usuario
   useEffect(() => {
@@ -40,6 +43,28 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
       if (data) setChannels(data.map((g: any) => g.nombre));
     };
     loadChannels();
+  }, [activeWorkspace?.id, currentUser?.id]);
+
+  // Capa 2+3: Cargar contexto enriquecido (productividad + comportamiento)
+  useEffect(() => {
+    const loadContext = async () => {
+      if (!activeWorkspace?.id || !currentUser?.id || currentUser.id === 'guest' || contextLoadedRef.current) return;
+      contextLoadedRef.current = true;
+      try {
+        const [productivity, behavior] = await Promise.all([
+          loadProductivityContext(currentUser.id, activeWorkspace.id),
+          loadBehaviorContext(currentUser.id, activeWorkspace.id),
+        ]);
+        const prompt = buildEnrichedPrompt(productivity, behavior);
+        if (prompt) {
+          console.log('Mónica: contexto enriquecido cargado', { resumenes: productivity.resumenes.length, actionItems: productivity.actionItemsPendientes.length, metricas: !!behavior.metricas });
+          setEnrichedContext(prompt);
+        }
+      } catch (err) {
+        console.error('Error loading enriched context:', err);
+      }
+    };
+    loadContext();
   }, [activeWorkspace?.id, currentUser?.id]);
 
   // Click outside para minimizar
@@ -119,7 +144,8 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
         role: currentUser.role,
         workspaceName: activeWorkspace?.name || 'No especificado',
         channels: channels.length > 0 ? channels.join(', ') : 'Ninguno',
-        onlineMembers: onlineUsers.length > 0 ? onlineUsers.map((u: any) => u.name || u.user_name).join(', ') : 'Solo tú'
+        onlineMembers: onlineUsers.length > 0 ? onlineUsers.map((u: any) => u.name || u.user_name).join(', ') : 'Solo tú',
+        enrichedContext,
       };
       
       const response = await generateChatResponse(userMsg, context);
