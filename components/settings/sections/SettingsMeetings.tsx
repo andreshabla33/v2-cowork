@@ -3,12 +3,18 @@ import { SettingToggle } from '../components/SettingToggle';
 import { SettingSection } from '../components/SettingSection';
 import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
 import { useStore } from '../../../store/useStore';
+import { supabase } from '../../../lib/supabase';
 import {
   TipoAnalisis as TipoAnalisisService,
   getTodasMetricasCached,
   guardarMetricasEspacio,
   METRICAS_DEFAULT,
 } from '../../../lib/metricasAnalisis';
+import {
+  CargoLaboral,
+  PERMISOS_ANALISIS,
+  INFO_CARGOS,
+} from '../../meetings/recording/types/analysis';
 
 // ==================== CATÁLOGO DE MÉTRICAS ====================
 
@@ -104,11 +110,12 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
   isAdmin,
   workspaceId,
 }) => {
-  const { currentUser } = useStore();
+  const { currentUser, session } = useStore();
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
   const [expandedTipo, setExpandedTipo] = useState<TipoAnalisis | null>(null);
   const [metricasEspacio, setMetricasEspacio] = useState<Record<TipoAnalisis, string[]> | null>(null);
   const [saving, setSaving] = useState<TipoAnalisis | null>(null);
+  const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral>('colaborador');
 
   useEffect(() => {
     const unsubscribe = subscribeToLanguageChange(() => {
@@ -116,6 +123,33 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
     });
     return unsubscribe;
   }, []);
+
+  // Cargar cargo del usuario desde miembros_espacio
+  useEffect(() => {
+    const cargarCargo = async () => {
+      const userId = currentUser?.id || session?.user?.id;
+      if (!userId || !workspaceId) return;
+
+      const { data } = await supabase
+        .from('miembros_espacio')
+        .select('cargo')
+        .eq('usuario_id', userId)
+        .eq('espacio_id', workspaceId)
+        .single();
+
+      if (data?.cargo) {
+        setCargoUsuario(data.cargo as CargoLaboral);
+      }
+    };
+    cargarCargo();
+  }, [currentUser?.id, session?.user?.id, workspaceId]);
+
+  // Permisos por cargo: qué tipos puede editar este usuario
+  const permisos = PERMISOS_ANALISIS[cargoUsuario] || PERMISOS_ANALISIS.colaborador;
+  const puedeEditarAlgunTipo = permisos.rrhh_entrevista || permisos.rrhh_one_to_one || permisos.deals || permisos.equipo;
+  const tiposEditables: TipoAnalisis[] = (
+    ['rrhh_entrevista', 'rrhh_one_to_one', 'deals', 'equipo'] as TipoAnalisis[]
+  ).filter(tipo => permisos[tipo]);
 
   // Cargar métricas del espacio desde cache de Supabase
   useEffect(() => {
@@ -204,8 +238,8 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
         </div>
       </div>
 
-      {/* Métricas de análisis customizables — solo visible para admins/roles con acceso */}
-      {isAdmin && (
+      {/* Métricas de análisis customizables — visible para cargos con permisos de análisis */}
+      {puedeEditarAlgunTipo && (
         <div className="mt-8">
           <h3 className="text-lg font-bold text-white mb-1">
             {currentLang === 'en' ? 'Behavioral Analysis Metrics' : currentLang === 'pt' ? 'Métricas de Análise Comportamental' : 'Métricas de Análisis Conductual'}
@@ -218,8 +252,22 @@ export const SettingsMeetings: React.FC<SettingsMeetingsProps> = ({
               : 'Personaliza qué métricas se analizan para cada tipo de reunión. Se evaluarán durante la grabación.'}
           </p>
 
+          {/* Badge del cargo actual */}
+          <div className="mb-4 flex items-center gap-2">
+            <span className="text-sm">{INFO_CARGOS[cargoUsuario]?.icono || '👤'}</span>
+            <span className="text-xs text-zinc-400">
+              {currentLang === 'en' ? 'Your role' : currentLang === 'pt' ? 'Seu cargo' : 'Tu cargo'}:{' '}
+              <span className="text-white font-medium">{INFO_CARGOS[cargoUsuario]?.nombre || cargoUsuario}</span>
+            </span>
+            {tiposEditables.length < 4 && (
+              <span className="text-[10px] text-zinc-500 ml-auto">
+                {tiposEditables.length} {currentLang === 'en' ? 'types available' : currentLang === 'pt' ? 'tipos disponíveis' : 'tipos disponibles'}
+              </span>
+            )}
+          </div>
+
           <div className="space-y-3">
-            {(Object.keys(TIPO_ANALISIS_CONFIG) as TipoAnalisis[]).map(tipo => {
+            {tiposEditables.map(tipo => {
               const config = TIPO_ANALISIS_CONFIG[tipo];
               const metricas = CATALOGO_METRICAS[tipo];
               const activas = getMetricasActivas(tipo);
