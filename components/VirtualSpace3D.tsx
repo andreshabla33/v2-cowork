@@ -986,9 +986,12 @@ interface SceneProps {
   onTeleportDone?: () => void;
   showFloorGrid?: boolean;
   showNamesAboveAvatars?: boolean;
+  cameraSensitivity?: number;
+  invertYAxis?: boolean;
+  cameraMode?: string;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true, cameraSensitivity = 5, invertYAxis = false, cameraMode = 'free' }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -1019,10 +1022,12 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         maxDistance={50}
         maxPolarAngle={Math.PI / 2 - 0.1}
         minPolarAngle={Math.PI / 6}
-        enablePan={true}
+        enablePan={cameraMode === 'free'}
+        enableRotate={cameraMode !== 'fixed'}
         panSpeed={0.5}
-        rotateSpeed={0.5}
+        rotateSpeed={cameraSensitivity / 10}
         zoomSpeed={0.8}
+        reverseOrbit={invertYAxis}
       />
       
       {/* Cámara que sigue al jugador */}
@@ -1839,11 +1844,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     };
   }, [stream, session?.user?.id]);
   
-  // Audio espacial - ajustar volumen según distancia
+  // Audio espacial - ajustar volumen según distancia (solo si spatialAudio está activado)
   useEffect(() => {
     remoteStreams.forEach((remoteStream, oderId) => {
-      const distance = userDistances.get(oderId) || PROXIMITY_RADIUS;
-      const volume = Math.max(0.1, 1 - (distance / userProximityRadius));
+      let volume = 1;
+      if (space3dSettings.spatialAudio) {
+        const distance = userDistances.get(oderId) || PROXIMITY_RADIUS;
+        volume = Math.max(0.1, 1 - (distance / userProximityRadius));
+      }
       
       // Aplicar volumen a los elementos de audio
       const audioElements = document.querySelectorAll(`video[data-user-id="${oderId}"]`);
@@ -1851,7 +1859,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         (el as HTMLVideoElement).volume = volume;
       });
     });
-  }, [remoteStreams, userDistances, userProximityRadius]);
+  }, [remoteStreams, userDistances, userProximityRadius, space3dSettings.spatialAudio]);
   
   // Función para enviar wave a un usuario
   const handleWaveUser = useCallback((userId: string) => {
@@ -2758,6 +2766,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             onTeleportDone={() => setTeleportTarget(null)}
             showFloorGrid={space3dSettings.showFloorGrid}
             showNamesAboveAvatars={space3dSettings.showNamesAboveAvatars}
+            cameraSensitivity={space3dSettings.cameraSensitivity}
+            invertYAxis={space3dSettings.invertYAxis}
+            cameraMode={space3dSettings.cameraMode}
             onDoubleClickFloor={(point) => {
               // Calcular distancia desde posición actual del avatar
               const playerX = (currentUser.x || 400) / 16;
