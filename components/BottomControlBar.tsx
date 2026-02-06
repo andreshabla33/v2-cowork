@@ -235,8 +235,8 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
     }
   };
 
-  // Ocultar completamente cuando el menú del GameHub está abierto (sin jugar)
-  if (isGameHubOpen && !isGameActive) return null;
+  // Ocultar completamente cuando el GameHub está abierto (menú o jugando)
+  if (isGameHubOpen) return null;
 
   return (
     <div className={`absolute z-[200] transition-all duration-500 ease-out ${
