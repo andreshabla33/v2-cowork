@@ -14,8 +14,8 @@ import { Room, Track, RoomEvent } from 'livekit-client';
 import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { MeetingControlBar, TipoReunion } from './MeetingControlBar';
-import { TipoReunionUnificado, MAPEO_TIPO_GRABACION, InvitadoExterno } from '@/types/meeting-types';
-import { CargoLaboral } from '../recording/types/analysis';
+import { TipoReunionUnificado, InvitadoExterno } from '@/types/meeting-types';
+import { CargoLaboral, TipoGrabacionDetallado } from '../recording/types/analysis';
 import { CustomParticipantTile } from './CustomParticipantTile';
 import { ScreenShareViewer } from './ScreenShareViewer';
 import { ViewModeSelector, ViewMode } from './ViewModeSelector';
@@ -908,7 +908,11 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           onProcessingComplete={(resultado) => {
             console.log('✅ Análisis conductual completado en videollamada:', resultado?.tipo_grabacion);
           }}
-          preselectedTipoGrabacion={MAPEO_TIPO_GRABACION[tipoReunion as TipoReunionUnificado] || undefined}
+          preselectedTipoGrabacion={{
+            equipo: 'equipo' as TipoGrabacionDetallado,
+            deal: 'deals' as TipoGrabacionDetallado,
+            entrevista: 'rrhh_entrevista' as TipoGrabacionDetallado,
+          }[tipoReunion] || undefined}
           headlessMode={true}
           externalTrigger={recordingTrigger}
           onExternalTriggerHandled={() => setRecordingTrigger(false)}
