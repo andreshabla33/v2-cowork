@@ -234,6 +234,9 @@ interface AvatarProps {
   showVideoBubble?: boolean;
   message?: string | null;
   onClickAvatar?: () => void;
+  mirrorVideo?: boolean;
+  hideSelfView?: boolean;
+  showName?: boolean;
 }
 
 // Labels de estado para mostrar al hacer clic
@@ -244,8 +247,15 @@ const STATUS_LABELS: Record<PresenceStatus, string> = {
   [PresenceStatus.DND]: 'No molestar',
 };
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar, mirrorVideo: mirrorVideoProp, hideSelfView: hideSelfViewProp, showName: showNameProp }) => {
   const [showStatusLabel, setShowStatusLabel] = useState(false);
+  
+  // Leer video settings y space3d settings desde localStorage (sin necesidad de props)
+  const videoSettings = useMemo(() => getSettingsSection('video'), []);
+  const space3dS = useMemo(() => getSettingsSection('space3d'), []);
+  const mirrorVideo = mirrorVideoProp ?? videoSettings.mirrorVideo ?? true;
+  const hideSelfView = hideSelfViewProp ?? videoSettings.hideSelfView ?? false;
+  const showName = showNameProp ?? space3dS.showNamesAboveAvatars ?? true;
   
   // Auto-ocultar el label después de 2 segundos
   useEffect(() => {
@@ -280,11 +290,11 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Video Bubble above avatar (Gather style) */}
-      {camOn && showVideoBubble && (
+      {camOn && showVideoBubble && !(isCurrentUser && hideSelfView) && (
         <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
           <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125 flex items-center justify-center">
              {videoStream && videoStream.getVideoTracks().length > 0 ? (
-               <StableVideo stream={videoStream} muted={isCurrentUser} className="w-full h-full object-cover transform scale-110" />
+               <StableVideo stream={videoStream} muted={isCurrentUser} className={`w-full h-full object-cover transform scale-110 ${isCurrentUser && mirrorVideo ? '-scale-x-100' : ''}`} />
              ) : (
                /* Placeholder cuando hay cámara pero no hay stream (usuario lejos) */
                <div className="flex flex-col items-center justify-center w-full h-full bg-gradient-to-br from-indigo-900/80 to-purple-900/80">
@@ -310,7 +320,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Nombre flotante con indicador de estado - Clickeable para ver estado */}
-      {!camOn && (
+      {!camOn && showName && (
         <Html position={[0, 2.4, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
           <div 
             className={`flex items-center gap-1 whitespace-nowrap ${!isCurrentUser ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
@@ -2661,10 +2671,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   return (
     <div className="w-full h-full relative bg-black" onClick={handleCanvasClick}>
       <Canvas
-        shadows
+        shadows={performanceSettings.graphicsQuality !== 'low'}
+        dpr={performanceSettings.graphicsQuality === 'low' ? 1 : performanceSettings.graphicsQuality === 'medium' ? 1.5 : window.devicePixelRatio}
         gl={{ 
-          antialias: true,
-          powerPreference: 'default',
+          antialias: performanceSettings.graphicsQuality !== 'low',
+          powerPreference: performanceSettings.batterySaver ? 'low-power' : 'default',
           failIfMajorPerformanceCaveat: false
         }}
         onCreated={({ gl }) => {
