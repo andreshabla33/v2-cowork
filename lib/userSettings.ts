@@ -79,6 +79,14 @@ export interface UserSettings {
     showGoogleEvents: boolean;
     autoCreateGoogleEvent: boolean;
   };
+  minimode: {
+    enableMiniMode: boolean;
+    miniModePosition: string;
+    showVideoInMini: boolean;
+    showChatInMini: boolean;
+    autoMinimize: boolean;
+    autoMinimizeDelay: number;
+  };
 }
 
 const defaultSettings: UserSettings = {
@@ -155,6 +163,14 @@ const defaultSettings: UserSettings = {
     defaultReminder: 15,
     showGoogleEvents: true,
     autoCreateGoogleEvent: true
+  },
+  minimode: {
+    enableMiniMode: true,
+    miniModePosition: 'bottom-right',
+    showVideoInMini: true,
+    showChatInMini: true,
+    autoMinimize: false,
+    autoMinimizeDelay: 60
   }
 };
 

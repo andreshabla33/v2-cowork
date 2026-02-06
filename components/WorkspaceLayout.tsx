@@ -18,6 +18,7 @@ import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
 import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
 import { getSettingsSection } from '../lib/userSettings';
+import { MiniModeOverlay } from './MiniModeOverlay';
 
 export const WorkspaceLayout: React.FC = () => {
   const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
@@ -528,6 +529,9 @@ export const WorkspaceLayout: React.FC = () => {
         currentTheme={theme}
         onThemeChange={(newTheme) => setTheme(newTheme as any)}
       />
+
+      {/* Mini Mode Overlay */}
+      <MiniModeOverlay />
     </div>
   );
 };

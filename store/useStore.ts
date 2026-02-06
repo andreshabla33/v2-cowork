@@ -65,6 +65,9 @@ interface AppState {
   addMessage: (msg: ChatMessage) => void;
   addNotification: (message: string, type?: Notification['type']) => void;
   clearNotifications: () => void;
+  isMiniMode: boolean;
+  setMiniMode: (val: boolean) => void;
+  toggleMiniMode: () => void;
 }
 
 const initialAvatar: AvatarConfig = {
@@ -87,6 +90,7 @@ export const useStore = create<AppState>((set, get) => ({
   userRoleInActiveWorkspace: null,
   departamentos: [],
   initialized: false,
+  isMiniMode: false,
   isInitializing: false,
   notifications: [],
   currentUser: {
@@ -405,4 +409,6 @@ export const useStore = create<AppState>((set, get) => ({
     notifications: [{ id: Math.random().toString(), message, type, timestamp: Date.now() }, ...state.notifications].slice(0, 5)
   })),
   clearNotifications: () => set({ notifications: [] }),
+  setMiniMode: (val) => set({ isMiniMode: val }),
+  toggleMiniMode: () => set((state) => ({ isMiniMode: !state.isMiniMode })),
 }));
