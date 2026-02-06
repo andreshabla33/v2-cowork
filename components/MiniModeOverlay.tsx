@@ -165,8 +165,15 @@ export const MiniModeOverlay: React.FC = () => {
       if (!isDraggingRef.current || !overlayRef.current) return;
       e.preventDefault();
       hasDraggedRef.current = true;
-      const x = e.clientX - dragOffsetRef.current.x;
-      const y = e.clientY - dragOffsetRef.current.y;
+      let x = e.clientX - dragOffsetRef.current.x;
+      let y = e.clientY - dragOffsetRef.current.y;
+      // Clamp al viewport
+      const ow = overlayRef.current.offsetWidth || 44;
+      const oh = overlayRef.current.offsetHeight || 44;
+      if (x < 0) x = 0;
+      if (y < 0) y = 0;
+      if (x + ow > window.innerWidth) x = window.innerWidth - ow;
+      if (y + oh > window.innerHeight) y = window.innerHeight - oh;
       overlayRef.current.style.left = `${x}px`;
       overlayRef.current.style.top = `${y}px`;
       overlayRef.current.style.right = 'auto';
@@ -227,13 +234,37 @@ export const MiniModeOverlay: React.FC = () => {
         onMouseDown={handleMouseDown}
       >
         <button
-          onClick={() => { if (!hasDraggedRef.current) setCollapsed(false); }}
+          onClick={() => {
+            if (!hasDraggedRef.current) {
+              // Clamp posición al expandir para que no se salga de pantalla
+              if (overlayRef.current) {
+                const rect = overlayRef.current.getBoundingClientRect();
+                const expandW = 272;
+                const expandH = 280;
+                let nx = rect.left;
+                let ny = rect.top;
+                if (nx + expandW > window.innerWidth - 8) nx = window.innerWidth - expandW - 8;
+                if (ny + expandH > window.innerHeight - 8) ny = window.innerHeight - expandH - 8;
+                if (nx < 8) nx = 8;
+                if (ny < 8) ny = 8;
+                overlayRef.current.style.left = `${nx}px`;
+                overlayRef.current.style.top = `${ny}px`;
+                overlayRef.current.style.right = 'auto';
+                overlayRef.current.style.bottom = 'auto';
+              }
+              setCollapsed(false);
+            }
+          }}
           className="relative w-11 h-11 rounded-full bg-black/70 backdrop-blur-2xl border border-white/10 shadow-2xl flex items-center justify-center cursor-pointer hover:scale-110 transition-transform duration-200 hover:border-violet-500/50"
           title="Expandir Mini Mode"
         >
-          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-[8px] font-black text-white">
-            {currentUser.name?.[0]?.toUpperCase() || 'U'}
-          </div>
+          {currentUser.profilePhoto ? (
+            <img src={currentUser.profilePhoto} alt="" className="w-7 h-7 rounded-full object-cover" />
+          ) : (
+            <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-[8px] font-black text-white">
+              {currentUser.name?.[0]?.toUpperCase() || 'U'}
+            </div>
+          )}
           <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-black ${statusColorMap[currentStatus]}`} />
           {onlineUsers.length > 0 && (
             <div className="absolute -top-1 -left-1 w-4 h-4 rounded-full bg-violet-600 border-2 border-black flex items-center justify-center text-[7px] font-bold text-white">
@@ -267,9 +298,13 @@ export const MiniModeOverlay: React.FC = () => {
           >
             <div className="flex items-center gap-2">
               <div className="relative">
-                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-[10px] font-black text-white">
-                  {currentUser.name?.[0]?.toUpperCase() || 'U'}
-                </div>
+                {currentUser.profilePhoto ? (
+                  <img src={currentUser.profilePhoto} alt="" className="w-7 h-7 rounded-lg object-cover" />
+                ) : (
+                  <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-fuchsia-600 flex items-center justify-center text-[10px] font-black text-white">
+                    {currentUser.name?.[0]?.toUpperCase() || 'U'}
+                  </div>
+                )}
                 <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-black ${statusColorMap[currentStatus]}`} />
               </div>
               <div>
