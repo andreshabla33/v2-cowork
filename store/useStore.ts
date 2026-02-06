@@ -154,13 +154,17 @@ export const useStore = create<AppState>((set, get) => ({
           console.warn("initialize: Could not load avatar config", e);
         }
 
+        let profilePhoto = '';
         try {
           const { data: usuarioData } = await supabase
             .from('usuarios')
-            .select('estado_disponibilidad, estado_personalizado')
+            .select('estado_disponibilidad, estado_personalizado, avatar_url')
             .eq('id', user.id)
             .maybeSingle();
-          if (usuarioData) statusData = usuarioData as any;
+          if (usuarioData) {
+            statusData = usuarioData as any;
+            profilePhoto = usuarioData.avatar_url || '';
+          }
         } catch (e) {
           console.warn("initialize: Could not load user status", e);
         }
@@ -171,6 +175,7 @@ export const useStore = create<AppState>((set, get) => ({
             id: user.id,
             name: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
             avatarConfig,
+            profilePhoto,
             status: statusData.estado_disponibilidad || PresenceStatus.AVAILABLE,
             statusText: statusData.estado_personalizado || ''
           }

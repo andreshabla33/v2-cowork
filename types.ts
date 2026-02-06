@@ -38,6 +38,7 @@ export interface User {
   role: Role;
   avatar: string;
   avatarConfig?: AvatarConfig;
+  profilePhoto?: string;
   x: number;
   y: number;
   direction: 'front' | 'left' | 'right' | 'back';
