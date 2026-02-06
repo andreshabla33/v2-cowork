@@ -73,25 +73,26 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     }
   };
 
+  const refetchGrupos = async () => {
+    if (!activeWorkspace) return;
+    const { data, error } = await supabase
+      .from('grupos_chat')
+      .select('*')
+      .eq('espacio_id', activeWorkspace.id)
+      .order('creado_en', { ascending: true });
+    if (!error && data) setGrupos(data);
+    return data;
+  };
+
   useEffect(() => {
     if (!activeWorkspace) return;
     const cargarGrupos = async () => {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('grupos_chat')
-        .select('*')
-        .eq('espacio_id', activeWorkspace.id)
-        .order('creado_en', { ascending: true });
-      
-      if (!error && data) {
-        setGrupos(data);
-        // Solo establecer grupoActivo inicial si no hay uno seleccionado
-        // Y asegurarse de que sea un canal, no un DM
-        if (data.length > 0 && !grupoActivo) {
-          const canales = data.filter(g => g.tipo !== 'directo');
-          const general = canales.find(g => g.nombre.toLowerCase() === 'general');
-          setGrupoActivo(general ? general.id : (canales[0]?.id || data[0].id));
-        }
+      const data = await refetchGrupos();
+      if (data && data.length > 0 && !grupoActivo) {
+        const canales = data.filter(g => g.tipo !== 'directo');
+        const general = canales.find(g => g.nombre.toLowerCase() === 'general');
+        setGrupoActivo(general ? general.id : (canales[0]?.id || data[0].id));
       }
       setLoading(false);
     };
@@ -137,6 +138,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     };
     cargarMiembros();
   }, [activeWorkspace]);
+
+  // Refetch grupos cuando grupoActivo cambia a un grupo que no está en el estado local
+  // (ej: canal creado en la instancia sidebarOnly, pero chatOnly no lo tiene)
+  useEffect(() => {
+    if (grupoActivo && activeWorkspace && !grupos.find(g => g.id === grupoActivo)) {
+      refetchGrupos();
+    }
+  }, [grupoActivo, activeWorkspace]);
 
   // SuscripciÃ³n global para toast notifications (todos los canales)
   useEffect(() => {
@@ -752,9 +761,11 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           </div>
         </div>
 
-        {showCreateModal && <ModalCrearGrupo onClose={() => setShowCreateModal(false)} onCreate={async (nombre, tipo) => {
+        {showCreateModal && <ModalCrearGrupo onClose={() => setShowCreateModal(false)} onCreate={async (nombre, tipo, contrasena) => {
           console.log('📢 Creando canal:', nombre, tipo, 'espacio:', activeWorkspace?.id, 'user:', currentUser.id);
-          const { data, error } = await supabase.from('grupos_chat').insert({ espacio_id: activeWorkspace!.id, nombre, tipo, creado_por: currentUser.id, icono: '#' }).select().single();
+          const insertData: any = { espacio_id: activeWorkspace!.id, nombre, tipo, creado_por: currentUser.id, icono: tipo === 'privado' ? '🔒' : '#' };
+          if (contrasena) insertData.contrasena = contrasena;
+          const { data, error } = await supabase.from('grupos_chat').insert(insertData).select().single();
           if (error) { console.error('❌ Error creando canal:', error); alert('Error al crear el canal: ' + error.message); return; }
           if (data) {
             // Agregar al creador como miembro del canal
