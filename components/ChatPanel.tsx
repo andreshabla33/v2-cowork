@@ -752,9 +752,17 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           </div>
         </div>
 
-        {showCreateModal && <ModalCrearGrupo onClose={() => setShowCreateModal(false)} onCreate={async (n, t) => {
-          const { data, error } = await supabase.from('grupos_chat').insert({ espacio_id: activeWorkspace!.id, nombre: n, tipo: t, creado_por: currentUser.id, icono: '#' }).select().single();
-          if (!error && data) { setGrupos(prev => [...prev, data]); handleChannelSelect(data.id); setShowCreateModal(false); }
+        {showCreateModal && <ModalCrearGrupo onClose={() => setShowCreateModal(false)} onCreate={async (nombre, tipo) => {
+          console.log('📢 Creando canal:', nombre, tipo, 'espacio:', activeWorkspace?.id, 'user:', currentUser.id);
+          const { data, error } = await supabase.from('grupos_chat').insert({ espacio_id: activeWorkspace!.id, nombre, tipo, creado_por: currentUser.id, icono: '#' }).select().single();
+          if (error) { console.error('❌ Error creando canal:', error); alert('Error al crear el canal: ' + error.message); return; }
+          if (data) {
+            // Agregar al creador como miembro del canal
+            await supabase.from('miembros_grupo').insert({ grupo_id: data.id, usuario_id: currentUser.id, rol: 'admin' });
+            setGrupos(prev => [...prev, data]);
+            handleChannelSelect(data.id);
+            setShowCreateModal(false);
+          }
         }} />}
         
         {/* Toast Notifications */}

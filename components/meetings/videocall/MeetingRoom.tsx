@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   LiveKitRoom,
   RoomAudioRenderer,
@@ -80,6 +80,9 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
+  const tokenFetchedRef = useRef(false);
+  const onErrorRef = useRef(onError);
+  onErrorRef.current = onError;
   
   // Estados para tipo de reunión
   const [tipoReunion, setTipoReunion] = useState<TipoReunion>(propTipoReunion || 'equipo');
@@ -185,13 +188,15 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     } catch (err: any) {
       console.error('Error fetching token:', err);
       setError(err.message);
-      onError?.(err.message);
+      onErrorRef.current?.(err.message);
     } finally {
       setLoading(false);
     }
-  }, [salaId, tokenInvitacion, nombreInvitado, session?.access_token, onError]);
+  }, [salaId, tokenInvitacion, nombreInvitado, session?.access_token]);
 
   useEffect(() => {
+    if (tokenFetchedRef.current) return;
+    tokenFetchedRef.current = true;
     fetchToken();
   }, [fetchToken]);
 
@@ -300,6 +305,13 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     }
   }, [salaId, currentUser, tokenInvitacion]);
 
+  const userInitiatedLeaveRef = useRef(false);
+
+  const handleUserLeave = useCallback(() => {
+    userInitiatedLeaveRef.current = true;
+    onLeave?.();
+  }, [onLeave]);
+
   const handleRoomDisconnected = useCallback(() => {
     console.log('Desconectado de la sala');
     
@@ -315,7 +327,10 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         .eq('usuario_id', currentUser.id);
     }
 
-    onLeave?.();
+    // Solo llamar onLeave si fue una desconexión intencional del usuario
+    if (userInitiatedLeaveRef.current) {
+      onLeave?.();
+    }
   }, [salaId, currentUser, tokenInvitacion, onLeave]);
 
   // Loading state
@@ -365,7 +380,13 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         onDisconnected={handleRoomDisconnected}
         onError={(err) => {
           console.error('LiveKit error:', err);
-          setError(err.message);
+          const msg = err.message || '';
+          const isRecoverable = msg.includes('Device in use') || msg.includes('NotReadableError') || msg.includes('NotAllowedError') || msg.includes('PC manager') || msg.includes('UnexpectedConnectionState');
+          if (!isRecoverable) {
+            setError(msg);
+          } else {
+            console.warn('⚠️ Error recuperable de LiveKit (ignorado):', msg);
+          }
         }}
         data-lk-theme="default"
         style={{ height: '100%' }}
@@ -374,7 +395,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           theme={theme}
           isHost={tokenData.permisos.roomAdmin}
           isExternalGuest={!!tokenInvitacion}
-          onLeave={onLeave}
+          onLeave={handleUserLeave}
           tipoReunion={tipoReunion}
           salaId={salaId}
           reunionId={reunionId}
@@ -517,8 +538,12 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   const activeSpeaker = room?.activeSpeakers?.[0]?.identity;
 
   // Broadcast estado de grabación a todos los participantes
+  const prevRecordingRef = useRef(isRecording);
   useEffect(() => {
-    if (!room) return;
+    if (!room || room.state !== 'connected') return;
+    // No broadcast el estado inicial false (nadie necesita saber que NO se graba al entrar)
+    if (!isRecording && !prevRecordingRef.current) return;
+    prevRecordingRef.current = isRecording;
     
     const encoder = new TextEncoder();
     const data = encoder.encode(JSON.stringify({
@@ -527,7 +552,9 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
       by: room.localParticipant?.name || 'Anfitrión'
     }));
     
-    room.localParticipant?.publishData(data, { reliable: true });
+    room.localParticipant?.publishData(data, { reliable: true }).catch(() => {
+      console.warn('⚠️ No se pudo enviar estado de grabación (room no lista)');
+    });
   }, [isRecording, room]);
 
   // Escuchar mensajes DataChannel (grabación y reacciones)
