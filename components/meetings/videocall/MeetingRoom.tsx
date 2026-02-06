@@ -16,6 +16,9 @@ import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { MeetingControlBar, TipoReunion } from './MeetingControlBar';
 import { TipoReunionUnificado, MAPEO_TIPO_GRABACION, InvitadoExterno } from '@/types/meeting-types';
+import { CustomParticipantTile } from './CustomParticipantTile';
+import { ScreenShareViewer } from './ScreenShareViewer';
+import { ViewModeSelector, ViewMode } from './ViewModeSelector';
 
 interface MeetingRoomProps {
   salaId: string;
@@ -541,8 +544,9 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   const room = useRoomContext();
   const [remoteRecording, setRemoteRecording] = useState<{isRecording: boolean; by: string} | null>(null);
   const [reactions, setReactions] = useState<{id: string; emoji: string; by: string}[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('gallery');
 
-  // Obtener tracks de video de todos los participantes (solo Camera, no placeholders innecesarios)
+  // Obtener tracks de video de todos los participantes
   const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
@@ -551,11 +555,34 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
     { onlySubscribed: false }
   );
 
+  // Separar tracks de video y screen share
+  const videoTracks = tracks.filter(track => 
+    track.participant && 
+    track.source === Track.Source.Camera
+  );
+  
+  const screenShareTrack = tracks.find(track => 
+    track.source === Track.Source.ScreenShare && 
+    track.publication?.track
+  );
+
   // Filtrar tracks válidos para evitar pantallas negras
   const validTracks = tracks.filter(track => 
     track.participant && 
     (track.publication?.track || track.source === Track.Source.Camera)
   );
+
+  // Cambiar a modo sidebar cuando hay screen share
+  useEffect(() => {
+    if (screenShareTrack && viewMode === 'gallery') {
+      setViewMode('sidebar');
+    } else if (!screenShareTrack && viewMode === 'sidebar') {
+      setViewMode('gallery');
+    }
+  }, [screenShareTrack, viewMode]);
+
+  // Obtener hablante activo
+  const activeSpeaker = room?.activeSpeakers?.[0]?.identity;
 
   // Broadcast estado de grabación a todos los participantes
   useEffect(() => {
@@ -708,11 +735,100 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         }
       `}</style>
 
-      {/* Grid de participantes */}
+      {/* Selector de vista */}
+      <div className="absolute top-4 left-4 z-[100]">
+        <ViewModeSelector
+          currentMode={viewMode}
+          onChange={setViewMode}
+          hasScreenShare={!!screenShareTrack}
+          participantCount={videoTracks.length}
+        />
+      </div>
+
+      {/* Grid de participantes con nuevo layout */}
       <div className={`h-full w-full ${showChat ? 'pr-80' : ''} transition-all duration-300 pb-20`}>
-        <GridLayout tracks={validTracks} style={{ height: '100%' }}>
-          <ParticipantTile />
-        </GridLayout>
+        {screenShareTrack ? (
+          // Layout con screen share
+          <div className="h-full w-full flex flex-col lg:flex-row gap-2 p-2">
+            {/* Pantalla compartida principal */}
+            <div className={`${viewMode === 'sidebar' ? 'lg:flex-1' : 'flex-1'} min-h-0`}>
+              <ScreenShareViewer
+                isActive={true}
+                sharerName={screenShareTrack.participant?.name || screenShareTrack.participant?.identity}
+              >
+                <video
+                  ref={(el) => {
+                    if (el && screenShareTrack.publication?.track) {
+                      screenShareTrack.publication.track.attach(el);
+                    }
+                  }}
+                  autoPlay
+                  playsInline
+                  className="w-full h-full object-contain"
+                />
+              </ScreenShareViewer>
+            </div>
+            
+            {/* Strip de participantes */}
+            <div className={`${viewMode === 'sidebar' ? 'lg:w-56' : 'h-28'} flex ${viewMode === 'sidebar' ? 'lg:flex-col' : 'flex-row'} gap-2 overflow-auto`}>
+              {videoTracks.map((track, index) => (
+                <div
+                  key={track.participant?.identity || index}
+                  className={`${viewMode === 'sidebar' ? 'aspect-video w-full' : 'aspect-video h-full'} rounded-lg overflow-hidden bg-zinc-900 shrink-0`}
+                >
+                  <CustomParticipantTile trackRef={track} />
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          // Layout normal (gallery o speaker)
+          <div className={`h-full w-full p-2 ${
+            viewMode === 'speaker' && videoTracks.length > 1
+              ? 'flex flex-col gap-2'
+              : `grid gap-2 auto-rows-fr ${
+                  videoTracks.length <= 1 ? 'grid-cols-1' :
+                  videoTracks.length <= 2 ? 'grid-cols-2' :
+                  videoTracks.length <= 4 ? 'grid-cols-2' :
+                  videoTracks.length <= 6 ? 'grid-cols-3' :
+                  'grid-cols-3 lg:grid-cols-4'
+                }`
+          }`}>
+            {viewMode === 'speaker' && videoTracks.length > 1 ? (
+              <>
+                {/* Speaker principal */}
+                <div className="flex-1 min-h-0 rounded-xl overflow-hidden bg-zinc-900">
+                  <CustomParticipantTile 
+                    trackRef={videoTracks.find(t => t.participant?.identity === activeSpeaker) || videoTracks[0]} 
+                  />
+                </div>
+                {/* Otros participantes */}
+                <div className="h-24 lg:h-28 flex gap-2 overflow-x-auto justify-center">
+                  {videoTracks
+                    .filter(t => t.participant?.identity !== activeSpeaker)
+                    .map((track, index) => (
+                      <div
+                        key={track.participant?.identity || index}
+                        className="aspect-video h-full rounded-lg overflow-hidden bg-zinc-900 shrink-0"
+                      >
+                        <CustomParticipantTile trackRef={track} />
+                      </div>
+                    ))}
+                </div>
+              </>
+            ) : (
+              // Gallery view
+              videoTracks.map((track, index) => (
+                <div
+                  key={track.participant?.identity || index}
+                  className="rounded-xl overflow-hidden bg-zinc-900 min-h-0"
+                >
+                  <CustomParticipantTile trackRef={track} />
+                </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
 
       {/* Panel de Chat - Estilos mejorados */}
