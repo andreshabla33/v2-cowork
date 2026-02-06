@@ -49,6 +49,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
   const [threadMessages, setThreadMessages] = useState<ChatMessage[]>([]);
   const [threadCounts, setThreadCounts] = useState<Record<string, number>>({});
   const [showMeetingRooms, setShowMeetingRooms] = useState(false);
+  const [showMembersPanel, setShowMembersPanel] = useState(false);
+  const [channelMembers, setChannelMembers] = useState<any[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const { t } = useTranslation();
@@ -146,6 +148,34 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       refetchGrupos();
     }
   }, [grupoActivo, activeWorkspace]);
+
+  // Cargar miembros del canal activo
+  useEffect(() => {
+    if (!grupoActivo) return;
+    const cargarMiembrosCanal = async () => {
+      const { data: miembros } = await supabase
+        .from('miembros_grupo')
+        .select('usuario_id, rol, unido_en')
+        .eq('grupo_id', grupoActivo);
+      
+      if (miembros && miembros.length > 0) {
+        const userIds = miembros.map(m => m.usuario_id);
+        const { data: usuarios } = await supabase
+          .from('usuarios')
+          .select('id, nombre, email')
+          .in('id', userIds);
+        
+        const merged = miembros.map(m => ({
+          ...m,
+          usuario: usuarios?.find(u => u.id === m.usuario_id)
+        }));
+        setChannelMembers(merged);
+      } else {
+        setChannelMembers([]);
+      }
+    };
+    cargarMiembrosCanal();
+  }, [grupoActivo]);
 
   // SuscripciÃ³n global para toast notifications (todos los canales)
   useEffect(() => {
@@ -835,12 +865,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
   return (
     <div className={`h-full flex flex-col transition-all duration-500 overflow-hidden ${s.chatBg}`}>
-      <div className={`px-8 py-5 border-b border-white/5 flex items-center justify-between shrink-0 shadow-sm`}>
-         <div className="flex items-center gap-4">
-            <span className={`text-2xl opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
+      <div className={`px-6 py-4 border-b border-white/5 flex items-center justify-between shrink-0 shadow-sm`}>
+         <div className="flex items-center gap-3 min-w-0 flex-1">
+            <span className={`text-xl opacity-40 ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>
               {grupoActivoData?.tipo === 'directo' ? '💬' : (grupoActivoData?.tipo === 'privado' ? '🔒' : '#')}
             </span>
-            <div>
+            <div className="min-w-0 flex-1">
               <h3 className={`font-black text-sm uppercase tracking-widest truncate ${theme === 'arcade' ? 'text-[#00ff41] neon-text' : ''}`}>
                 {grupoActivoData?.tipo === 'directo' 
                   ? miembrosEspacio.find(m => grupoActivoData?.nombre.includes(m.id) && m.id !== currentUser.id)?.nombre || 'Chat Directo'
@@ -848,18 +878,36 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
                 }
               </h3>
               <p className="text-[9px] font-bold opacity-30 uppercase tracking-tighter">
-                {grupoActivoData?.tipo === 'directo' ? t('chat.directMessage') : t('chat.openCollaboration')}
+                {grupoActivoData?.tipo === 'directo' 
+                  ? t('chat.directMessage')
+                  : grupoActivoData?.tipo === 'privado'
+                    ? `Canal privado · ${channelMembers.length} miembro${channelMembers.length !== 1 ? 's' : ''}`
+                    : `Canal · ${channelMembers.length} miembro${channelMembers.length !== 1 ? 's' : ''}`
+                }
               </p>
             </div>
          </div>
-         {/* BOTÃ“N DE AÃ‘ADIR MIEMBROS REPARADO Y MEJORADO */}
-         <button 
-           onClick={() => setShowAddMembers(true)} 
-           className={`p-3 rounded-2xl transition-all shadow-xl flex items-center gap-2 group ${theme === 'arcade' ? 'bg-[#00ff41] text-black font-black' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
-         >
-            <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
-            <span className="hidden md:block text-[10px] uppercase font-black tracking-widest px-1">{t('action.add')}</span>
-         </button>
+         <div className="flex items-center gap-2 shrink-0">
+           {/* Ver miembros del canal */}
+           {grupoActivoData?.tipo !== 'directo' && (
+             <button 
+               onClick={() => setShowMembersPanel(!showMembersPanel)} 
+               className={`p-2.5 rounded-xl transition-all flex items-center gap-1.5 ${showMembersPanel ? (theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-400') : 'bg-white/5 hover:bg-white/10 opacity-60 hover:opacity-100'}`}
+               title="Ver miembros"
+             >
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+               <span className="text-[10px] font-bold">{channelMembers.length}</span>
+             </button>
+           )}
+           {/* Agregar miembros */}
+           <button 
+             onClick={() => setShowAddMembers(true)} 
+             className={`p-2.5 rounded-xl transition-all flex items-center gap-1.5 group ${theme === 'arcade' ? 'bg-[#00ff41] text-black font-black' : 'bg-indigo-600 text-white hover:bg-indigo-500'}`}
+             title="Agregar miembros"
+           >
+              <svg className="w-4 h-4 group-hover:scale-110 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+           </button>
+         </div>
       </div>
 
       <div ref={mensajesRef} className="flex-1 overflow-y-auto px-6 py-4 custom-scrollbar">
@@ -1036,7 +1084,71 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
           </div>
         </form>
       </div>
-      {showAddMembers && grupoActivo && <AgregarMiembros grupoId={grupoActivo} espacioId={activeWorkspace!.id} onClose={() => setShowAddMembers(false)} />}
+      {showAddMembers && grupoActivo && <AgregarMiembros grupoId={grupoActivo} espacioId={activeWorkspace!.id} onClose={() => { setShowAddMembers(false); /* Refrescar miembros */ const refresh = async () => { const { data: miembros } = await supabase.from('miembros_grupo').select('usuario_id, rol, unido_en').eq('grupo_id', grupoActivo); if (miembros && miembros.length > 0) { const uids = miembros.map(m => m.usuario_id); const { data: usrs } = await supabase.from('usuarios').select('id, nombre, email').in('id', uids); setChannelMembers(miembros.map(m => ({ ...m, usuario: usrs?.find(u => u.id === m.usuario_id) }))); } }; refresh(); }} />}
+
+      {/* Panel Lateral de Miembros - Estilo Slack/Discord */}
+      <div className={`fixed top-0 right-0 h-full w-[320px] bg-[#0d0d15]/95 backdrop-blur-xl border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-300 ease-out ${showMembersPanel ? 'translate-x-0' : 'translate-x-full'}`}>
+        <div className="h-full flex flex-col">
+          <div className="p-4 border-b border-white/5 flex items-center justify-between bg-gradient-to-r from-indigo-500/10 to-transparent">
+            <div className="flex items-center gap-3">
+              <div className={`w-8 h-8 rounded-lg ${theme === 'arcade' ? 'bg-[#00ff41]/20' : 'bg-indigo-500/20'} flex items-center justify-center`}>
+                <svg className={`w-4 h-4 ${theme === 'arcade' ? 'text-[#00ff41]' : 'text-indigo-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+              </div>
+              <div>
+                <h3 className={`font-black text-[11px] uppercase tracking-widest ${theme === 'arcade' ? 'text-[#00ff41]' : ''}`}>Miembros</h3>
+                <p className="text-[9px] opacity-50">{channelMembers.length} en este canal</p>
+              </div>
+            </div>
+            <button onClick={() => setShowMembersPanel(false)} className="p-2 hover:bg-white/10 rounded-xl transition-all hover:rotate-90 duration-200">
+              <svg className="w-5 h-5 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-3 space-y-1 custom-scrollbar">
+            {channelMembers.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 opacity-30">
+                <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                <p className="text-[10px] font-bold uppercase tracking-widest">Sin miembros</p>
+              </div>
+            ) : channelMembers.map((member: any) => {
+              const isOnline = onlineUsers.some(ou => ou.id === member.usuario_id);
+              const isMe = member.usuario_id === currentUser.id;
+              return (
+                <div key={member.usuario_id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-white/5 transition-all group">
+                  <div className="relative shrink-0">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-[12px] font-black ${isMe ? (theme === 'arcade' ? 'bg-[#00ff41]/20 text-[#00ff41]' : 'bg-indigo-500/20 text-indigo-400') : 'bg-white/10'}`}>
+                      {member.usuario?.nombre?.charAt(0)?.toUpperCase() || '?'}
+                    </div>
+                    <div className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-[#0d0d15] ${isOnline ? 'bg-green-500' : 'bg-zinc-600'}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[12px] font-bold truncate">{member.usuario?.nombre || 'Usuario'}</span>
+                      {isMe && <span className="text-[8px] opacity-40 font-bold uppercase">(tu)</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {member.rol === 'admin' && (
+                        <span className={`text-[8px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded ${theme === 'arcade' ? 'bg-[#00ff41]/15 text-[#00ff41]' : 'bg-indigo-500/15 text-indigo-400'}`}>Admin</span>
+                      )}
+                      <span className={`text-[9px] ${isOnline ? 'text-green-400' : 'opacity-30'}`}>{isOnline ? 'En linea' : 'Desconectado'}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="p-3 border-t border-white/5">
+            <button 
+              onClick={() => { setShowMembersPanel(false); setShowAddMembers(true); }}
+              className={`w-full p-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${theme === 'arcade' ? 'bg-[#00ff41]/10 text-[#00ff41] hover:bg-[#00ff41]/20' : 'bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20'}`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/></svg>
+              Agregar miembro
+            </button>
+          </div>
+        </div>
+      </div>
       
       {/* Panel Lateral de Hilo - Estilo 2026 */}
       <div className={`fixed top-0 right-0 h-full w-[400px] bg-[#0d0d15]/95 backdrop-blur-xl border-l border-white/10 shadow-2xl z-50 transform transition-transform duration-300 ease-out ${activeThread ? 'translate-x-0' : 'translate-x-full'}`}>
