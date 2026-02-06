@@ -1,13 +1,12 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   LiveKitRoom,
-  GridLayout,
-  ParticipantTile,
   RoomAudioRenderer,
   useTracks,
   useRoomContext,
+  useLocalParticipant,
   Chat,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
@@ -19,6 +18,7 @@ import { TipoReunionUnificado, MAPEO_TIPO_GRABACION, InvitadoExterno } from '@/t
 import { CustomParticipantTile } from './CustomParticipantTile';
 import { ScreenShareViewer } from './ScreenShareViewer';
 import { ViewModeSelector, ViewMode } from './ViewModeSelector';
+import { RecordingManager } from '../recording/RecordingManager';
 
 interface MeetingRoomProps {
   salaId: string;
@@ -80,19 +80,10 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [room, setRoom] = useState<Room | null>(null);
   
-  // Estados para tipo de reunión y grabación
+  // Estados para tipo de reunión
   const [tipoReunion, setTipoReunion] = useState<TipoReunion>(propTipoReunion || 'equipo');
   const [reunionId, setReunionId] = useState<string | undefined>(propReunionId);
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
   const [showChat, setShowChat] = useState(false);
-  
-  // Refs para grabación
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const recordingChunksRef = useRef<Blob[]>([]);
-  const recordingStartTimeRef = useRef<number>(0);
-  const recordingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const grabacionIdRef = useRef<string>('');
 
   const s = themeStyles[theme as keyof typeof themeStyles] || themeStyles.dark;
 
@@ -270,186 +261,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     fetchSalaInfo();
   }, [salaId, tokenInvitacion, propTipoReunion, tokenData, salaInfoFetched]);
 
-  // Funciones de grabación
-  const startRecording = useCallback(async () => {
-    try {
-      console.log('🎬 Iniciando grabación...', { currentUser: !!currentUser, activeWorkspace: !!activeWorkspace?.id, tokenInvitacion: !!tokenInvitacion });
-      
-      // Obtener stream de audio/video usando displayMedia + audio del navegador
-      let stream: MediaStream;
-      
-      try {
-        // Intentar capturar la pestaña del navegador (mejor calidad para grabación de reunión)
-        stream = await navigator.mediaDevices.getDisplayMedia({
-          video: { displaySurface: 'browser' } as any,
-          audio: true,
-        });
-      } catch (displayErr) {
-        console.warn('getDisplayMedia no disponible, usando getUserMedia:', displayErr);
-        // Fallback: capturar cámara y micrófono local
-        stream = await navigator.mediaDevices.getUserMedia({ 
-          video: true, 
-          audio: true 
-        });
-      }
-      
-      // Configurar MediaRecorder
-      const mimeType = MediaRecorder.isTypeSupported('video/webm;codecs=vp9,opus')
-        ? 'video/webm;codecs=vp9,opus'
-        : MediaRecorder.isTypeSupported('video/webm;codecs=vp8,opus')
-          ? 'video/webm;codecs=vp8,opus'
-          : 'video/webm';
-      
-      const recorder = new MediaRecorder(stream, {
-        mimeType,
-        videoBitsPerSecond: 2500000,
-        audioBitsPerSecond: 128000,
-      });
-      
-      recordingChunksRef.current = [];
-      grabacionIdRef.current = crypto.randomUUID();
-      
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) {
-          recordingChunksRef.current.push(e.data);
-        }
-      };
-      
-      recorder.onstop = async () => {
-        // Detener todos los tracks del stream capturado
-        stream.getTracks().forEach(t => t.stop());
-        await processRecording();
-      };
-      
-      // Si el usuario detiene compartir pantalla desde el navegador, detener grabación
-      stream.getVideoTracks()[0]?.addEventListener('ended', () => {
-        if (mediaRecorderRef.current?.state === 'recording') {
-          stopRecording();
-        }
-      });
-      
-      mediaRecorderRef.current = recorder;
-      recordingStartTimeRef.current = Date.now();
-      
-      // Iniciar grabación PRIMERO (no bloquear por Supabase)
-      recorder.start(1000);
-      setIsRecording(true);
-      
-      // Timer de duración
-      recordingIntervalRef.current = setInterval(() => {
-        const elapsed = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
-        setRecordingDuration(elapsed);
-      }, 1000);
-      
-      console.log('🔴 Grabación de videollamada iniciada');
-      
-      // Registrar en Supabase (no bloqueante, solo si es usuario autenticado)
-      if (currentUser && activeWorkspace?.id) {
-        supabase.from('grabaciones').insert({
-          id: grabacionIdRef.current,
-          espacio_id: activeWorkspace.id,
-          creado_por: currentUser.id,
-          estado: 'grabando',
-          inicio_grabacion: new Date().toISOString(),
-          tipo: tipoReunion === 'equipo' ? 'equipo' : tipoReunion === 'deal' ? 'deals' : 'rrhh_entrevista',
-          tiene_video: true,
-          tiene_audio: true,
-          formato: 'webm',
-          sala_id: salaId,
-        }).then(({ error: insertErr }) => {
-          if (insertErr) console.warn('⚠️ No se pudo registrar grabación en DB:', insertErr.message);
-        });
-      }
-      
-    } catch (err: any) {
-      console.error('Error iniciando grabación:', err);
-      // No mostrar alert si el usuario simplemente canceló el diálogo de compartir pantalla
-      if (err.name !== 'NotAllowedError' && err.name !== 'AbortError') {
-        alert('Error al iniciar grabación: ' + err.message);
-      }
-    }
-  }, [currentUser, activeWorkspace?.id, tipoReunion, salaId, tokenInvitacion]);
-
-  const stopRecording = useCallback(async () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      // Limpiar timer
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-        recordingIntervalRef.current = null;
-      }
-      
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
-      setRecordingDuration(0);
-      
-      console.log('⏹️ Grabación de videollamada detenida');
-    }
-  }, []);
-
-  const processRecording = useCallback(async () => {
-    try {
-      const blob = new Blob(recordingChunksRef.current, { type: 'video/webm' });
-      const duration = Math.floor((Date.now() - recordingStartTimeRef.current) / 1000);
-      
-      // Siempre descargar localmente el archivo
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `Reunion_${tipoReunion}_${new Date().toISOString().slice(0,10)}.webm`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      
-      console.log('💾 Grabación descargada localmente:', a.download);
-      
-      // Si es usuario autenticado, registrar en Supabase
-      if (currentUser && activeWorkspace?.id) {
-        await supabase.from('grabaciones').update({
-          estado: 'completado',
-          duracion_segundos: duration,
-          fin_grabacion: new Date().toISOString(),
-          archivo_nombre: `Videollamada ${tipoReunion} - ${new Date().toLocaleDateString('es-ES')}`,
-        }).eq('id', grabacionIdRef.current);
-        
-        // Notificar al usuario
-        await supabase.from('notificaciones').insert({
-          usuario_id: currentUser.id,
-          espacio_id: activeWorkspace.id,
-          tipo: 'grabacion_lista',
-          titulo: '📹 Grabación de videollamada lista',
-          mensaje: `La grabación de tu ${tipoReunion === 'deal' ? 'reunión con cliente' : tipoReunion === 'entrevista' ? 'entrevista' : 'reunión de equipo'} está disponible`,
-          entidad_tipo: 'grabacion',
-          entidad_id: grabacionIdRef.current,
-        });
-      }
-      
-      console.log('✅ Grabación procesada y guardada');
-      
-    } catch (err: any) {
-      console.error('Error procesando grabación:', err);
-      
-      // Marcar grabación como error (solo si usuario autenticado)
-      if (currentUser && activeWorkspace?.id) {
-        await supabase.from('grabaciones').update({
-          estado: 'error',
-          error_mensaje: err.message || 'Error en procesamiento',
-        }).eq('id', grabacionIdRef.current);
-      }
-    }
-  }, [currentUser, activeWorkspace?.id, tipoReunion]);
-
-  // Cleanup al desmontar
-  useEffect(() => {
-    return () => {
-      if (recordingIntervalRef.current) {
-        clearInterval(recordingIntervalRef.current);
-      }
-      if (mediaRecorderRef.current?.state !== 'inactive') {
-        mediaRecorderRef.current?.stop();
-      }
-    };
-  }, []);
+  // La grabación ahora la maneja RecordingManager dentro de MeetingRoomContent
 
   // Manejar eventos de la sala
   const handleRoomConnected = useCallback(() => {
@@ -543,12 +355,11 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           tipoReunion={tipoReunion}
           salaId={salaId}
           reunionId={reunionId}
-          isRecording={isRecording}
-          recordingDuration={recordingDuration}
-          onStartRecording={startRecording}
-          onStopRecording={stopRecording}
           showChat={showChat}
           onToggleChat={() => setShowChat(!showChat)}
+          espacioId={activeWorkspace?.id || ''}
+          userId={currentUser?.id || ''}
+          userName={currentUser?.name || nombreInvitado || 'Participante'}
         />
         <RoomAudioRenderer />
       </LiveKitRoom>
@@ -565,12 +376,11 @@ interface MeetingRoomContentProps {
   tipoReunion: TipoReunion;
   salaId: string;
   reunionId?: string;
-  isRecording: boolean;
-  recordingDuration: number;
-  onStartRecording: () => void;
-  onStopRecording: () => void;
   showChat: boolean;
   onToggleChat: () => void;
+  espacioId: string;
+  userId: string;
+  userName: string;
 }
 
 const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({ 
@@ -581,17 +391,66 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   tipoReunion,
   salaId,
   reunionId,
-  isRecording,
-  recordingDuration,
-  onStartRecording,
-  onStopRecording,
   showChat,
   onToggleChat,
+  espacioId,
+  userId,
+  userName,
 }) => {
   const room = useRoomContext();
+  const { localParticipant } = useLocalParticipant();
   const [remoteRecording, setRemoteRecording] = useState<{isRecording: boolean; by: string} | null>(null);
   const [reactions, setReactions] = useState<{id: string; emoji: string; by: string}[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+
+  // Estados de grabación internos (manejados por RecordingManager)
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingTrigger, setRecordingTrigger] = useState(false);
+
+  // Extraer MediaStream local de LiveKit para RecordingManager
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
+  
+  useEffect(() => {
+    if (!localParticipant) return;
+    
+    const buildStream = () => {
+      const tracks: MediaStreamTrack[] = [];
+      
+      // Obtener track de cámara
+      const cameraPublication = localParticipant.getTrackPublication(Track.Source.Camera);
+      if (cameraPublication?.track?.mediaStreamTrack) {
+        tracks.push(cameraPublication.track.mediaStreamTrack);
+      }
+      
+      // Obtener track de micrófono
+      const micPublication = localParticipant.getTrackPublication(Track.Source.Microphone);
+      if (micPublication?.track?.mediaStreamTrack) {
+        tracks.push(micPublication.track.mediaStreamTrack);
+      }
+      
+      if (tracks.length > 0) {
+        setLocalStream(new MediaStream(tracks));
+      }
+    };
+    
+    buildStream();
+    
+    // Reconstruir cuando cambian los tracks
+    const handleTrackChange = () => setTimeout(buildStream, 500);
+    room?.on(RoomEvent.LocalTrackPublished, handleTrackChange);
+    room?.on(RoomEvent.LocalTrackUnpublished, handleTrackChange);
+    
+    return () => {
+      room?.off(RoomEvent.LocalTrackPublished, handleTrackChange);
+      room?.off(RoomEvent.LocalTrackUnpublished, handleTrackChange);
+    };
+  }, [localParticipant, room]);
+
+  // Toggle grabación via RecordingManager
+  const handleToggleRecording = useCallback(() => {
+    setRecordingTrigger(true);
+  }, []);
 
   // Obtener tracks de video de todos los participantes
   const tracks = useTracks(
@@ -683,10 +542,6 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
       room.off(RoomEvent.DataReceived, handleDataReceived);
     };
   }, [room]);
-
-  // Determinar si mostrar banner de grabación (local o remoto)
-  const showRecordingBanner = isRecording || remoteRecording?.isRecording;
-  const recordingBy = isRecording ? 'Tú' : remoteRecording?.by;
 
   return (
     <div className="relative h-full w-full bg-zinc-950 overflow-hidden">
@@ -984,22 +839,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         }
       `}</style>
 
-      {/* Banner de grabación activa - visible para TODOS */}
-      {showRecordingBanner && (
-        <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[150]">
-          <div className="flex items-center gap-2 px-4 py-2 bg-red-600/90 backdrop-blur-sm rounded-full shadow-lg">
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
-            </span>
-            <span className="text-white text-sm font-medium">
-              {isRecording ? 'Grabando reunión' : `${recordingBy} está grabando`}
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* Barra de controles */}
+      {/* Barra de controles - indicador de grabación integrado inline */}
       <MeetingControlBar
         onLeave={onLeave || (() => {})}
         onToggleChat={onToggleChat}
@@ -1009,10 +849,43 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         reunionId={reunionId}
         isRecording={isRecording}
         recordingDuration={recordingDuration}
-        onStartRecording={onStartRecording}
-        onStopRecording={onStopRecording}
-        showRecordingButton={isHost || isExternalGuest}
+        onStartRecording={handleToggleRecording}
+        onStopRecording={handleToggleRecording}
+        showRecordingButton={isHost || !isExternalGuest}
+        remoteRecordingBy={!isRecording && remoteRecording?.isRecording ? remoteRecording.by : null}
       />
+
+      {/* RecordingManager con análisis conductual - headless mode (UI via MeetingControlBar) */}
+      {(isHost || !isExternalGuest) && (
+        <RecordingManager
+          espacioId={espacioId}
+          userId={userId}
+          userName={userName}
+          reunionTitulo={`Videollamada ${tipoReunion} - ${new Date().toLocaleDateString('es-ES')}`}
+          stream={localStream}
+          usuariosEnLlamada={
+            room?.remoteParticipants 
+              ? Array.from(room.remoteParticipants.values()).map(p => ({
+                  id: p.identity,
+                  nombre: p.name || p.identity,
+                }))
+              : []
+          }
+          onRecordingStateChange={(recording) => {
+            setIsRecording(recording);
+            if (!recording) {
+              setRecordingDuration(0);
+            }
+          }}
+          onDurationChange={(duration) => setRecordingDuration(duration)}
+          onProcessingComplete={(resultado) => {
+            console.log('✅ Análisis conductual completado en videollamada:', resultado?.tipo_grabacion);
+          }}
+          headlessMode={true}
+          externalTrigger={recordingTrigger}
+          onExternalTriggerHandled={() => setRecordingTrigger(false)}
+        />
+      )}
     </div>
   );
 };

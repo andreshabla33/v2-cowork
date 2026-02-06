@@ -38,6 +38,7 @@ const App: React.FC = () => {
   const [directSalaId, setDirectSalaId] = useState<string | null>(null);
   const [inMeeting, setInMeeting] = useState(false);
   const [meetingNombre, setMeetingNombre] = useState('');
+  const [showThankYou, setShowThankYou] = useState(false);
 
   useEffect(() => {
     const path = window.location.pathname;
@@ -68,6 +69,39 @@ const App: React.FC = () => {
     );
   }
 
+  // Pantalla de agradecimiento para invitados externos
+  if (showThankYou) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 flex items-center justify-center p-4">
+        <div className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-10 max-w-lg text-center">
+          <div className="w-24 h-24 mx-auto mb-6 rounded-full bg-gradient-to-br from-green-500/20 to-emerald-500/20 flex items-center justify-center">
+            <svg className="w-12 h-12 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <h2 className="text-2xl font-bold text-white mb-3">¡Gracias por participar!</h2>
+          <p className="text-white/60 mb-2">La reunión ha finalizado.</p>
+          <p className="text-white/50 text-sm mb-8">
+            Esperamos que haya sido una gran experiencia. Si el organizador configuró un resumen, lo recibirás por email.
+          </p>
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => {
+                setShowThankYou(false);
+                setMeetingToken(null);
+                window.history.pushState({}, '', '/');
+              }}
+              className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-white font-bold transition-all"
+            >
+              Cerrar
+            </button>
+          </div>
+          <p className="text-white/30 text-xs mt-8">Powered by Cowork</p>
+        </div>
+      </div>
+    );
+  }
+
   if (meetingToken && inMeeting) {
     return (
       <MeetingRoom
@@ -76,8 +110,7 @@ const App: React.FC = () => {
         nombreInvitado={meetingNombre}
         onLeave={() => {
           setInMeeting(false);
-          setMeetingToken(null);
-          window.history.pushState({}, '', '/');
+          setShowThankYou(true);
         }}
       />
     );
