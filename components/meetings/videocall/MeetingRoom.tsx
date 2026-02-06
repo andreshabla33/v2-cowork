@@ -494,6 +494,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         <MeetingRoomContent 
           theme={theme}
           isHost={tokenData.permisos.roomAdmin}
+          isExternalGuest={!!tokenInvitacion}
           onLeave={onLeave}
           tipoReunion={tipoReunion}
           salaId={salaId}
@@ -515,6 +516,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
 interface MeetingRoomContentProps {
   theme: string;
   isHost: boolean;
+  isExternalGuest?: boolean;
   onLeave?: () => void;
   tipoReunion: TipoReunion;
   salaId: string;
@@ -530,6 +532,7 @@ interface MeetingRoomContentProps {
 const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({ 
   theme, 
   isHost, 
+  isExternalGuest = false,
   onLeave,
   tipoReunion,
   salaId,
@@ -964,7 +967,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
         recordingDuration={recordingDuration}
         onStartRecording={onStartRecording}
         onStopRecording={onStopRecording}
-        showRecordingButton={isHost}
+        showRecordingButton={isHost || isExternalGuest}
       />
     </div>
   );
