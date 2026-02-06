@@ -123,7 +123,48 @@ export const WorkspaceLayout: React.FC = () => {
 
     presenceChannelRef.current = channel;
 
+    // Registrar conexión al espacio para tracking de tiempo
+    let conexionId: string | null = null;
+    const registrarConexion = async () => {
+      try {
+        const { data } = await supabase
+          .from('registro_conexiones')
+          .insert({ usuario_id: session.user.id, espacio_id: activeWorkspace.id })
+          .select('id')
+          .single();
+        if (data) conexionId = data.id;
+      } catch (e) { console.warn('Error registrando conexión:', e); }
+    };
+    registrarConexion();
+
+    // Al cerrar pestaña, registrar desconexión via fetch keepalive (soporta headers)
+    const handleBeforeUnload = () => {
+      if (conexionId) {
+        const url = `https://lcryrsdyrzotjqdxcwtp.supabase.co/rest/v1/registro_conexiones?id=eq.${conexionId}`;
+        fetch(url, {
+          method: 'PATCH',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxjcnlyc2R5cnpvdGpxZHhjd3RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2NDg0MTgsImV4cCI6MjA4MzIyNDQxOH0.8fsqkKHHOVCZMi8tAb85HN_It2QCSWP0delcFn56vd4',
+            'Authorization': `Bearer ${session.access_token}`,
+            'Prefer': 'return=minimal'
+          },
+          body: JSON.stringify({ desconectado_en: new Date().toISOString() }),
+          keepalive: true
+        }).catch(() => {});
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
     return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Registrar desconexión al desmontar
+      if (conexionId) {
+        supabase.from('registro_conexiones')
+          .update({ desconectado_en: new Date().toISOString() })
+          .eq('id', conexionId)
+          .then(() => console.log('Desconexión registrada'));
+      }
       supabase.removeChannel(channel);
       presenceChannelRef.current = null;
     };
