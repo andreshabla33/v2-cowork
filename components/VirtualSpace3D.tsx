@@ -427,6 +427,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   const [isRunning, setIsRunning] = useState(false);
   const keysPressed = useRef<Set<string>>(new Set());
   const lastSyncTime = useRef(0);
+  const autoMoveTimeRef = useRef(0);
   const { camera } = useThree();
 
   useEffect(() => {
@@ -490,7 +491,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
 
     if (hasKeyboardInput) {
       // Teclado cancela cualquier movimiento por doble clic
-      if (moveTarget && onReachTarget) onReachTarget();
+      if (moveTarget && onReachTarget) { autoMoveTimeRef.current = 0; onReachTarget(); }
 
       if (keyW) { dy = speed * delta; newDirection = 'up'; }
       if (keyS) { dy = -speed * delta; newDirection = 'front'; }
@@ -514,26 +515,38 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
 
       if (dist < 0.15) {
         // Llegó al destino
+        autoMoveTimeRef.current = 0;
         if (onReachTarget) onReachTarget();
       } else {
-        // Normalizar dirección y aplicar velocidad
-        const moveSpeed = MOVE_SPEED * delta;
-        const step = Math.min(moveSpeed, dist);
-        dx = (distX / dist) * step;
-        dy = -(distZ / dist) * step; // invertido porque dy positivo = -z
+        // Transición walk → run: empieza caminando, después de 0.4s corre
+        autoMoveTimeRef.current += delta;
+        const isAutoRunning = autoMoveTimeRef.current > 0.4;
+        const autoSpeed = isAutoRunning ? RUN_SPEED : MOVE_SPEED;
+        const step = Math.min(autoSpeed * delta, dist);
 
-        // Determinar dirección visual
+        // Aplicar movimiento directamente en X/Z (sin capa dy invertida)
+        positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, cx + (distX / dist) * step));
+        positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, cz + (distZ / dist) * step));
+
+        // Determinar dirección visual del avatar
+        // En la escena: +Z = hacia la cámara (front), -Z = alejándose (up)
         if (Math.abs(distX) > Math.abs(distZ)) {
           newDirection = distX > 0 ? 'right' : 'left';
         } else {
-          newDirection = distZ < 0 ? 'front' : 'up';
+          newDirection = distZ > 0 ? 'front' : 'up';
+        }
+
+        // Animación: walk al inicio, run después
+        if (animationState !== 'cheer' && animationState !== 'dance' && animationState !== 'sit') {
+          setAnimationState(isAutoRunning ? 'run' : 'walk');
         }
       }
     }
 
-    const moving = dx !== 0 || dy !== 0;
+    // Movimiento por teclado (usa dx/dy)
+    const movingByKeyboard = dx !== 0 || dy !== 0;
     
-    if (moving) {
+    if (movingByKeyboard) {
       // Actualizar posición
       positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
       positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
@@ -542,7 +555,12 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       if (animationState !== 'cheer' && animationState !== 'dance' && animationState !== 'sit') {
         setAnimationState(hasKeyboardInput && isRunning ? 'run' : 'walk');
       }
-    } else if (animationState === 'walk' || animationState === 'run') {
+    }
+
+    // Detectar si hay movimiento (teclado o automático)
+    const moving = movingByKeyboard || (moveTarget !== null && moveTarget !== undefined);
+    
+    if (!moving && (animationState === 'walk' || animationState === 'run')) {
       setAnimationState('idle');
     }
 
