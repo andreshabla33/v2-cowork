@@ -22,6 +22,7 @@ export const WorkspaceLayout: React.FC = () => {
   const [showViben, setShowViben] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGameHub, setShowGameHub] = useState(false);
+  const [isPlayingGame, setIsPlayingGame] = useState(false);
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
   const presenceChannelRef = useRef<any>(null);
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
@@ -375,7 +376,7 @@ export const WorkspaceLayout: React.FC = () => {
           {/* VirtualSpace3D siempre montado pero oculto cuando no está activo
               Esto mantiene el stream y conexiones WebRTC activas */}
           <div className={activeSubTab === 'space' ? 'h-full w-full' : 'hidden'}>
-            <VirtualSpace3D theme={theme} isGameActive={showGameHub} />
+            <VirtualSpace3D theme={theme} isGameHubOpen={showGameHub} isPlayingGame={isPlayingGame} />
           </div>
           {activeSubTab !== 'space' && (
             <div className="h-full w-full overflow-y-auto animate-in fade-in duration-500">
@@ -423,6 +424,7 @@ export const WorkspaceLayout: React.FC = () => {
           isOpen={showGameHub} 
           onClose={() => {
             setShowGameHub(false);
+            setIsPlayingGame(false);
             setPendingGameInvitation(null);
           }}
           espacioId={activeWorkspace?.id}
@@ -430,6 +432,7 @@ export const WorkspaceLayout: React.FC = () => {
           currentUserName={currentUser?.name}
           pendingInvitation={pendingGameInvitation}
           onPendingInvitationHandled={() => setPendingGameInvitation(null)}
+          onGamePlayingChange={setIsPlayingGame}
         />
 
         {/* Notificaciones de invitación a juegos */}

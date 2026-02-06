@@ -38,6 +38,7 @@ interface GameHubProps {
   currentUserName?: string;
   pendingInvitation?: PendingGameInvitation | null;
   onPendingInvitationHandled?: () => void;
+  onGamePlayingChange?: (isPlaying: boolean) => void;
 }
 
 interface GameInfo {
@@ -64,7 +65,7 @@ const GAMES_CONFIG = [
   { type: 'chess', translationKey: 'chess', icon: <Crown className="w-6 h-6" />, color: 'orange', players: '2', duration: '10-30', difficultyKey: 'medium' },
 ] as const;
 
-export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName, pendingInvitation, onPendingInvitationHandled }) => {
+export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, currentUserId, currentUserName, pendingInvitation, onPendingInvitationHandled, onGamePlayingChange }) => {
   const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'games' | 'leaderboard' | 'achievements'>('games');
   const [selectedGame, setSelectedGame] = useState<GameType | null>(null);
@@ -72,6 +73,18 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, cu
   const [activeOpponent, setActiveOpponent] = useState<{ id: string; name: string } | null>(null);
   const [activePlayerColor, setActivePlayerColor] = useState<'w' | 'b'>('w');
   const { leaderboard, achievements, playerStats, updateLeaderboard } = useGameStore();
+
+  // Notificar al padre cuando se entra/sale de un juego específico
+  React.useEffect(() => {
+    onGamePlayingChange?.(selectedGame !== null);
+  }, [selectedGame, onGamePlayingChange]);
+
+  // Notificar false cuando se cierra el GameHub
+  React.useEffect(() => {
+    if (!isOpen) {
+      onGamePlayingChange?.(false);
+    }
+  }, [isOpen, onGamePlayingChange]);
 
   // Manejar invitación pendiente cuando se abre el GameHub
   React.useEffect(() => {
@@ -150,7 +163,7 @@ export const GameHub: React.FC<GameHubProps> = ({ isOpen, onClose, espacioId, cu
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
+        className="fixed inset-0 z-[150] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
         onClick={onClose}
       >
         <motion.div

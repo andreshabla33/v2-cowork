@@ -68,6 +68,7 @@ interface BottomControlBarProps {
   onCameraSettingsChange?: (settings: CameraSettings) => void;
   onOpenGameHub?: () => void;
   isGameActive?: boolean;
+  isGameHubOpen?: boolean;
 }
 
 // Configuración de estados con iconos y colores (estilo 2026)
@@ -103,6 +104,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
   onAudioSettingsChange,
   onOpenGameHub,
   isGameActive = false,
+  isGameHubOpen = false,
 }) => {
   const { currentUser, updateStatus } = useStore();
   const emojis = ['👍', '🔥', '❤️', '👏', '😂', '😮', '🚀', '✨'];
@@ -232,6 +234,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
       reader.readAsDataURL(file);
     }
   };
+
+  // Ocultar completamente cuando el menú del GameHub está abierto (sin jugar)
+  if (isGameHubOpen && !isGameActive) return null;
 
   return (
     <div className={`absolute z-[200] transition-all duration-500 ease-out ${
