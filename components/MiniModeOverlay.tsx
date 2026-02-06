@@ -25,8 +25,8 @@ const statusHexMap: Record<string, string> = {
 };
 
 // ========== MINI MAPA CANVAS ==========
-const MAP_W = 280;
-const MAP_H = 130;
+const MAP_W = 278;
+const MAP_H = 120;
 const SPACE_SIZE = 2000; // Tamaño del espacio virtual
 
 const MiniMapCanvas: React.FC<{ currentUser: any; onlineUsers: any[] }> = ({ currentUser, onlineUsers }) => {
@@ -129,8 +129,7 @@ const MiniMapCanvas: React.FC<{ currentUser: any; onlineUsers: any[] }> = ({ cur
       ref={canvasRef}
       width={MAP_W}
       height={MAP_H}
-      style={{ width: MAP_W, height: MAP_H }}
-      className="rounded-none"
+      style={{ width: '100%', height: MAP_H }}
     />
   );
 };
@@ -257,7 +256,7 @@ export const MiniModeOverlay: React.FC = () => {
       <div
         ref={overlayRef}
         className="fixed z-[9999] select-none"
-        style={{ ...initialPos, position: 'fixed', width: 280 }}
+        style={{ ...initialPos, position: 'fixed', width: 272 }}
       >
         <div className="rounded-2xl border border-white/10 bg-black/75 backdrop-blur-2xl shadow-2xl shadow-black/50">
           
