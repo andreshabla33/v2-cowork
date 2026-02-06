@@ -264,6 +264,73 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   );
 };
 
+// ============== AVATAR REMOTO CON INTERPOLACIÓN ==============
+const RemoteAvatarInterpolated: React.FC<{
+  user: User;
+  remoteStream: MediaStream | null;
+  showVideoBubble?: boolean;
+  message?: string;
+  reaction?: string | null;
+}> = ({ user, remoteStream, showVideoBubble, message, reaction }) => {
+  const groupRef = useRef<THREE.Group>(null);
+  const targetPos = useRef({ x: user.x / 16, z: user.y / 16 });
+  const currentPos = useRef({ x: user.x / 16, z: user.y / 16 });
+  const [isMoving, setIsMoving] = useState(false);
+
+  // Actualizar posición destino cuando cambia
+  useEffect(() => {
+    targetPos.current = { x: user.x / 16, z: user.y / 16 };
+  }, [user.x, user.y]);
+
+  // Interpolar suavemente hacia la posición destino
+  useFrame(() => {
+    if (!groupRef.current) return;
+
+    const dx = targetPos.current.x - currentPos.current.x;
+    const dz = targetPos.current.z - currentPos.current.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+
+    if (dist > 0.02) {
+      // Lerp suave hacia el destino
+      const lerpFactor = Math.min(0.12, dist * 0.5);
+      currentPos.current.x += dx * lerpFactor;
+      currentPos.current.z += dz * lerpFactor;
+      
+      groupRef.current.position.x = currentPos.current.x;
+      groupRef.current.position.z = currentPos.current.z;
+
+      if (!isMoving) setIsMoving(true);
+    } else {
+      // Llegó al destino
+      currentPos.current.x = targetPos.current.x;
+      currentPos.current.z = targetPos.current.z;
+      groupRef.current.position.x = currentPos.current.x;
+      groupRef.current.position.z = currentPos.current.z;
+
+      if (isMoving) setIsMoving(false);
+    }
+  });
+
+  return (
+    <group ref={groupRef} position={[currentPos.current.x, 0, currentPos.current.z]}>
+      <Avatar
+        position={new THREE.Vector3(0, 0, 0)}
+        config={user.avatarConfig}
+        name={user.name}
+        status={user.status}
+        isCurrentUser={false}
+        animationState={isMoving ? 'walk' : 'idle'}
+        direction={user.direction}
+        reaction={reaction}
+        videoStream={remoteStream}
+        camOn={user.isCameraOn}
+        showVideoBubble={showVideoBubble}
+        message={message}
+      />
+    </group>
+  );
+};
+
 // ============== COMPONENTE USUARIOS REMOTOS ==============
 interface RemoteUsersProps {
   users: User[];
@@ -279,22 +346,14 @@ const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVid
   return (
     <>
       {users.filter(u => u.id !== currentUser.id).map(u => (
-        <group key={u.id} position={[u.x / 16, 0, u.y / 16]}>
-          <Avatar
-            position={new THREE.Vector3(0, 0, 0)}
-            config={u.avatarConfig}
-            name={u.name}
-            status={u.status}
-            isCurrentUser={false}
-            animationState="idle"
-            direction={u.direction}
-            reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}
-            videoStream={remoteStreams.get(u.id) || null}
-            camOn={u.isCameraOn}
-            showVideoBubble={showVideoBubble}
-            message={remoteMessages.get(u.id)}
-          />
-        </group>
+        <RemoteAvatarInterpolated
+          key={u.id}
+          user={u}
+          remoteStream={remoteStreams.get(u.id) || null}
+          showVideoBubble={showVideoBubble}
+          message={remoteMessages.get(u.id)}
+          reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}
+        />
       ))}
     </>
   );
