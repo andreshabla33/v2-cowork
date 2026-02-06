@@ -908,6 +908,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           onProcessingComplete={(resultado) => {
             console.log('✅ Análisis conductual completado en videollamada:', resultado?.tipo_grabacion);
           }}
+          preselectedTipoGrabacion={MAPEO_TIPO_GRABACION[tipoReunion as TipoReunionUnificado] || undefined}
           headlessMode={true}
           externalTrigger={recordingTrigger}
           onExternalTriggerHandled={() => setRecordingTrigger(false)}

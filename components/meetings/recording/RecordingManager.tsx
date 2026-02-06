@@ -44,6 +44,7 @@ interface RecordingManagerProps {
   headlessMode?: boolean;
   externalTrigger?: boolean;
   onExternalTriggerHandled?: () => void;
+  preselectedTipoGrabacion?: TipoGrabacionDetallado; // Auto-seleccionar tipo (saltar selector)
 }
 
 interface ProcessingState {
@@ -68,6 +69,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   onProcessingComplete,
   onDurationChange,
   onTipoGrabacionChange,
+  preselectedTipoGrabacion,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
@@ -320,27 +322,6 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     }
   }, [updateState, onRecordingStateChange, stopTranscription, combinedAnalysis]);
 
-  // Manejar trigger externo
-  useEffect(() => {
-    if (externalTrigger && onExternalTriggerHandled) {
-      if (isRecording) {
-        stopRecording();
-      } else {
-        setShowTypeSelector(true);
-      }
-      onExternalTriggerHandled();
-    }
-  }, [externalTrigger, onExternalTriggerHandled, isRecording, stopRecording]);
-
-  // Manejar selección de tipo de grabar
-  const handleRecordClick = useCallback(() => {
-    if (isRecording) {
-      stopRecording();
-    } else {
-      setShowTypeSelector(true);
-    }
-  }, [isRecording, stopRecording]);
-
   // Manejar selección de tipo
   const handleTypeSelect = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean, evaluadoId?: string) => {
     console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis, 'evaluado:', evaluadoId);
@@ -349,6 +330,34 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     setShowTypeSelector(false);
     await startRecording(tipo, analisis, evaluadoId);
   }, [startRecording]);
+
+  // Manejar trigger externo
+  useEffect(() => {
+    if (externalTrigger && onExternalTriggerHandled) {
+      if (isRecording) {
+        stopRecording();
+      } else if (preselectedTipoGrabacion) {
+        // Si ya hay tipo predefinido (de la reunión programada), iniciar directo con análisis
+        console.log('🎬 Auto-inicio con tipo predefinido:', preselectedTipoGrabacion);
+        handleTypeSelect(preselectedTipoGrabacion, true);
+      } else {
+        setShowTypeSelector(true);
+      }
+      onExternalTriggerHandled();
+    }
+  }, [externalTrigger, onExternalTriggerHandled, isRecording, stopRecording, preselectedTipoGrabacion, handleTypeSelect]);
+
+  // Manejar selección de tipo de grabar
+  const handleRecordClick = useCallback(() => {
+    if (isRecording) {
+      stopRecording();
+    } else if (preselectedTipoGrabacion) {
+      // Si hay tipo predefinido, iniciar directo
+      handleTypeSelect(preselectedTipoGrabacion, true);
+    } else {
+      setShowTypeSelector(true);
+    }
+  }, [isRecording, stopRecording, preselectedTipoGrabacion, handleTypeSelect]);
 
   // Procesar grabación
   const processRecording = useCallback(async () => {
