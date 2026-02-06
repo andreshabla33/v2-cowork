@@ -130,20 +130,17 @@ export const CalendarPanel: React.FC<CalendarPanelProps> = ({ onJoinMeeting }) =
       
       if (usuarios) setMiembrosEspacio(usuarios);
 
-      // Obtener cargo del usuario actual para RBAC
-      const miembroActual = data.find((m: any) => m.usuario_id === currentUser.id);
-      if (miembroActual?.rol) {
-        // Mapear rol del espacio a CargoLaboral
-        const rolCargoMap: Record<string, CargoLaboral> = {
-          'super_admin': 'ceo',
-          'admin': 'manager_equipo',
-          'miembro': 'colaborador',
-          'rrhh': 'director_rrhh',
-          'comercial': 'director_comercial',
-          'reclutador': 'reclutador',
-          'team_lead': 'team_lead'
-        };
-        setCargoUsuario(rolCargoMap[miembroActual.rol] || 'colaborador');
+      // Obtener cargo del usuario actual para RBAC (desde columna 'cargo' directamente)
+      const { data: miembroData } = await supabase
+        .from('miembros_espacio')
+        .select('cargo')
+        .eq('usuario_id', currentUser.id)
+        .eq('espacio_id', activeWorkspace.id)
+        .single();
+      
+      if (miembroData?.cargo) {
+        console.log('📋 Cargo del usuario (CalendarPanel):', miembroData.cargo);
+        setCargoUsuario(miembroData.cargo as CargoLaboral);
       }
     }
   }, [activeWorkspace?.id, currentUser?.id]);

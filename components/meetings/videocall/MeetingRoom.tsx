@@ -15,6 +15,7 @@ import { useStore } from '@/store/useStore';
 import { supabase } from '@/lib/supabase';
 import { MeetingControlBar, TipoReunion } from './MeetingControlBar';
 import { TipoReunionUnificado, MAPEO_TIPO_GRABACION, InvitadoExterno } from '@/types/meeting-types';
+import { CargoLaboral } from '../recording/types/analysis';
 import { CustomParticipantTile } from './CustomParticipantTile';
 import { ScreenShareViewer } from './ScreenShareViewer';
 import { ViewModeSelector, ViewMode } from './ViewModeSelector';
@@ -84,8 +85,30 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
   const [tipoReunion, setTipoReunion] = useState<TipoReunion>(propTipoReunion || 'equipo');
   const [reunionId, setReunionId] = useState<string | undefined>(propReunionId);
   const [showChat, setShowChat] = useState(false);
+  const [cargoUsuario, setCargoUsuario] = useState<CargoLaboral>('colaborador');
 
   const s = themeStyles[theme as keyof typeof themeStyles] || themeStyles.dark;
+
+  // Cargar cargo del usuario desde miembros_espacio
+  useEffect(() => {
+    const cargarCargo = async () => {
+      if (!currentUser?.id || !activeWorkspace?.id) return;
+      
+      const { data } = await supabase
+        .from('miembros_espacio')
+        .select('cargo')
+        .eq('usuario_id', currentUser.id)
+        .eq('espacio_id', activeWorkspace.id)
+        .single();
+      
+      if (data?.cargo) {
+        console.log('📋 Cargo del usuario (MeetingRoom):', data.cargo);
+        setCargoUsuario(data.cargo as CargoLaboral);
+      }
+    };
+    
+    cargarCargo();
+  }, [currentUser?.id, activeWorkspace?.id]);
 
   // Obtener token de LiveKit
   const fetchToken = useCallback(async () => {
@@ -360,6 +383,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           espacioId={activeWorkspace?.id || ''}
           userId={currentUser?.id || ''}
           userName={currentUser?.name || nombreInvitado || 'Participante'}
+          cargoUsuario={cargoUsuario}
         />
         <RoomAudioRenderer />
       </LiveKitRoom>
@@ -381,6 +405,7 @@ interface MeetingRoomContentProps {
   espacioId: string;
   userId: string;
   userName: string;
+  cargoUsuario: CargoLaboral;
 }
 
 const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({ 
@@ -396,6 +421,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   espacioId,
   userId,
   userName,
+  cargoUsuario,
 }) => {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
@@ -861,6 +887,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           espacioId={espacioId}
           userId={userId}
           userName={userName}
+          cargoUsuario={cargoUsuario}
           reunionTitulo={`Videollamada ${tipoReunion} - ${new Date().toLocaleDateString('es-ES')}`}
           stream={localStream}
           usuariosEnLlamada={
