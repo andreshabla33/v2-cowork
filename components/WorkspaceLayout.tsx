@@ -17,6 +17,7 @@ import { SettingsModal } from './settings/SettingsModal';
 import { Role, PresenceStatus, ThemeType, User } from '../types';
 import { supabase } from '../lib/supabase';
 import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
+import { getSettingsSection } from '../lib/userSettings';
 
 export const WorkspaceLayout: React.FC = () => {
   const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace } = useStore();
@@ -94,17 +95,18 @@ export const WorkspaceLayout: React.FC = () => {
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
+          const privacy = getSettingsSection('privacy');
           await channel.track({
             user_id: session.user.id,
             name: currentUser.name,
             role: currentUser.role,
             avatarConfig: currentUser.avatarConfig,
-            x: currentUser.x,
-            y: currentUser.y,
+            x: privacy.showLocationInSpace ? currentUser.x : 0,
+            y: privacy.showLocationInSpace ? currentUser.y : 0,
             direction: currentUser.direction,
             isMicOn: currentUser.isMicOn,
             isCameraOn: currentUser.isCameraOn,
-            status: currentUser.status,
+            status: privacy.showOnlineStatus ? currentUser.status : PresenceStatus.AWAY,
           });
         }
       });
@@ -117,20 +119,21 @@ export const WorkspaceLayout: React.FC = () => {
     };
   }, [activeWorkspace?.id, session?.user?.id]);
 
-  // Actualizar presencia cuando cambia la posición
+  // Actualizar presencia cuando cambia la posición (respetando settings de privacidad)
   useEffect(() => {
     if (presenceChannelRef.current && session?.user?.id && presenceChannelRef.current.state === 'joined') {
+      const privacy = getSettingsSection('privacy');
       presenceChannelRef.current.track({
         user_id: session.user.id,
         name: currentUser.name,
         role: currentUser.role,
         avatarConfig: currentUser.avatarConfig,
-        x: currentUser.x,
-        y: currentUser.y,
+        x: privacy.showLocationInSpace ? currentUser.x : 0,
+        y: privacy.showLocationInSpace ? currentUser.y : 0,
         direction: currentUser.direction,
         isMicOn: currentUser.isMicOn,
         isCameraOn: currentUser.isCameraOn,
-        status: currentUser.status,
+        status: privacy.showOnlineStatus ? currentUser.status : PresenceStatus.AWAY,
       });
     }
   }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, currentUser.status, session?.user?.id]);
