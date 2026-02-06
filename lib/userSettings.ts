@@ -29,14 +29,22 @@ export interface UserSettings {
     autoIdleMuting: boolean;
   };
   meetings: {
-    enableRecordingForMembers: boolean;
     autoMuteOnJoin: boolean;
     autoCameraOffOnJoin: boolean;
-    showTranscription: boolean;
-    aiSummaryEnabled: boolean;
-    maxParticipants: number;
-    waitingRoomEnabled: boolean;
-    allowScreenShare: boolean;
+    // Legacy — mantenidos para compatibilidad con localStorage existente
+    enableRecordingForMembers?: boolean;
+    showTranscription?: boolean;
+    aiSummaryEnabled?: boolean;
+    maxParticipants?: number;
+    waitingRoomEnabled?: boolean;
+    allowScreenShare?: boolean;
+    // Métricas de análisis customizables por tipo de reunión
+    analisisMetricas: {
+      rrhh_entrevista: string[];
+      rrhh_one_to_one: string[];
+      deals: string[];
+      equipo: string[];
+    };
   };
   notifications: {
     desktopNotifications: boolean;
@@ -114,14 +122,48 @@ const defaultSettings: UserSettings = {
     autoIdleMuting: true
   },
   meetings: {
-    enableRecordingForMembers: false,
     autoMuteOnJoin: false,
     autoCameraOffOnJoin: false,
+    enableRecordingForMembers: false,
     showTranscription: true,
     aiSummaryEnabled: true,
     maxParticipants: 25,
     waitingRoomEnabled: false,
-    allowScreenShare: true
+    allowScreenShare: true,
+    analisisMetricas: {
+      rrhh_entrevista: [
+        'congruencia_verbal_no_verbal',
+        'nivel_nerviosismo',
+        'confianza_percibida',
+        'engagement_por_pregunta',
+        'momentos_incomodidad',
+        'prediccion_fit_cultural',
+      ],
+      rrhh_one_to_one: [
+        'congruencia_verbal_no_verbal',
+        'nivel_comodidad',
+        'engagement_por_tema',
+        'momentos_preocupacion',
+        'señales_satisfaccion',
+        'apertura_comunicacion',
+      ],
+      deals: [
+        'momentos_interes',
+        'señales_objecion',
+        'engagement_por_tema',
+        'señales_cierre',
+        'prediccion_probabilidad_cierre',
+        'puntos_dolor_detectados',
+      ],
+      equipo: [
+        'participacion_por_persona',
+        'engagement_grupal',
+        'reacciones_a_ideas',
+        'momentos_desconexion',
+        'dinamica_grupal',
+        'prediccion_adopcion_ideas',
+      ],
+    },
   },
   notifications: {
     desktopNotifications: true,

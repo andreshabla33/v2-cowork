@@ -274,6 +274,32 @@ export const CONFIGURACIONES_GRABACION: Record<TipoGrabacion, ConfiguracionGraba
   equipo: CONFIGURACIONES_GRABACION_DETALLADO.equipo,
 };
 
+/**
+ * Obtiene la configuración de grabación con métricas customizadas desde settings del usuario.
+ * Si el usuario tiene métricas personalizadas en localStorage (via SettingsMeetings),
+ * las usa en vez de las hardcodeadas.
+ * @param tipo - Tipo de grabación detallado
+ * @returns ConfiguracionGrabacion con métricas del usuario o defaults
+ */
+export function getConfiguracionConMetricasCustom(tipo: TipoGrabacionDetallado): ConfiguracionGrabacion {
+  const config = { ...CONFIGURACIONES_GRABACION_DETALLADO[tipo] };
+  
+  try {
+    const raw = localStorage.getItem('user_settings');
+    if (raw) {
+      const settings = JSON.parse(raw);
+      const metricasCustom = settings?.meetings?.analisisMetricas?.[tipo];
+      if (Array.isArray(metricasCustom) && metricasCustom.length > 0) {
+        config.metricas = metricasCustom;
+      }
+    }
+  } catch {
+    // Fallback a métricas por defecto si hay error
+  }
+  
+  return config;
+}
+
 // ==================== ANÁLISIS FACIAL ====================
 
 export interface MicroexpresionData {

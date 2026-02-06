@@ -20,6 +20,7 @@ import {
   TipoGrabacionDetallado,
   CargoLaboral,
   CONFIGURACIONES_GRABACION_DETALLADO,
+  getConfiguracionConMetricasCustom,
   ResultadoAnalisis,
   tienePermisoAnalisis,
 } from './types/analysis';
@@ -95,7 +96,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
 
   const isRecording = processingState.step === 'recording';
-  const config = tipoGrabacion ? CONFIGURACIONES_GRABACION_DETALLADO[tipoGrabacion] : null;
+  const config = tipoGrabacion ? getConfiguracionConMetricasCustom(tipoGrabacion) : null;
 
   // Hook de transcripción
   const {
