@@ -60,7 +60,7 @@ export const MeetingRooms: React.FC<{ onJoinRoom?: (roomId: string) => void }> =
     if (!newRoom.nombre.trim() || !activeWorkspace?.id) return;
     setLoading(true);
     
-    const { error } = await supabase.from('salas_reunion').insert({
+    const { data, error } = await supabase.from('salas_reunion').insert({
       espacio_id: activeWorkspace.id,
       nombre: newRoom.nombre.trim(),
       descripcion: newRoom.descripcion.trim() || null,
@@ -68,11 +68,25 @@ export const MeetingRooms: React.FC<{ onJoinRoom?: (roomId: string) => void }> =
       es_privada: newRoom.es_privada,
       password_hash: newRoom.es_privada && newRoom.password ? newRoom.password : null,
       max_participantes: newRoom.max_participantes
-    });
+    }).select('id').single();
 
-    if (!error) {
+    if (error) {
+      console.error('Error creating room:', error);
+      alert('Error al crear sala: ' + error.message);
+    } else if (data) {
+      console.log('Room created:', data.id);
+      // Auto-unir al creador como host
+      const { error: joinError } = await supabase.from('participantes_sala').insert({
+        sala_id: data.id,
+        usuario_id: currentUser.id,
+        mic_activo: true,
+        cam_activa: false
+      });
+      if (joinError) console.error('Error auto-joining room:', joinError);
+      
       setShowCreateModal(false);
       setNewRoom({ nombre: '', descripcion: '', es_privada: false, password: '', max_participantes: 10 });
+      onJoinRoom?.(data.id);
       loadRooms();
     }
     setLoading(false);
