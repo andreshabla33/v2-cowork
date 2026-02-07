@@ -292,7 +292,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         </div>
 
         {/* Micrófono con dropdown - Estilo Gather 2026 */}
-        <div className="relative" ref={audioMenuRef}>
+        <div className="relative" ref={audioMenuRef} data-tour-step="mic-btn">
           {isGameActive ? (
             <button
               onClick={onToggleMic}
@@ -443,7 +443,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         </div>
 
         {/* Cámara con dropdown */}
-        <div className="relative" ref={cameraMenuRef}>
+        <div className="relative" ref={cameraMenuRef} data-tour-step="cam-btn">
           {isGameActive ? (
             <button
               onClick={onToggleCam}
@@ -624,6 +624,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
         <div className={`${isGameActive ? 'h-px w-6' : 'w-px h-6'} bg-white/10 mx-0.5`}></div>
 
         {/* Chat */}
+        <div data-tour-step="chat-btn">
         <ControlButton 
           onClick={onToggleChat} 
           isActive={showChat} 
@@ -632,6 +633,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           icon={<IconChat />}
           tooltip="Chat"
         />
+        </div>
 
         {/* Reacciones */}
         <div className="relative">
@@ -661,7 +663,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
           <>
             <div className={`${isGameActive ? 'h-px w-6' : 'w-px h-6'} bg-white/10 mx-0.5`}></div>
 
-            {isRecording ? (
+            {isRecording ? (<div data-tour-step="recording-btn">
               /* Indicador de grabación activa - Minimalista estilo 2026 */
               <div className="flex items-center gap-2 pl-2 pr-1 py-1 rounded-xl bg-red-500/15 border border-red-500/30">
                 {/* Punto rojo parpadeante */}
@@ -682,9 +684,9 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   <div className="w-2.5 h-2.5 bg-white rounded-sm"></div>
                 </button>
               </div>
-            ) : (
+            </div>) : (
               /* Botón para iniciar grabación */
-              <button
+              <button data-tour-step="recording-btn"
                 onClick={onToggleRecording}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-white transition-all duration-300"
               >

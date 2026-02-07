@@ -20,6 +20,7 @@ import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../l
 import { getSettingsSection } from '../lib/userSettings';
 import { cargarMetricasEspacio } from '../lib/metricasAnalisis';
 import { MiniModeOverlay } from './MiniModeOverlay';
+import { ProductTour } from './onboarding/ProductTour';
 
 export const WorkspaceLayout: React.FC = () => {
   const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace, setMiniMode, isMiniMode } = useStore();
@@ -309,7 +310,7 @@ export const WorkspaceLayout: React.FC = () => {
           </svg>
         </div>
 
-        <nav className="flex-1 flex flex-col gap-1 mt-3">
+        <nav className="flex-1 flex flex-col gap-1 mt-3" data-tour-step="sidebar-nav">
           {[
             { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: t('nav.space', currentLang) },
             { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: t('nav.messages', currentLang) },
@@ -346,6 +347,7 @@ export const WorkspaceLayout: React.FC = () => {
         <div className="mt-auto flex flex-col gap-1 items-center pb-3">
           {/* Botón de Configuración - 2026 Minimal */}
           <button
+            data-tour-step="settings-btn"
             onClick={() => setShowSettings(true)}
             className={`p-2.5 rounded-lg transition-all duration-200 ${
               theme === 'arcade' 
@@ -373,7 +375,7 @@ export const WorkspaceLayout: React.FC = () => {
       </aside>
 
       {/* Sidebar Workspace */}
-      <aside className={`w-[260px] ${s.sidebar} flex flex-col shrink-0 border-r ${s.border} z-90 shadow-2xl relative overflow-hidden`}>
+      <aside className={`w-[260px] ${s.sidebar} flex flex-col shrink-0 border-r ${s.border} z-90 shadow-2xl relative overflow-hidden`} data-tour-step="sidebar-chat">
         {theme === 'arcade' && <div className="absolute top-0 left-0 w-full h-1 bg-[#00ff41] animate-pulse" />}
         <ChatPanel sidebarOnly={true} />
       </aside>
@@ -402,7 +404,7 @@ export const WorkspaceLayout: React.FC = () => {
             <StatusSelector />
             
             {/* SELECTOR DE TEMAS - Glassmorphism */}
-            <div className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-xl ${
+            <div data-tour-step="theme-selector" className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-xl ${
               theme === 'arcade' 
                 ? 'border-[#00ff41]/40 bg-black/60' 
                 : theme === 'light'
@@ -432,6 +434,7 @@ export const WorkspaceLayout: React.FC = () => {
 
             {/* BOTÓN MINI JUEGOS - Estilo glassmorphism */}
             <button 
+              data-tour-step="games-btn"
               onClick={() => setShowGameHub(true)} 
               className={`relative overflow-hidden flex items-center gap-2.5 px-4 py-2.5 rounded-2xl transition-all font-bold text-[10px] tracking-wider group ${
                 theme === 'arcade' 
@@ -447,6 +450,7 @@ export const WorkspaceLayout: React.FC = () => {
 
             {/* BOTÓN VIBEN AI - Estilo onboarding con gradiente */}
             <button 
+              data-tour-step="viben-btn"
               onClick={onVibenToggle} 
               className={`relative overflow-hidden flex items-center gap-2.5 px-5 py-2.5 rounded-2xl transition-all font-black uppercase text-[10px] tracking-wider group ${
                 theme === 'arcade' 
@@ -469,7 +473,7 @@ export const WorkspaceLayout: React.FC = () => {
         <div className="flex-1 relative overflow-hidden">
           {/* VirtualSpace3D siempre montado pero oculto cuando no está activo
               Esto mantiene el stream y conexiones WebRTC activas */}
-          <div className={activeSubTab === 'space' ? 'h-full w-full' : 'hidden'}>
+          <div className={activeSubTab === 'space' ? 'h-full w-full' : 'hidden'} data-tour-step="space-canvas">
             <VirtualSpace3D theme={theme} isGameHubOpen={showGameHub} isPlayingGame={isPlayingGame} />
           </div>
           {activeSubTab !== 'space' && (
@@ -551,6 +555,15 @@ export const WorkspaceLayout: React.FC = () => {
 
       {/* Mini Mode Overlay */}
       <MiniModeOverlay />
+
+      {/* Product Tour - Guía interactiva para nuevos miembros */}
+      {activeWorkspace?.id && session?.user?.id && activeSubTab === 'space' && (
+        <ProductTour
+          espacioId={activeWorkspace.id}
+          userId={session.user.id}
+          rol={userRoleInActiveWorkspace || 'miembro'}
+        />
+      )}
     </div>
   );
 };
