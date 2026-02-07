@@ -39,12 +39,13 @@ const MODELS = [
 ];
 
 export const generateChatResponse = async (prompt: string, context: any) => {
-  const apiKey = process.env.OPENROUTER_API_KEY;
+  const apiKey = process.env.OPENROUTER_API_KEY || process.env.OPEN_AI;
   
   if (!apiKey) {
-    console.error('❌ Mónica AI: OPENROUTER_API_KEY no configurada. Valor:', typeof apiKey);
-    throw new Error('OPENROUTER_API_KEY no configurada');
+    console.error('❌ Mónica AI: Ni OPENROUTER_API_KEY ni OPEN_AI configuradas');
+    throw new Error('API Key de IA no configurada (OPENROUTER_API_KEY o OPEN_AI)');
   }
+  console.log('🔑 Mónica AI: Usando key:', apiKey.substring(0, 10) + '...');
 
   let lastError: Error | null = null;
 

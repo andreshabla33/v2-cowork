@@ -91,6 +91,15 @@ const PASOS_GENERALES: DriveStep[] = [
     },
   },
   {
+    element: '[data-tour-step="avatar-area"]',
+    popover: {
+      title: '🧍 Tu Avatar',
+      description: 'Este eres t\u00FA en el espacio virtual. Haz doble clic en cualquier lugar del espacio para mover tu avatar autom\u00E1ticamente hasta ese punto.',
+      side: 'bottom',
+      align: 'center',
+    },
+  },
+  {
     element: '[data-tour-step="viben-btn"]',
     popover: {
       title: '🤖 Mónica AI',
@@ -105,8 +114,8 @@ const PASOS_ADMIN: DriveStep[] = [
   {
     element: '[data-tour-step="games-btn"]',
     popover: {
-      title: '🎮 Mini Juegos',
-      description: 'Juega con tu equipo para fortalecer la cultura. Ajedrez, trivia y más.',
+      title: '🎮 Mini Juegos (🚧 En construcci\u00F3n)',
+      description: 'Pr\u00F3ximamente: juega con tu equipo para fortalecer la cultura. Ajedrez, trivia y m\u00E1s. \u00A1Estamos trabajando en ello!',
       side: 'bottom',
       align: 'center',
     },
