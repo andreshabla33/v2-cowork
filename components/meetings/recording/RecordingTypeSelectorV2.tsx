@@ -33,6 +33,7 @@ interface RecordingTypeSelectorV2Props {
   cargoUsuario: CargoLaboral;
   usuariosEnLlamada?: UsuarioEnLlamada[]; // Usuarios disponibles para seleccionar como evaluado
   currentUserId?: string; // ID del usuario actual (grabador)
+  preselectedType?: TipoGrabacionDetallado; // Tipo preseleccionado (ir directo a disclaimer si aplica)
 }
 
 export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = ({
@@ -42,6 +43,7 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
   cargoUsuario,
   usuariosEnLlamada = [],
   currentUserId,
+  preselectedType,
 }) => {
   const [selectedType, setSelectedType] = useState<TipoGrabacionDetallado | null>(null);
   const [showDisclaimer, setShowDisclaimer] = useState(false);
@@ -70,14 +72,25 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
 
   const cargoInfo = INFO_CARGOS[cargoUsuario];
 
-  // Animación de entrada
+  // Animación de entrada + auto-selección de tipo predefinido
   useEffect(() => {
     if (isOpen) {
       setIsAnimating(true);
       const timer = setTimeout(() => setIsAnimating(false), 300);
+      
+      // Si hay tipo preseleccionado que requiere disclaimer, ir directo
+      if (preselectedType && !selectedType && !showDisclaimer) {
+        const preConfig = CONFIGURACIONES_GRABACION_DETALLADO[preselectedType];
+        if (preConfig?.requiereDisclaimer) {
+          setSelectedType(preselectedType);
+          setShowDisclaimer(true);
+          setDisclaimerAccepted(false);
+        }
+      }
+      
       return () => clearTimeout(timer);
     }
-  }, [isOpen]);
+  }, [isOpen, preselectedType]);
 
   if (!isOpen) return null;
 

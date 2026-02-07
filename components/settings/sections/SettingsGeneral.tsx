@@ -4,6 +4,8 @@ import { SettingToggle } from '../components/SettingToggle';
 import { SettingDropdown } from '../components/SettingDropdown';
 import { SettingSection } from '../components/SettingSection';
 import { Language, getCurrentLanguage, setLanguage } from '../../../lib/i18n';
+import { supabase } from '../../../lib/supabase';
+import { useStore } from '../../../store/useStore';
 
 interface GeneralSettings {
   skipWelcomeScreen: boolean;
@@ -23,6 +25,21 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
 }) => {
   const { t, i18n } = useTranslation();
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+  const [tourResetDone, setTourResetDone] = useState(false);
+  const { session, activeWorkspace } = useStore();
+
+  const handleResetTour = async () => {
+    if (!session?.user?.id || !activeWorkspace?.id) return;
+    const { error } = await supabase
+      .from('miembros_espacio')
+      .update({ tour_completado: false, tour_veces_mostrado: 0 })
+      .eq('usuario_id', session.user.id)
+      .eq('espacio_id', activeWorkspace.id);
+    if (!error) {
+      setTourResetDone(true);
+      setTimeout(() => setTourResetDone(false), 3000);
+    }
+  };
 
   // Escuchar cambios de idioma de i18next
   useEffect(() => {
@@ -90,6 +107,23 @@ export const SettingsGeneral: React.FC<SettingsGeneralProps> = ({
           checked={settings.autoUpdates}
           onChange={(v) => updateSetting('autoUpdates', v)}
         />
+        <div className="flex items-center justify-between py-3">
+          <div>
+            <p className="text-sm font-medium text-white">Tour guiado</p>
+            <p className="text-xs text-zinc-400">Vuelve a ver el recorrido interactivo del espacio</p>
+          </div>
+          <button
+            onClick={handleResetTour}
+            disabled={tourResetDone}
+            className={`px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+              tourResetDone
+                ? 'bg-green-500/20 text-green-400 border border-green-500/30'
+                : 'bg-indigo-500/20 text-indigo-400 border border-indigo-500/30 hover:bg-indigo-500/30'
+            }`}
+          >
+            {tourResetDone ? '✓ Listo, cierra settings' : '🔄 Ver tour de nuevo'}
+          </button>
+        </div>
       </SettingSection>
 
       <SettingSection title={getTitle('language')}>

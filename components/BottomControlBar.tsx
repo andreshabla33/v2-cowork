@@ -330,7 +330,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
           {/* Menú de configuración de audio estilo Gather */}
           {showAudioMenu && (
-            <div className="absolute bottom-full left-0 mb-2 w-72 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="absolute bottom-full left-0 mb-2 w-80 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="p-3 space-y-3">
                 {/* Selección de micrófono */}
                 <div>

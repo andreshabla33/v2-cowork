@@ -176,7 +176,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-[#050508] flex items-center justify-center p-4 lg:p-3 overflow-y-auto">
+    <div className="fixed inset-0 bg-[#050508] flex items-center justify-center p-4 lg:p-3 overflow-y-auto min-h-0">
       {/* Fondo con gradientes neon animados - mismo estilo que login */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-[-30%] left-[-20%] w-[70%] h-[70%] rounded-full bg-violet-600/15 blur-[180px] animate-pulse" />
@@ -258,6 +258,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
               onSelect={handleSelectCargo}
               espacioNombre="tu nuevo espacio"
               isLoading={false}
+              rolUsuario="super_admin"
             />
           </motion.div>
         )}

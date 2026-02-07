@@ -31,60 +31,92 @@ Instrucciones:
 - Usa emojis con moderación para hacer la conversación más amigable.
 - Sé breve, máximo 2-3 oraciones por respuesta a menos que se pida algo detallado.`;
 
+// Modelos en orden de preferencia (fallback si el primero falla)
+const MODELS = [
+  'google/gemini-2.0-flash-001',
+  'google/gemini-2.0-flash-exp:free',
+  'google/gemini-flash-1.5',
+];
+
 export const generateChatResponse = async (prompt: string, context: any) => {
   const apiKey = process.env.OPENROUTER_API_KEY;
   
   if (!apiKey) {
+    console.error('❌ Mónica AI: OPENROUTER_API_KEY no configurada. Valor:', typeof apiKey);
     throw new Error('OPENROUTER_API_KEY no configurada');
   }
 
-  try {
-    const response = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': window.location.origin,
-        'X-Title': 'Cowork - Mónica AI',
-      },
-      body: JSON.stringify({
-        model: 'google/gemini-2.0-flash-001',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT(context) },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.7,
-        max_tokens: 500,
-      }),
-    });
+  let lastError: Error | null = null;
 
-    if (!response.ok) {
-      const errorData = await response.text();
-      console.error('OpenRouter error:', response.status, errorData);
-      throw new Error(`Error de API: ${response.status}`);
-    }
+  for (const model of MODELS) {
+    try {
+      console.log(`🤖 Mónica AI: Intentando con modelo ${model}...`);
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-    const data = await response.json();
-    const content = data.choices?.[0]?.message?.content || '';
+      const response = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+          'HTTP-Referer': window.location.origin,
+          'X-Title': 'Cowork - Mónica AI',
+        },
+        body: JSON.stringify({
+          model,
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT(context) },
+            { role: 'user', content: prompt },
+          ],
+          temperature: 0.7,
+          max_tokens: 500,
+        }),
+        signal: controller.signal,
+      });
 
-    // Detectar si hay un comando de crear tarea
-    const taskMatch = content.match(/\[CREATE_TASK\](.*?)\[\/CREATE_TASK\]/s);
-    if (taskMatch) {
-      try {
-        const taskData = JSON.parse(taskMatch[1]);
-        const cleanText = content.replace(/\[CREATE_TASK\].*?\[\/CREATE_TASK\]/s, '').trim();
-        return {
-          text: cleanText || `✅ Tarea "${taskData.title}" creada.`,
-          functionCalls: [{ name: 'createTask', args: taskData }],
-        };
-      } catch (e) {
-        console.error('Error parsing task JSON:', e);
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.warn(`⚠️ Mónica AI: Modelo ${model} falló (${response.status}):`, errorData);
+        lastError = new Error(`Error de API: ${response.status} - ${errorData}`);
+        continue; // Intentar siguiente modelo
       }
-    }
 
-    return { text: content, functionCalls: null };
-  } catch (error) {
-    console.error('Mónica AI Error:', error);
-    throw error;
+      console.log(`✅ Mónica AI: Respuesta exitosa con modelo ${model}`);
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content || '';
+
+      // Detectar si hay un comando de crear tarea
+      const taskMatch = content.match(/\[CREATE_TASK\](.*?)\[\/CREATE_TASK\]/s);
+      if (taskMatch) {
+        try {
+          const taskData = JSON.parse(taskMatch[1]);
+          const cleanText = content.replace(/\[CREATE_TASK\].*?\[\/CREATE_TASK\]/s, '').trim();
+          return {
+            text: cleanText || `✅ Tarea "${taskData.title}" creada.`,
+            functionCalls: [{ name: 'createTask', args: taskData }],
+          };
+        } catch (e) {
+          console.error('Error parsing task JSON:', e);
+        }
+      }
+
+      return { text: content, functionCalls: null };
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        console.warn(`⚠️ Mónica AI: Timeout con modelo ${model}`);
+        lastError = new Error(`Timeout con modelo ${model}`);
+      } else {
+        console.error(`❌ Mónica AI: Error con modelo ${model}:`, error);
+        lastError = error;
+      }
+      continue; // Intentar siguiente modelo
+    }
   }
+
+  // Si todos los modelos fallaron
+  console.error('❌ Mónica AI: Todos los modelos fallaron');
+  throw lastError || new Error('No se pudo conectar con ningún modelo de IA');
 };

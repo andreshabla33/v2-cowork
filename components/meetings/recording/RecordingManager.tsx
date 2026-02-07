@@ -377,9 +377,15 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       if (isRecording) {
         stopRecording();
       } else if (preselectedTipoGrabacion) {
-        // Si ya hay tipo predefinido (de la reunión programada), iniciar directo con análisis
-        console.log('🎬 Auto-inicio con tipo predefinido:', preselectedTipoGrabacion);
-        handleTypeSelect(preselectedTipoGrabacion, true);
+        // Si requiere disclaimer (RRHH), mostrar selector para elegir evaluado y aceptar
+        const preConfig = CONFIGURACIONES_GRABACION_DETALLADO[preselectedTipoGrabacion];
+        if (preConfig?.requiereDisclaimer) {
+          console.log('🎬 Tipo predefinido requiere disclaimer, mostrando selector:', preselectedTipoGrabacion);
+          setShowTypeSelector(true);
+        } else {
+          console.log('🎬 Auto-inicio con tipo predefinido:', preselectedTipoGrabacion);
+          handleTypeSelect(preselectedTipoGrabacion, true);
+        }
       } else {
         setShowTypeSelector(true);
       }
@@ -392,8 +398,13 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     if (isRecording) {
       stopRecording();
     } else if (preselectedTipoGrabacion) {
-      // Si hay tipo predefinido, iniciar directo
-      handleTypeSelect(preselectedTipoGrabacion, true);
+      // Si requiere disclaimer (RRHH), mostrar selector para elegir evaluado
+      const preConfig = CONFIGURACIONES_GRABACION_DETALLADO[preselectedTipoGrabacion];
+      if (preConfig?.requiereDisclaimer) {
+        setShowTypeSelector(true);
+      } else {
+        handleTypeSelect(preselectedTipoGrabacion, true);
+      }
     } else {
       setShowTypeSelector(true);
     }
@@ -654,6 +665,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         cargoUsuario={cargoUsuario}
         usuariosEnLlamada={usuariosEnLlamada}
         currentUserId={userId}
+        preselectedType={preselectedTipoGrabacion}
       />
 
       {/* Dashboard de resultados */}

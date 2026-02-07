@@ -349,16 +349,22 @@ export const useStore = create<AppState>((set, get) => ({
 
   updateStatus: async (status, statusText) => {
     const { session } = get();
+    // Actualizar UI inmediatamente (optimistic update)
+    set((state) => ({
+      currentUser: { ...state.currentUser, status, statusText: statusText !== undefined ? statusText : state.currentUser.statusText }
+    }));
     if (session?.user?.id) {
-      await supabase.from('usuarios').update({
+      const { error } = await supabase.from('usuarios').update({
         estado_disponibilidad: status,
         estado_personalizado: statusText || null,
         estado_actualizado_en: new Date().toISOString()
       }).eq('id', session.user.id);
+      if (error) {
+        console.error('❌ Error actualizando estado de disponibilidad:', error);
+      } else {
+        console.log('✅ Estado actualizado:', status);
+      }
     }
-    set((state) => ({
-      currentUser: { ...state.currentUser, status, statusText: statusText !== undefined ? statusText : state.currentUser.statusText }
-    }));
   },
 
   toggleMic: () => set((state) => ({

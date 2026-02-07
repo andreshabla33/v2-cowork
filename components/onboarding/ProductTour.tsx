@@ -135,37 +135,64 @@ export const ProductTour: React.FC<ProductTourProps> = ({
   const isAdmin = rol === 'super_admin' || rol === 'admin';
 
   // Cargar estado del tour desde Supabase
-  useEffect(() => {
-    const cargarEstado = async () => {
-      try {
-        const { data } = await supabase
-          .from('miembros_espacio')
-          .select('id, tour_completado, tour_veces_mostrado, tour_no_mostrar')
-          .eq('espacio_id', espacioId)
-          .eq('usuario_id', userId)
-          .single();
+  const cargarEstado = useCallback(async () => {
+    try {
+      const { data } = await supabase
+        .from('miembros_espacio')
+        .select('id, tour_completado, tour_veces_mostrado, tour_no_mostrar')
+        .eq('espacio_id', espacioId)
+        .eq('usuario_id', userId)
+        .single();
 
-        if (data) {
-          if (!miembroId) {
-            // Guardar miembroId para updates
-          }
-          setTourState({
-            tour_completado: data.tour_completado ?? false,
-            tour_veces_mostrado: data.tour_veces_mostrado ?? 0,
-            tour_no_mostrar: data.tour_no_mostrar ?? false,
-          });
+      if (data) {
+        const nuevoEstado = {
+          tour_completado: data.tour_completado ?? false,
+          tour_veces_mostrado: data.tour_veces_mostrado ?? 0,
+          tour_no_mostrar: data.tour_no_mostrar ?? false,
+        };
+        setTourState(nuevoEstado);
+        // Si el tour fue reseteado (completado=false, veces=0), permitir re-disparo
+        if (!nuevoEstado.tour_completado && nuevoEstado.tour_veces_mostrado === 0) {
+          setTourStarted(false);
         }
-      } catch (err) {
-        console.warn('ProductTour: Error cargando estado', err);
-      } finally {
-        setLoaded(true);
       }
-    };
+    } catch (err) {
+      console.warn('ProductTour: Error cargando estado', err);
+    } finally {
+      setLoaded(true);
+    }
+  }, [espacioId, userId]);
 
+  useEffect(() => {
     if (espacioId && userId) {
       cargarEstado();
     }
-  }, [espacioId, userId]);
+  }, [espacioId, userId, cargarEstado]);
+
+  // Escuchar cambios en miembros_espacio (reset desde settings)
+  useEffect(() => {
+    if (!espacioId || !userId) return;
+
+    const channel = supabase
+      .channel(`tour-reset-${userId}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'miembros_espacio',
+        filter: `usuario_id=eq.${userId}`,
+      }, (payload) => {
+        const nuevo = payload.new as any;
+        if (nuevo.espacio_id === espacioId && nuevo.tour_completado === false) {
+          console.log('ProductTour: Tour reseteado desde settings, recargando...');
+          cargarEstado();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [espacioId, userId, cargarEstado]);
 
   // Actualizar estado en Supabase
   const actualizarEstado = useCallback(async (updates: Partial<TourState>) => {
