@@ -206,7 +206,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
   // Iniciar grabación
-  const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true, evaluadoId?: string) => {
+  const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true, evaluadoId?: string, evaluadoNombre?: string, evaluadoEmail?: string) => {
     if (!stream) {
       updateState({ step: 'error', message: 'No hay stream de audio/video disponible' });
       return;
@@ -261,6 +261,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         tiene_audio: true,
         formato: 'webm',
         evaluado_id: (evaluadoId && isValidUUID(evaluadoId)) ? evaluadoId : null,
+        evaluado_nombre: evaluadoNombre || null,
+        evaluado_email: evaluadoEmail || null,
       });
       
       if (insertError) {
@@ -368,12 +370,12 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   }, [updateState, onRecordingStateChange, stopTranscription, combinedAnalysis]);
 
   // Manejar selección de tipo
-  const handleTypeSelect = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean, evaluadoId?: string) => {
-    console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis, 'evaluado:', evaluadoId);
+  const handleTypeSelect = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean, evaluadoId?: string, evaluadoNombre?: string, evaluadoEmail?: string) => {
+    console.log('🎬 Tipo seleccionado:', tipo, 'con análisis:', analisis, 'evaluado:', evaluadoId, 'nombre:', evaluadoNombre, 'email:', evaluadoEmail);
     setTipoGrabacion(tipo);
     setConAnalisis(analisis);
     setShowTypeSelector(false);
-    await startRecording(tipo, analisis, evaluadoId);
+    await startRecording(tipo, analisis, evaluadoId, evaluadoNombre, evaluadoEmail);
   }, [startRecording]);
 
   // Manejar trigger externo

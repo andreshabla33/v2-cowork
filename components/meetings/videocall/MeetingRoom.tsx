@@ -411,6 +411,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           userId={currentUser?.id || ''}
           userName={currentUser?.name || nombreInvitado || 'Participante'}
           cargoUsuario={cargoUsuario}
+          invitadosExternos={invitadoExterno ? [invitadoExterno] : []}
         />
         <RoomAudioRenderer />
       </LiveKitRoom>
@@ -433,6 +434,7 @@ interface MeetingRoomContentProps {
   userId: string;
   userName: string;
   cargoUsuario: CargoLaboral;
+  invitadosExternos?: InvitadoExterno[];
 }
 
 const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({ 
@@ -449,6 +451,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   userId,
   userName,
   cargoUsuario,
+  invitadosExternos = [],
 }) => {
   const room = useRoomContext();
   const { localParticipant } = useLocalParticipant();
@@ -925,10 +928,18 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           stream={localStream}
           usuariosEnLlamada={
             room?.remoteParticipants 
-              ? Array.from(room.remoteParticipants.values()).map(p => ({
-                  id: p.identity,
-                  nombre: p.name || p.identity,
-                }))
+              ? Array.from(room.remoteParticipants.values()).map(p => {
+                  // Buscar si este participante coincide con un invitado externo (por nombre o identity)
+                  const externo = invitadosExternos.find(inv => 
+                    p.name?.toLowerCase().includes(inv.nombre.toLowerCase()) ||
+                    p.identity.startsWith('guest_')
+                  );
+                  return {
+                    id: p.identity,
+                    nombre: p.name || p.identity,
+                    email: externo?.email,
+                  };
+                })
               : []
           }
           onRecordingStateChange={(recording) => {

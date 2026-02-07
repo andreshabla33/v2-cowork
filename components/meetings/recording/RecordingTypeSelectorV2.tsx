@@ -24,12 +24,13 @@ import {
 interface UsuarioEnLlamada {
   id: string;
   nombre: string;
+  email?: string;
 }
 
 interface RecordingTypeSelectorV2Props {
   isOpen: boolean;
   onClose: () => void;
-  onSelect: (tipo: TipoGrabacionDetallado, conAnalisis: boolean, evaluadoId?: string) => void;
+  onSelect: (tipo: TipoGrabacionDetallado, conAnalisis: boolean, evaluadoId?: string, evaluadoNombre?: string, evaluadoEmail?: string) => void;
   cargoUsuario: CargoLaboral;
   usuariosEnLlamada?: UsuarioEnLlamada[]; // Usuarios disponibles para seleccionar como evaluado
   currentUserId?: string; // ID del usuario actual (grabador)
@@ -112,8 +113,9 @@ export const RecordingTypeSelectorV2: React.FC<RecordingTypeSelectorV2Props> = (
     
     // Si hay evaluados disponibles y se seleccionó uno, enviar solicitud de consentimiento
     if (evaluadosDisponibles.length > 0 && selectedEvaluado) {
-      // Pasar el evaluado seleccionado para que se envíe la solicitud
-      onSelect(selectedType, true, selectedEvaluado);
+      // Pasar el evaluado seleccionado + su nombre
+      const evaluado = evaluadosDisponibles.find(u => u.id === selectedEvaluado);
+      onSelect(selectedType, true, selectedEvaluado, evaluado?.nombre, evaluado?.email);
       resetState();
     } else if (evaluadosDisponibles.length === 0) {
       // No hay otros usuarios, grabar sin evaluado específico
