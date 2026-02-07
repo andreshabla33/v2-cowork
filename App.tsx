@@ -403,9 +403,10 @@ interface OnboardingCargoState {
   cargoSugerido: CargoLaboral | null;
   miembroId: string | null;
   departamentos: Departamento[];
-  paso: 'cargo' | 'departamento';
+  paso: 'bienvenida' | 'cargo' | 'departamento';
   cargoSeleccionado: CargoLaboral | null;
   rolSistema: string; // Rol del sistema (super_admin, admin, member)
+  invitadorNombre: string;
 }
 
 const OnboardingCargoView: React.FC = () => {
@@ -418,9 +419,10 @@ const OnboardingCargoView: React.FC = () => {
     cargoSugerido: null,
     miembroId: null,
     departamentos: [],
-    paso: 'cargo',
+    paso: 'bienvenida',
     cargoSeleccionado: null,
-    rolSistema: 'member', // Por defecto member (más restrictivo)
+    rolSistema: 'member',
+    invitadorNombre: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -470,15 +472,16 @@ const OnboardingCargoView: React.FC = () => {
         .eq('espacio_id', miembro.espacio_id)
         .order('nombre');
 
-      // Buscar cargo sugerido en invitación
+      // Buscar cargo sugerido e invitador
       const { data: invitacion } = await supabase
         .from('invitaciones_pendientes')
-        .select('cargo_sugerido')
+        .select('cargo_sugerido, creada_por, invitador:usuarios!creada_por(nombre)')
         .eq('email', session.user.email)
         .eq('usada', true)
         .single();
 
       const espacioData = miembro.espacios_trabajo as any;
+      const invitadorData = invitacion?.invitador as any;
       setState({
         isLoading: false,
         error: null,
@@ -487,9 +490,10 @@ const OnboardingCargoView: React.FC = () => {
         cargoSugerido: invitacion?.cargo_sugerido || null,
         miembroId: miembro.id,
         departamentos: departamentosData || [],
-        paso: 'cargo',
+        paso: 'bienvenida',
         cargoSeleccionado: null,
-        rolSistema: (miembro as any).rol || 'member', // Rol del sistema para filtrar cargos
+        rolSistema: (miembro as any).rol || 'member',
+        invitadorNombre: invitadorData?.nombre || '',
       });
     } catch (err) {
       console.error('Error verificando miembro:', err);
@@ -560,7 +564,77 @@ const OnboardingCargoView: React.FC = () => {
     );
   }
 
-  // Paso 1: Selección de cargo (filtrado por rol del sistema)
+  const esAdmin = state.rolSistema === 'admin' || state.rolSistema === 'super_admin';
+
+  // Paso 0: Bienvenida diferenciada por rol
+  if (state.paso === 'bienvenida') {
+    return (
+      <div className="fixed inset-0 bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
+        <div className="w-full max-w-lg text-center">
+          <div className={`inline-flex items-center justify-center w-20 h-20 rounded-2xl mb-6 shadow-lg ${
+            esAdmin
+              ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-amber-500/30'
+              : 'bg-gradient-to-br from-indigo-500 to-purple-600 shadow-indigo-500/30'
+          }`}>
+            <span className="text-4xl">{esAdmin ? '\u{1F451}' : '\u{1F44B}'}</span>
+          </div>
+
+          <h1 className="text-3xl font-bold text-white mb-3">
+            {esAdmin
+              ? `\u00A1Bienvenido como ${state.rolSistema === 'super_admin' ? 'Super Admin' : 'Administrador'}!`
+              : '\u00A1Bienvenido al equipo!'
+            }
+          </h1>
+
+          <p className="text-slate-400 text-lg mb-2">
+            Te uniste a <span className="text-white font-semibold">{state.espacioNombre}</span>
+            {state.invitadorNombre && (
+              <span> por invitaci\u00F3n de <span className="text-indigo-400 font-medium">{state.invitadorNombre}</span></span>
+            )}
+          </p>
+
+          {esAdmin ? (
+            <div className="mt-6 bg-amber-500/10 border border-amber-500/20 rounded-2xl p-6 text-left">
+              <h3 className="text-amber-400 font-bold text-sm mb-3">Como administrador podr\u00E1s:</h3>
+              <ul className="space-y-2 text-sm text-slate-300">
+                <li className="flex items-center gap-2"><span className="text-amber-400">\u2713</span> Invitar y gestionar miembros del equipo</li>
+                <li className="flex items-center gap-2"><span className="text-amber-400">\u2713</span> Configurar m\u00E9tricas de an\u00E1lisis conductual</li>
+                <li className="flex items-center gap-2"><span className="text-amber-400">\u2713</span> Administrar departamentos y roles</li>
+                <li className="flex items-center gap-2"><span className="text-amber-400">\u2713</span> Acceder a configuraciones avanzadas del espacio</li>
+              </ul>
+            </div>
+          ) : (
+            <div className="mt-6 bg-indigo-500/10 border border-indigo-500/20 rounded-2xl p-6 text-left">
+              <h3 className="text-indigo-400 font-bold text-sm mb-3">En tu espacio podr\u00E1s:</h3>
+              <ul className="space-y-2 text-sm text-slate-300">
+                <li className="flex items-center gap-2"><span className="text-indigo-400">\u2713</span> Colaborar en el espacio virtual 3D</li>
+                <li className="flex items-center gap-2"><span className="text-indigo-400">\u2713</span> Participar en reuniones con an\u00E1lisis inteligente</li>
+                <li className="flex items-center gap-2"><span className="text-indigo-400">\u2713</span> Gestionar tareas y comunicarte con tu equipo</li>
+                <li className="flex items-center gap-2"><span className="text-indigo-400">\u2713</span> Personalizar tu avatar y experiencia</li>
+              </ul>
+            </div>
+          )}
+
+          <p className="text-slate-500 text-sm mt-6 mb-4">
+            Primero, cu\u00E9ntanos cu\u00E1l es tu cargo para personalizar tu experiencia.
+          </p>
+
+          <button
+            onClick={() => setState(prev => ({ ...prev, paso: 'cargo' }))}
+            className={`px-8 py-3 rounded-xl font-semibold text-white shadow-lg transition-all hover:scale-105 active:scale-95 ${
+              esAdmin
+                ? 'bg-gradient-to-r from-amber-500 to-orange-600 shadow-amber-500/30'
+                : 'bg-gradient-to-r from-indigo-500 to-purple-600 shadow-indigo-500/30'
+            }`}
+          >
+            Continuar \u2192
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Paso 1: Selecci\u00F3n de cargo (filtrado por rol del sistema)
   if (state.paso === 'cargo') {
     return (
       <CargoSelector

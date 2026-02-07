@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { SettingSection } from '../components/SettingSection';
 import { Language, getCurrentLanguage, subscribeToLanguageChange } from '../../../lib/i18n';
+import { ModalInvitarUsuario } from '../../invitaciones/ModalInvitarUsuario';
+import { useStore } from '../../../store/useStore';
 
 interface Member {
   id: string;
@@ -15,6 +17,15 @@ interface Member {
   };
 }
 
+interface InvitacionPendiente {
+  id: string;
+  email: string;
+  rol: string;
+  nombre_invitado?: string;
+  created_at: string;
+  expira_en: string;
+}
+
 interface SettingsMembersProps {
   workspaceId: string;
   isAdmin: boolean;
@@ -24,8 +35,11 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
   workspaceId,
   isAdmin
 }) => {
+  const { activeWorkspace } = useStore();
   const [members, setMembers] = useState<Member[]>([]);
+  const [invitaciones, setInvitaciones] = useState<InvitacionPendiente[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
 
   // Escuchar cambios de idioma
@@ -36,9 +50,12 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
     return unsubscribe;
   }, []);
 
-  useEffect(() => {
-    const loadMembers = async () => {
-      const { data, error } = await supabase
+  const loadData = async () => {
+    if (!workspaceId) return;
+    setLoading(true);
+
+    const [membersRes, invitesRes] = await Promise.all([
+      supabase
         .from('miembros_espacio')
         .select(`
           id,
@@ -48,16 +65,28 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
           aceptado,
           usuario:usuarios(nombre, email)
         `)
-        .eq('espacio_id', workspaceId);
+        .eq('espacio_id', workspaceId),
+      supabase
+        .from('invitaciones_pendientes')
+        .select('id, email, rol, nombre_invitado, created_at, expira_en')
+        .eq('espacio_id', workspaceId)
+        .eq('usada', false)
+        .order('created_at', { ascending: false }),
+    ]);
 
-      if (!error && data) {
-        setMembers(data as any);
-      }
-      setLoading(false);
-    };
+    if (!membersRes.error && membersRes.data) setMembers(membersRes.data as any);
+    if (!invitesRes.error && invitesRes.data) setInvitaciones(invitesRes.data as any);
+    setLoading(false);
+  };
 
-    if (workspaceId) loadMembers();
+  useEffect(() => {
+    loadData();
   }, [workspaceId]);
+
+  const cancelarInvitacion = async (id: string) => {
+    await supabase.from('invitaciones_pendientes').delete().eq('id', id);
+    setInvitaciones(prev => prev.filter(i => i.id !== id));
+  };
 
   const getRoleBadge = (rol: string) => {
     const colors: Record<string, string> = {
@@ -127,15 +156,79 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
         )}
       </SettingSection>
 
+      {/* Invitaciones pendientes */}
+      {isAdmin && invitaciones.length > 0 && (
+        <div className="mt-6">
+          <SettingSection title={`${currentLang === 'en' ? 'Pending Invitations' : currentLang === 'pt' ? 'Convites Pendentes' : 'Invitaciones Pendientes'} (${invitaciones.length})`}>
+            <div className="divide-y divide-white/[0.05]">
+              {invitaciones.map((inv) => {
+                const expirada = new Date(inv.expira_en) < new Date();
+                return (
+                  <div key={inv.id} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 border border-amber-500/20 flex items-center justify-center">
+                        <svg className="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-white">
+                          {inv.nombre_invitado || inv.email}
+                        </p>
+                        <p className="text-xs text-zinc-500">
+                          {inv.email} · <span className="capitalize">{inv.rol}</span>
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {expirada ? (
+                        <span className="text-[10px] text-red-400 font-bold uppercase">
+                          {currentLang === 'en' ? 'Expired' : currentLang === 'pt' ? 'Expirado' : 'Expirada'}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-amber-400 font-bold uppercase">
+                          {currentLang === 'en' ? 'Pending' : currentLang === 'pt' ? 'Pendente' : 'Pendiente'}
+                        </span>
+                      )}
+                      <button
+                        onClick={() => cancelarInvitacion(inv.id)}
+                        className="text-xs text-red-500 hover:text-red-400 transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                      >
+                        {currentLang === 'en' ? 'Cancel' : currentLang === 'pt' ? 'Cancelar' : 'Cancelar'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </SettingSection>
+        </div>
+      )}
+
+      {/* Botón invitar */}
       {isAdmin && (
         <div className="mt-6">
-          <button className="w-full py-4 border-2 border-dashed border-white/[0.1] rounded-2xl text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-all flex items-center justify-center gap-2">
+          <button
+            onClick={() => setShowInviteModal(true)}
+            className="w-full py-4 border-2 border-dashed border-white/[0.1] rounded-2xl text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-all flex items-center justify-center gap-2"
+          >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
             {currentLang === 'en' ? 'Invite new member' : currentLang === 'pt' ? 'Convidar novo membro' : 'Invitar nuevo miembro'}
           </button>
         </div>
+      )}
+
+      {/* Modal de invitación */}
+      {activeWorkspace && (
+        <ModalInvitarUsuario
+          espacioId={workspaceId}
+          espacioNombre={activeWorkspace.name}
+          abierto={showInviteModal}
+          onCerrar={() => setShowInviteModal(false)}
+          onExito={loadData}
+        />
       )}
     </div>
   );
