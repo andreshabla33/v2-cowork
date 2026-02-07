@@ -312,6 +312,21 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
     onLeave?.();
   }, [onLeave]);
 
+  const handleLiveKitError = useCallback((err: Error) => {
+    console.error('LiveKit error:', err);
+    const msg = err.message || '';
+    const isRecoverable = msg.includes('Device in use') || msg.includes('NotReadableError') || msg.includes('NotAllowedError') || msg.includes('PC manager') || msg.includes('UnexpectedConnectionState') || msg.includes('already connected');
+    if (!isRecoverable) {
+      setError(msg);
+    } else {
+      console.warn('⚠️ Error recuperable de LiveKit (ignorado):', msg);
+    }
+  }, []);
+
+  const handleToggleChat = useCallback(() => {
+    setShowChat(prev => !prev);
+  }, []);
+
   const handleRoomDisconnected = useCallback(() => {
     console.log('Desconectado de la sala');
     
@@ -378,16 +393,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
         video={true}
         onConnected={handleRoomConnected}
         onDisconnected={handleRoomDisconnected}
-        onError={(err) => {
-          console.error('LiveKit error:', err);
-          const msg = err.message || '';
-          const isRecoverable = msg.includes('Device in use') || msg.includes('NotReadableError') || msg.includes('NotAllowedError') || msg.includes('PC manager') || msg.includes('UnexpectedConnectionState');
-          if (!isRecoverable) {
-            setError(msg);
-          } else {
-            console.warn('⚠️ Error recuperable de LiveKit (ignorado):', msg);
-          }
-        }}
+        onError={handleLiveKitError}
         data-lk-theme="default"
         style={{ height: '100%' }}
       >
@@ -400,7 +406,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           salaId={salaId}
           reunionId={reunionId}
           showChat={showChat}
-          onToggleChat={() => setShowChat(!showChat)}
+          onToggleChat={handleToggleChat}
           espacioId={activeWorkspace?.id || ''}
           userId={currentUser?.id || ''}
           userName={currentUser?.name || nombreInvitado || 'Participante'}

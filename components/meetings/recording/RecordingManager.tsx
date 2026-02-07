@@ -202,6 +202,9 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
     };
   }, []);
 
+  // Validar si es UUID válido
+  const isValidUUID = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+
   // Iniciar grabación
   const startRecording = useCallback(async (tipo: TipoGrabacionDetallado, analisis: boolean = true, evaluadoId?: string) => {
     if (!stream) {
@@ -257,7 +260,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         tiene_video: true,
         tiene_audio: true,
         formato: 'webm',
-        evaluado_id: evaluadoId || null,
+        evaluado_id: (evaluadoId && isValidUUID(evaluadoId)) ? evaluadoId : null,
       });
       
       if (insertError) {
@@ -267,8 +270,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
       }
       console.log('✅ Grabación insertada en BD');
 
-      // Si hay evaluado, enviar solicitud de consentimiento
-      if (evaluadoId) {
+      // Si hay evaluado con UUID válido, enviar solicitud de consentimiento
+      if (evaluadoId && isValidUUID(evaluadoId)) {
         console.log('📨 Enviando solicitud de consentimiento a:', evaluadoId);
         const { error: consentError } = await supabase.rpc('solicitar_consentimiento_grabacion', {
           p_grabacion_id: grabacionIdRef.current,
@@ -280,6 +283,8 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         } else {
           console.log('✅ Solicitud de consentimiento enviada');
         }
+      } else if (evaluadoId) {
+        console.log('👤 Evaluado es invitado externo (sin UUID), grabando sin consentimiento BD:', evaluadoId);
       }
 
       // Registrar al grabador como participante
