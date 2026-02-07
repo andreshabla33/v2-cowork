@@ -464,6 +464,12 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [recordingTrigger, setRecordingTrigger] = useState(false);
 
+  // Estado para modal de consentimiento (invitado externo)
+  const [guestConsentRequest, setGuestConsentRequest] = useState<{
+    by: string;
+    grabacionId: string;
+  } | null>(null);
+
   // Extraer MediaStream local de LiveKit para RecordingManager
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   
@@ -566,7 +572,41 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
     });
   }, [isRecording, room]);
 
-  // Escuchar mensajes DataChannel (grabación y reacciones)
+  // Enviar solicitud de consentimiento a invitado externo via DataChannel
+  const handleRequestGuestConsent = useCallback((guestName: string, guestEmail: string, grabacionId: string) => {
+    if (!room || room.state !== 'connected') return;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify({
+      type: 'consent_request',
+      by: room.localParticipant?.name || 'Anfitrión',
+      grabacionId,
+      guestName,
+      guestEmail,
+    }));
+    room.localParticipant?.publishData(data, { reliable: true }).catch(() => {
+      console.warn('⚠️ No se pudo enviar solicitud de consentimiento');
+    });
+    console.log('📨 Solicitud de consentimiento enviada via DataChannel a:', guestName);
+  }, [room]);
+
+  // Responder a solicitud de consentimiento (desde el guest)
+  const handleGuestConsentResponse = useCallback((accepted: boolean) => {
+    if (!room || room.state !== 'connected' || !guestConsentRequest) return;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify({
+      type: 'consent_response',
+      accepted,
+      grabacionId: guestConsentRequest.grabacionId,
+      by: room.localParticipant?.name || 'Invitado',
+    }));
+    room.localParticipant?.publishData(data, { reliable: true }).catch(() => {
+      console.warn('⚠️ No se pudo enviar respuesta de consentimiento');
+    });
+    console.log(accepted ? '✅ Consentimiento aceptado' : '❌ Consentimiento rechazado');
+    setGuestConsentRequest(null);
+  }, [room, guestConsentRequest]);
+
+  // Escuchar mensajes DataChannel (grabación, reacciones, consentimiento)
   useEffect(() => {
     if (!room) return;
 
@@ -594,6 +634,31 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
             setReactions(prev => prev.filter(r => r.id !== reactionId));
           }, 3000);
         }
+
+        // Invitado externo recibe solicitud de consentimiento
+        if (message.type === 'consent_request' && isExternalGuest) {
+          console.log('📋 Solicitud de consentimiento recibida de:', message.by);
+          setGuestConsentRequest({
+            by: message.by,
+            grabacionId: message.grabacionId,
+          });
+        }
+
+        // Host recibe respuesta de consentimiento del invitado
+        if (message.type === 'consent_response' && !isExternalGuest) {
+          const participantName = participant?.name || participant?.identity || 'Invitado';
+          console.log(`📋 Respuesta consentimiento de ${participantName}: ${message.accepted ? 'ACEPTADO' : 'RECHAZADO'}`);
+          // Actualizar en BD
+          if (message.grabacionId) {
+            supabase.from('grabaciones').update({
+              consentimiento_evaluado: message.accepted,
+              consentimiento_evaluado_fecha: new Date().toISOString(),
+            }).eq('id', message.grabacionId).then(({ error }) => {
+              if (error) console.warn('⚠️ Error actualizando consentimiento:', error);
+              else console.log('✅ Consentimiento actualizado en BD');
+            });
+          }
+        }
       } catch (e) {
         // Ignorar mensajes no JSON
       }
@@ -603,7 +668,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
     return () => {
       room.off(RoomEvent.DataReceived, handleDataReceived);
     };
-  }, [room]);
+  }, [room, isExternalGuest]);
 
   return (
     <div className="relative h-full w-full bg-zinc-950 overflow-hidden">
@@ -960,7 +1025,46 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
           headlessMode={true}
           externalTrigger={recordingTrigger}
           onExternalTriggerHandled={() => setRecordingTrigger(false)}
+          onRequestGuestConsent={handleRequestGuestConsent}
         />
+      )}
+
+      {/* Modal de consentimiento para invitado externo */}
+      {guestConsentRequest && isExternalGuest && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+            <div className="text-center mb-4">
+              <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-amber-500/20 flex items-center justify-center">
+                <svg className="w-7 h-7 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-white mb-1">Solicitud de grabaci\u00F3n</h3>
+              <p className="text-sm text-zinc-400">
+                <span className="text-indigo-400 font-semibold">{guestConsentRequest.by}</span> desea grabar esta reuni\u00F3n con an\u00E1lisis conductual.
+              </p>
+            </div>
+            <div className="bg-zinc-800/50 border border-zinc-700/50 rounded-xl p-4 mb-5 text-xs text-zinc-400 space-y-2">
+              <p>\u2022 Se analizar\u00E1n expresiones faciales, tono de voz y lenguaje corporal</p>
+              <p>\u2022 Los datos se usan exclusivamente para evaluaci\u00F3n profesional</p>
+              <p>\u2022 Puedes rechazar sin afectar tu participaci\u00F3n en la reuni\u00F3n</p>
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleGuestConsentResponse(false)}
+                className="flex-1 px-4 py-2.5 bg-zinc-800 hover:bg-zinc-700 text-zinc-300 rounded-xl text-sm font-medium transition-colors"
+              >
+                Rechazar
+              </button>
+              <button
+                onClick={() => handleGuestConsentResponse(true)}
+                className="flex-1 px-4 py-2.5 bg-gradient-to-r from-emerald-500 to-green-600 hover:from-emerald-400 hover:to-green-500 text-white rounded-xl text-sm font-bold transition-all shadow-lg shadow-emerald-500/20"
+              >
+                Aceptar grabaci\u00F3n
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

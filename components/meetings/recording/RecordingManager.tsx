@@ -46,6 +46,7 @@ interface RecordingManagerProps {
   externalTrigger?: boolean;
   onExternalTriggerHandled?: () => void;
   preselectedTipoGrabacion?: TipoGrabacionDetallado; // Auto-seleccionar tipo (saltar selector)
+  onRequestGuestConsent?: (guestName: string, guestEmail: string, grabacionId: string) => void;
 }
 
 interface ProcessingState {
@@ -71,6 +72,7 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
   onDurationChange,
   onTipoGrabacionChange,
   preselectedTipoGrabacion,
+  onRequestGuestConsent,
 }) => {
   // Estados principales
   const [processingState, setProcessingState] = useState<ProcessingState>({
@@ -285,8 +287,10 @@ export const RecordingManager: React.FC<RecordingManagerProps> = ({
         } else {
           console.log('✅ Solicitud de consentimiento enviada');
         }
-      } else if (evaluadoId) {
-        console.log('👤 Evaluado es invitado externo (sin UUID), grabando sin consentimiento BD:', evaluadoId);
+      } else if (evaluadoId && evaluadoNombre) {
+        // Invitado externo: solicitar consentimiento via DataChannel
+        console.log('👤 Evaluado es invitado externo, solicitando consentimiento via DataChannel:', evaluadoNombre, evaluadoEmail);
+        onRequestGuestConsent?.(evaluadoNombre, evaluadoEmail || '', grabacionIdRef.current);
       }
 
       // Registrar al grabador como participante
