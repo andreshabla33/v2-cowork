@@ -26,25 +26,31 @@ export const LoginScreen: React.FC = () => {
     const urlParams = new URLSearchParams(window.location.search);
     const token = urlParams.get('token');
     if (token) {
-      supabase
-        .from('invitaciones_pendientes')
-        .select('email, rol, espacio:espacios_trabajo(nombre), invitador:usuarios!creada_por(nombre)')
-        .eq('token', token)
-        .eq('usada', false)
-        .single()
-        .then(({ data }) => {
-          if (data) {
-            const espacio = data.espacio as any;
-            const invitador = data.invitador as any;
-            setInvitacionBanner({
-              email: data.email,
-              espacioNombre: espacio?.nombre || '',
-              invitadorNombre: invitador?.nombre || '',
-              rol: data.rol,
-            });
-            if (!email) setEmail(data.email);
-          }
-        });
+      // Hashear token en el cliente para buscar por hash (seguridad)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(token);
+      crypto.subtle.digest('SHA-256', data).then(hashBuffer => {
+        const tokenHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+        supabase
+          .from('invitaciones_pendientes')
+          .select('email, rol, espacio:espacios_trabajo(nombre), invitador:usuarios!creada_por(nombre)')
+          .eq('token_hash', tokenHash)
+          .eq('usada', false)
+          .single()
+          .then(({ data }) => {
+            if (data) {
+              const espacio = data.espacio as any;
+              const invitador = data.invitador as any;
+              setInvitacionBanner({
+                email: data.email,
+                espacioNombre: espacio?.nombre || '',
+                invitadorNombre: invitador?.nombre || '',
+                rol: data.rol,
+              });
+              if (!email) setEmail(data.email);
+            }
+          });
+      });
     }
   }, []);
 

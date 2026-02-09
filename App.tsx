@@ -214,11 +214,20 @@ interface InvitacionInfo {
   invitador: { nombre: string };
 }
 
+// Utilidad SHA-256 para hashear tokens en el cliente (Web Crypto API)
+const hashToken = async (rawToken: string): Promise<string> => {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(rawToken);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+};
+
 const InvitationProcessor: React.FC = () => {
   const [estado, setEstado] = useState<InvitationState>('cargando');
   const [invitacion, setInvitacion] = useState<InvitacionInfo | null>(null);
   const [procesando, setProcesando] = useState(false);
   const [errorLocal, setErrorLocal] = useState('');
+  const [tokenHashLocal, setTokenHashLocal] = useState<string>('');
   const { session, setAuthFeedback, setView, theme } = useStore();
 
   const token = new URLSearchParams(window.location.search).get('token');
@@ -233,6 +242,10 @@ const InvitationProcessor: React.FC = () => {
 
   const verificarInvitacion = async () => {
     try {
+      // Hashear token en el cliente para buscar por hash (no se envía el plaintext a la BD)
+      const tHash = await hashToken(token!);
+      setTokenHashLocal(tHash);
+
       const { data, error } = await supabase
         .from('invitaciones_pendientes')
         .select(`
@@ -243,7 +256,7 @@ const InvitationProcessor: React.FC = () => {
           espacio:espacios_trabajo (id, nombre, slug),
           invitador:usuarios!creada_por (nombre)
         `)
-        .eq('token', token)
+        .eq('token_hash', tHash)
         .single();
 
       if (error || !data) {
@@ -310,7 +323,7 @@ const InvitationProcessor: React.FC = () => {
       await supabase
         .from('invitaciones_pendientes')
         .update({ usada: true })
-        .eq('token', token);
+        .eq('token_hash', tokenHashLocal);
 
       setEstado('aceptado');
       

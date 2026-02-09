@@ -51,10 +51,13 @@ serve(async (req) => {
       });
     }
 
-    // Generar token único
+    // Generar token único y hashear con SHA-256 para almacenar en BD
     const invitationToken = crypto.randomUUID();
+    const tokenBytes = new TextEncoder().encode(invitationToken);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
+    const tokenHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // Crear invitación en BD
+    // Crear invitación en BD (token_hash para verificación segura, token para compatibilidad)
     const { error: insertError } = await supabaseClient
       .from('invitaciones_pendientes')
       .insert({
@@ -62,9 +65,10 @@ serve(async (req) => {
         espacio_id,
         rol,
         token: invitationToken,
+        token_hash: tokenHash,
         creada_por: user.id,
         usada: false,
-        expira_en: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 días
+        expira_en: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), // 48 horas
       });
 
     if (insertError) {
@@ -205,7 +209,7 @@ serve(async (req) => {
       });
     }
 
-    return new Response(JSON.stringify({ success: true, token: invitationToken }), {
+    return new Response(JSON.stringify({ success: true }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
