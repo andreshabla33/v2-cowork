@@ -46,37 +46,17 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
     setEnviando(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) throw new Error('Debes iniciar sesión');
+      const { data, error: fnError } = await supabase.functions.invoke('enviar-invitacion', {
+        body: {
+          email: email.trim().toLowerCase(),
+          espacio_id: espacioId,
+          rol,
+          nombre_invitado: nombre.trim() || undefined,
+        },
+      });
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      const response = await fetch(
-        `https://lcryrsdyrzotjqdxcwtp.supabase.co/functions/v1/enviar-invitacion`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            email: email.trim().toLowerCase(),
-            espacio_id: espacioId,
-            rol,
-            nombre_invitado: nombre.trim() || undefined,
-          }),
-          signal: controller.signal,
-        }
-      );
-
-      clearTimeout(timeoutId);
-
-      const result = await response.json();
-      if (!response.ok || (result.success === false)) {
-        throw new Error(result.error || 'Error al enviar la invitación');
-      }
+      if (fnError) throw new Error(fnError.message || 'Error al enviar la invitación');
+      if (data?.error) throw new Error(data.error);
 
       setExito(true);
       setEmail('');
