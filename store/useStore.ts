@@ -210,6 +210,7 @@ export const useStore = create<AppState>((set, get) => ({
         if (invitationToken) {
           console.log("initialize: Invitation token found, going to invitation view");
           set({ view: 'invitation' });
+          // No limpiar URL aquí - InvitationProcessor necesita el token para verificar
         } else if (workspaces.length === 0) {
           console.log("initialize: No workspaces, going to onboarding_creador");
           set({ view: 'onboarding_creador' });

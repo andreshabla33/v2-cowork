@@ -314,9 +314,11 @@ const InvitationProcessor: React.FC = () => {
 
       setEstado('aceptado');
       
+      // Limpiar token de la URL por seguridad
+      window.history.replaceState({}, '', window.location.pathname);
+
       setTimeout(() => {
         setAuthFeedback({ type: 'success', message: `¡Bienvenido a ${invitacion.espacio.nombre}!` });
-        // Redirigir a onboarding para selección de cargo
         setView('onboarding');
       }, 2000);
     } catch (err: any) {
