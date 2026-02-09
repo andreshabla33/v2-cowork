@@ -14,7 +14,8 @@ import {
   Plus
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import { CargoSelector, CargoLaboral } from './CargoSelector';
+import { CargoSelector } from './CargoSelector';
+import type { CargoLaboral, CargoDB } from './CargoSelector';
 
 interface OnboardingCreadorProps {
   userId: string;
@@ -23,7 +24,7 @@ interface OnboardingCreadorProps {
   onComplete: () => void;
 }
 
-type Paso = 'bienvenida' | 'cargo' | 'espacio' | 'invitar' | 'completado';
+type Paso = 'bienvenida' | 'espacio' | 'cargo' | 'invitar' | 'completado';
 
 interface EspacioData {
   nombre: string;
@@ -43,10 +44,27 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [espacioCreado, setEspacioCreado] = useState<{ id: string; nombre: string } | null>(null);
+  const [cargosDB, setCargosDB] = useState<CargoDB[]>([]);
+  const [miembroId, setMiembroId] = useState<string | null>(null);
 
-  const handleSelectCargo = (cargo: CargoLaboral) => {
-    setCargoSeleccionado(cargo);
-    setPaso('espacio');
+  const handleSelectCargo = async (cargo: CargoLaboral) => {
+    if (!miembroId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: updateError } = await supabase
+        .from('miembros_espacio')
+        .update({ cargo })
+        .eq('id', miembroId);
+      if (updateError) throw updateError;
+      setCargoSeleccionado(cargo);
+      setPaso('invitar');
+    } catch (err: any) {
+      console.error('Error guardando cargo:', err);
+      setError(err.message || 'Error al guardar cargo');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCrearEspacio = async () => {
@@ -59,7 +77,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     setError(null);
 
     try {
-      // Crear el espacio de trabajo
+      // Crear el espacio de trabajo (trigger auto-crea cargos y departamentos)
       const slug = `${espacioData.nombre.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
       
       const { data: espacio, error: espacioError } = await supabase
@@ -75,43 +93,33 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
       if (espacioError) throw espacioError;
 
-      // Crear departamentos por defecto PRIMERO
-      const departamentosDefault = [
-        { nombre: 'General', color: '#6366f1', icono: 'users' },
-        { nombre: 'Desarrollo', color: '#10b981', icono: 'code' },
-        { nombre: 'Diseño', color: '#f59e0b', icono: 'palette' },
-        { nombre: 'Marketing', color: '#8b5cf6', icono: 'megaphone' },
-        { nombre: 'Ventas', color: '#ef4444', icono: 'trending-up' },
-        { nombre: 'Soporte', color: '#06b6d4', icono: 'headphones' }
-      ];
-
-      const { data: deptData } = await supabase.from('departamentos').insert(
-        departamentosDefault.map(d => ({
-          ...d,
-          espacio_id: espacio.id
-        }))
-      ).select();
-
-      // Obtener ID del departamento "General" para asignar al creador
-      const deptGeneral = deptData?.find(d => d.nombre === 'General');
-
-      // Crear membresía como super_admin con departamento General
-      const { error: miembroError } = await supabase
+      // Crear membresía como super_admin (cargo se asigna en el siguiente paso)
+      const { data: miembroData, error: miembroError } = await supabase
         .from('miembros_espacio')
         .insert({
           espacio_id: espacio.id,
           usuario_id: userId,
           rol: 'super_admin',
-          cargo: cargoSeleccionado,
-          departamento_id: deptGeneral?.id || null,
           aceptado: true,
-          onboarding_completado: true
-        });
+          onboarding_completado: false
+        })
+        .select('id')
+        .single();
 
       if (miembroError) throw miembroError;
+      setMiembroId(miembroData.id);
 
+      // Fetch cargos creados por el trigger
+      const { data: cargosData } = await supabase
+        .from('cargos')
+        .select('id, nombre, descripcion, categoria, icono, orden, activo, tiene_analisis_avanzado, analisis_disponibles, solo_admin')
+        .eq('espacio_id', espacio.id)
+        .eq('activo', true)
+        .order('orden');
+
+      setCargosDB((cargosData || []) as CargoDB[]);
       setEspacioCreado({ id: espacio.id, nombre: espacio.nombre });
-      setPaso('invitar');
+      setPaso('cargo');
     } catch (err: any) {
       console.error('Error creando espacio:', err);
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
@@ -222,13 +230,13 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">1</span>
                 </div>
-                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Crea tu espacio de trabajo</span>
               </div>
               <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">2</span>
                 </div>
-                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Crea tu espacio de trabajo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
               </div>
               <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
@@ -239,7 +247,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             </div>
 
             <button
-              onClick={() => setPaso('cargo')}
+              onClick={() => setPaso('espacio')}
               className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-3 lg:py-2.5 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98]"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -248,24 +256,6 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
               </span>
             </button>
-          </motion.div>
-        )}
-
-        {/* PASO: Selección de Cargo */}
-        {paso === 'cargo' && (
-          <motion.div
-            key="cargo"
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-4xl"
-          >
-            <CargoSelector
-              onSelect={handleSelectCargo}
-              espacioNombre="tu nuevo espacio"
-              isLoading={false}
-              rolUsuario="super_admin"
-            />
           </motion.div>
         )}
 
@@ -279,7 +269,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             className="w-full max-w-lg relative z-10"
           >
             <button
-              onClick={() => setPaso('cargo')}
+              onClick={() => setPaso('bienvenida')}
               className="mb-6 text-zinc-500 hover:text-violet-400 flex items-center gap-2 text-sm transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
@@ -288,7 +278,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 2 de 3
+                Paso 1 de 3
               </div>
               <div className="relative group mx-auto w-16 h-16 mb-4">
                 <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur-lg opacity-40" />
@@ -353,6 +343,25 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 )}
               </span>
             </button>
+          </motion.div>
+        )}
+
+        {/* PASO: Selección de Cargo (después de crear espacio) */}
+        {paso === 'cargo' && (
+          <motion.div
+            key="cargo"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            className="w-full max-w-4xl"
+          >
+            <CargoSelector
+              onSelect={handleSelectCargo}
+              espacioNombre={espacioCreado?.nombre || 'tu espacio'}
+              isLoading={loading}
+              rolUsuario="super_admin"
+              cargosDB={cargosDB}
+            />
           </motion.div>
         )}
 

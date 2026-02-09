@@ -22,25 +22,11 @@ import {
   Shield,
 } from 'lucide-react';
 
-// Tipos de cargo laboral (sincronizado con Supabase ENUM)
-export type CargoLaboral =
-  | 'ceo'
-  | 'coo'
-  | 'director_rrhh'
-  | 'coordinador_rrhh'
-  | 'reclutador'
-  | 'director_comercial'
-  | 'coordinador_ventas'
-  | 'asesor_comercial'
-  | 'manager_equipo'
-  | 'team_lead'
-  | 'product_owner'
-  | 'scrum_master'
-  | 'colaborador'
-  | 'otro';
+// Tipo flexible — ahora viene de BD, no es un enum fijo
+export type CargoLaboral = string;
 
 // Categorías de cargos para organizar la UI
-type CategoriaCargoInfo = {
+export type CategoriaCargoInfo = {
   id: string;
   nombre: string;
   descripcion: string;
@@ -48,214 +34,113 @@ type CategoriaCargoInfo = {
   icono: React.ComponentType<{ className?: string }>;
 };
 
-type CargoInfo = {
-  id: CargoLaboral;
+// Cargo individual (puede venir de BD o hardcoded como fallback)
+export type CargoInfo = {
+  id: string;
   nombre: string;
   descripcion: string;
   categoria: string;
   icono: React.ComponentType<{ className?: string }>;
   tieneAnalisisAvanzado: boolean;
   analisisDisponibles: string[];
+  soloAdmin?: boolean;
 };
 
-// Información de categorías
-const CATEGORIAS: Record<string, CategoriaCargoInfo> = {
-  liderazgo: {
-    id: 'liderazgo',
-    nombre: 'Liderazgo Ejecutivo',
-    descripcion: 'Roles de alta dirección con acceso completo',
-    color: 'from-amber-500 to-orange-600',
-    icono: Crown,
-  },
-  rrhh: {
-    id: 'rrhh',
-    nombre: 'Recursos Humanos',
-    descripcion: 'Gestión del talento y desarrollo organizacional',
-    color: 'from-purple-500 to-pink-600',
-    icono: Users,
-  },
-  comercial: {
-    id: 'comercial',
-    nombre: 'Área Comercial',
-    descripcion: 'Ventas, negocios y relación con clientes',
-    color: 'from-emerald-500 to-teal-600',
-    icono: TrendingUp,
-  },
-  producto: {
-    id: 'producto',
-    nombre: 'Producto y Desarrollo',
-    descripcion: 'Gestión de producto y metodologías ágiles',
-    color: 'from-blue-500 to-indigo-600',
-    icono: Package,
-  },
-  general: {
-    id: 'general',
-    nombre: 'Otros Roles',
-    descripcion: 'Colaboradores y roles adicionales',
-    color: 'from-slate-500 to-gray-600',
-    icono: User,
-  },
+// Cargo desde BD
+export interface CargoDB {
+  id: string;
+  nombre: string;
+  descripcion: string | null;
+  categoria: string;
+  icono: string;
+  orden: number;
+  activo: boolean;
+  tiene_analisis_avanzado: boolean;
+  analisis_disponibles: string[];
+  solo_admin: boolean;
+}
+
+// Mapeo de nombre de icono (BD) a componente Lucide
+const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
+  crown: Crown,
+  settings: Settings,
+  users: Users,
+  'user-check': UserCheck,
+  search: Search,
+  'trending-up': TrendingUp,
+  target: Target,
+  briefcase: Briefcase,
+  rocket: Rocket,
+  package: Package,
+  'refresh-cw': RefreshCw,
+  user: User,
+  'help-circle': HelpCircle,
 };
 
-// Información detallada de cada cargo
-const CARGOS_INFO: CargoInfo[] = [
-  // Liderazgo
-  {
-    id: 'ceo',
-    nombre: 'CEO / Director General',
-    descripcion: 'Máxima autoridad ejecutiva de la organización',
-    categoria: 'liderazgo',
-    icono: Crown,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['RRHH', 'Comercial', 'Equipo'],
-  },
-  {
-    id: 'coo',
-    nombre: 'COO / Director de Operaciones',
-    descripcion: 'Responsable de operaciones y procesos',
-    categoria: 'liderazgo',
-    icono: Settings,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['RRHH', 'Comercial', 'Equipo'],
-  },
-  // RRHH
-  {
-    id: 'director_rrhh',
-    nombre: 'Director de RRHH',
-    descripcion: 'Lidera estrategia de gestión del talento',
-    categoria: 'rrhh',
-    icono: Users,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Entrevistas', 'One-to-One'],
-  },
-  {
-    id: 'coordinador_rrhh',
-    nombre: 'Coordinador de RRHH',
-    descripcion: 'Coordina procesos de recursos humanos',
-    categoria: 'rrhh',
-    icono: UserCheck,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Entrevistas', 'One-to-One'],
-  },
-  {
-    id: 'reclutador',
-    nombre: 'Reclutador',
-    descripcion: 'Especialista en selección de talento',
-    categoria: 'rrhh',
-    icono: Search,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Entrevistas a candidatos'],
-  },
-  // Comercial
-  {
-    id: 'director_comercial',
-    nombre: 'Director Comercial',
-    descripcion: 'Lidera estrategia comercial y ventas',
-    categoria: 'comercial',
-    icono: TrendingUp,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Deals', 'Negociaciones'],
-  },
-  {
-    id: 'coordinador_ventas',
-    nombre: 'Coordinador de Ventas',
-    descripcion: 'Coordina equipo y procesos de venta',
-    categoria: 'comercial',
-    icono: Target,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Deals', 'Negociaciones'],
-  },
-  {
-    id: 'asesor_comercial',
-    nombre: 'Asesor Comercial',
-    descripcion: 'Ejecutivo de ventas y atención a clientes',
-    categoria: 'comercial',
-    icono: Briefcase,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Deals', 'Negociaciones'],
-  },
-  // Producto
-  {
-    id: 'manager_equipo',
-    nombre: 'Manager de Equipo',
-    descripcion: 'Gestiona y desarrolla equipos de trabajo',
-    categoria: 'producto',
-    icono: Users,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Reuniones de equipo'],
-  },
-  {
-    id: 'team_lead',
-    nombre: 'Team Lead',
-    descripcion: 'Líder técnico del equipo',
-    categoria: 'producto',
-    icono: Rocket,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Reuniones de equipo'],
-  },
-  {
-    id: 'product_owner',
-    nombre: 'Product Owner',
-    descripcion: 'Responsable de la visión del producto',
-    categoria: 'producto',
-    icono: Package,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Reuniones de equipo'],
-  },
-  {
-    id: 'scrum_master',
-    nombre: 'Scrum Master',
-    descripcion: 'Facilita procesos ágiles del equipo',
-    categoria: 'producto',
-    icono: RefreshCw,
-    tieneAnalisisAvanzado: true,
-    analisisDisponibles: ['Reuniones de equipo'],
-  },
-  // General
-  {
-    id: 'colaborador',
-    nombre: 'Colaborador',
-    descripcion: 'Miembro activo del equipo',
-    categoria: 'general',
-    icono: User,
-    tieneAnalisisAvanzado: false,
-    analisisDisponibles: [],
-  },
-  {
-    id: 'otro',
-    nombre: 'Otro cargo',
-    descripcion: 'Mi cargo no está en la lista',
-    categoria: 'general',
-    icono: HelpCircle,
-    tieneAnalisisAvanzado: false,
-    analisisDisponibles: [],
-  },
-];
-
-// Mapeo de roles de sistema a categorías permitidas
-// Solo admins y super_admins pueden ver liderazgo
-export const CATEGORIAS_POR_ROL: Record<string, string[]> = {
-  super_admin: ['liderazgo', 'rrhh', 'comercial', 'producto', 'general'],
-  admin: ['liderazgo', 'rrhh', 'comercial', 'producto', 'general'],
-  member: ['rrhh', 'comercial', 'producto', 'general'], // Sin liderazgo
+// Colores por categoría
+const COLORES_CATEGORIA: Record<string, string> = {
+  liderazgo: 'from-amber-500 to-orange-600',
+  rrhh: 'from-purple-500 to-pink-600',
+  comercial: 'from-emerald-500 to-teal-600',
+  producto: 'from-blue-500 to-indigo-600',
+  otros: 'from-slate-500 to-gray-600',
+  general: 'from-slate-500 to-gray-600',
 };
 
-// Cargos restringidos para members (roles de dirección/liderazgo)
-// Un member no puede auto-asignarse estos cargos
-export const CARGOS_RESTRINGIDOS_MEMBER: CargoLaboral[] = [
-  'ceo',
-  'coo', 
-  'director_rrhh',
-  'director_comercial',
-  'manager_equipo',
-];
+// Nombres de categoría para UI
+const NOMBRES_CATEGORIA: Record<string, { nombre: string; descripcion: string }> = {
+  liderazgo: { nombre: 'Liderazgo Ejecutivo', descripcion: 'Roles de alta dirección con acceso completo' },
+  rrhh: { nombre: 'Recursos Humanos', descripcion: 'Gestión del talento y desarrollo organizacional' },
+  comercial: { nombre: 'Área Comercial', descripcion: 'Ventas, negocios y relación con clientes' },
+  producto: { nombre: 'Producto y Desarrollo', descripcion: 'Gestión de producto y metodologías ágiles' },
+  otros: { nombre: 'Otros Roles', descripcion: 'Colaboradores y roles adicionales' },
+  general: { nombre: 'Otros Roles', descripcion: 'Colaboradores y roles adicionales' },
+};
+
+// Función para convertir cargos de BD a formato del componente
+function cargosDBToCargoInfo(cargosDB: CargoDB[]): CargoInfo[] {
+  return cargosDB
+    .filter(c => c.activo)
+    .sort((a, b) => a.orden - b.orden)
+    .map(c => ({
+      id: c.nombre.toLowerCase().replace(/\s+/g, '_'),
+      nombre: c.nombre,
+      descripcion: c.descripcion || '',
+      categoria: c.categoria,
+      icono: ICON_MAP[c.icono] || User,
+      tieneAnalisisAvanzado: c.tiene_analisis_avanzado,
+      analisisDisponibles: c.analisis_disponibles || [],
+      soloAdmin: c.solo_admin,
+    }));
+}
+
+// Función para derivar categorías únicas de los cargos
+function derivarCategorias(cargos: CargoInfo[]): Record<string, CategoriaCargoInfo> {
+  const cats: Record<string, CategoriaCargoInfo> = {};
+  const seen = new Set<string>();
+  for (const c of cargos) {
+    if (seen.has(c.categoria)) continue;
+    seen.add(c.categoria);
+    const catIcon = ICON_MAP[c.categoria === 'liderazgo' ? 'crown' : c.categoria === 'rrhh' ? 'users' : c.categoria === 'comercial' ? 'trending-up' : c.categoria === 'producto' ? 'package' : 'user'] || User;
+    const meta = NOMBRES_CATEGORIA[c.categoria] || { nombre: c.categoria, descripcion: '' };
+    cats[c.categoria] = {
+      id: c.categoria,
+      nombre: meta.nombre,
+      descripcion: meta.descripcion,
+      color: COLORES_CATEGORIA[c.categoria] || 'from-slate-500 to-gray-600',
+      icono: catIcon,
+    };
+  }
+  return cats;
+}
 
 interface CargoSelectorProps {
-  onSelect: (cargo: CargoLaboral) => void;
-  cargoSugerido?: CargoLaboral;
+  onSelect: (cargo: string) => void;
+  cargoSugerido?: string;
   espacioNombre?: string;
   isLoading?: boolean;
-  rolUsuario?: string; // Rol del sistema (super_admin, admin, member)
+  rolUsuario?: string;
+  cargosDB?: CargoDB[];
 }
 
 export const CargoSelector: React.FC<CargoSelectorProps> = ({
@@ -263,29 +148,33 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
   cargoSugerido,
   espacioNombre = 'tu nuevo espacio',
   isLoading = false,
-  rolUsuario = 'member', // Por defecto member (más restrictivo)
+  rolUsuario = 'member',
+  cargosDB,
 }) => {
-  const [cargoSeleccionado, setCargoSeleccionado] = useState<CargoLaboral | null>(
+  // Convertir cargos de BD a formato interno
+  const cargosInfo = cargosDB ? cargosDBToCargoInfo(cargosDB) : [];
+  const CATEGORIAS = derivarCategorias(cargosInfo);
+
+  const [cargoSeleccionado, setCargoSeleccionado] = useState<string | null>(
     cargoSugerido || null
   );
   const [categoriaExpandida, setCategoriaExpandida] = useState<string | null>(
-    cargoSugerido ? CARGOS_INFO.find(c => c.id === cargoSugerido)?.categoria || null : null
+    cargoSugerido ? cargosInfo.find(c => c.id === cargoSugerido)?.categoria || null : null
   );
-  const [hoveredCargo, setHoveredCargo] = useState<CargoLaboral | null>(null);
+  const [hoveredCargo, setHoveredCargo] = useState<string | null>(null);
 
-  // Filtrar categorías según el rol del usuario
-  const categoriasPermitidas = CATEGORIAS_POR_ROL[rolUsuario] || CATEGORIAS_POR_ROL.member;
-  const categoriasVisibles = Object.entries(CATEGORIAS).filter(
-    ([catId]) => categoriasPermitidas.includes(catId)
-  );
-
-  // Filtrar cargos restringidos para members
+  // Filtrar categorías según el rol del usuario (members no ven liderazgo)
   const esMember = rolUsuario === 'member' || rolUsuario === 'miembro';
-  const cargosPermitidos = esMember 
-    ? CARGOS_INFO.filter(c => !CARGOS_RESTRINGIDOS_MEMBER.includes(c.id))
-    : CARGOS_INFO;
+  const categoriasVisibles = Object.entries(CATEGORIAS).filter(
+    ([catId]) => !esMember || catId !== 'liderazgo'
+  );
 
-  const handleSelectCargo = useCallback((cargo: CargoLaboral) => {
+  // Filtrar cargos restringidos para members (solo_admin)
+  const cargosPermitidos = esMember
+    ? cargosInfo.filter(c => !c.soloAdmin)
+    : cargosInfo;
+
+  const handleSelectCargo = useCallback((cargo: string) => {
     setCargoSeleccionado(cargo);
   }, []);
 
@@ -305,7 +194,7 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
   }, {} as Record<string, CargoInfo[]>);
 
   const cargoActual = cargoSeleccionado
-    ? CARGOS_INFO.find(c => c.id === cargoSeleccionado)
+    ? cargosPermitidos.find(c => c.id === cargoSeleccionado)
     : null;
 
   return (
@@ -552,5 +441,4 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
 };
 
 export default CargoSelector;
-export { CARGOS_INFO, CATEGORIAS };
-export type { CargoInfo, CategoriaCargoInfo };
+export { ICON_MAP, COLORES_CATEGORIA, NOMBRES_CATEGORIA };
