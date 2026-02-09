@@ -262,12 +262,32 @@ export const GrabacionesHistorial: React.FC = () => {
   // Cargar grabaciones al montar o cambiar espacio
   useEffect(() => {
     console.log('GrabacionesHistorial: useEffect - activeWorkspace:', activeWorkspace?.id);
-    if (!activeWorkspace?.id) {
+    if (!activeWorkspace?.id || !session?.user?.id) {
       setIsLoading(false);
       return;
     }
-    cargarGrabaciones();
-  }, [activeWorkspace?.id]);
+    let cancelled = false;
+
+    const load = async () => {
+      await cargarGrabaciones();
+      // Safety: si después de 10s sigue cargando, forzar false
+      if (!cancelled) setIsLoading(false);
+    };
+    load();
+
+    // Safety timeout por si la query se cuelga
+    const safetyTimer = setTimeout(() => {
+      if (!cancelled) {
+        console.warn('GrabacionesHistorial: Safety timeout - forzando isLoading=false');
+        setIsLoading(false);
+      }
+    }, 10000);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(safetyTimer);
+    };
+  }, [activeWorkspace?.id, session?.user?.id]);
 
   const cargarGrabaciones = async () => {
     if (!activeWorkspace?.id || !session?.user?.id) {
