@@ -144,6 +144,18 @@ export const useStore = create<AppState>((set, get) => ({
         set({ session });
         const { user } = session;
 
+        // Safety net: garantizar registro en public.usuarios (por si trigger falló)
+        try {
+          await supabase.from('usuarios').upsert({
+            id: user.id,
+            email: user.email,
+            nombre: user.user_metadata?.full_name || user.email?.split('@')[0] || 'Usuario',
+            estado_disponibilidad: 'available'
+          }, { onConflict: 'id', ignoreDuplicates: false });
+        } catch (e) {
+          console.warn("initialize: Upsert usuarios safety net failed", e);
+        }
+
         // Cargar datos opcionales (no bloquear si fallan)
         let avatarConfig = initialAvatar;
         let statusData = { estado_disponibilidad: PresenceStatus.AVAILABLE, estado_personalizado: '' };
