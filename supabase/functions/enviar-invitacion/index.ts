@@ -17,13 +17,18 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const authHeader = req.headers.get('Authorization')!;
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'No Authorization header' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'No autorizado' }), {
-        status: 401,
+      return new Response(JSON.stringify({ error: 'No autorizado', detail: authError?.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -31,13 +36,11 @@ serve(async (req) => {
     const { email, espacio_id, rol, nombre_invitado } = await req.json();
 
     if (!email || !espacio_id || !rol) {
-      return new Response(JSON.stringify({ error: 'Faltan parámetros requeridos' }), {
-        status: 400,
+      return new Response(JSON.stringify({ error: 'Faltan parametros' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Obtener info del espacio
     const { data: espacio, error: espacioError } = await supabaseClient
       .from('espacios_trabajo')
       .select('nombre')
@@ -46,18 +49,16 @@ serve(async (req) => {
 
     if (espacioError || !espacio) {
       return new Response(JSON.stringify({ error: 'Espacio no encontrado' }), {
-        status: 404,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Generar token único y hashear con SHA-256 para almacenar en BD
+    // SHA-256 Token Hashing
     const invitationToken = crypto.randomUUID();
     const tokenBytes = new TextEncoder().encode(invitationToken);
     const hashBuffer = await crypto.subtle.digest('SHA-256', tokenBytes);
     const tokenHash = Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
 
-    // Crear invitación en BD (token_hash para verificación segura, token para compatibilidad)
     const { error: insertError } = await supabaseClient
       .from('invitaciones_pendientes')
       .insert({
@@ -68,31 +69,25 @@ serve(async (req) => {
         token_hash: tokenHash,
         creada_por: user.id,
         usada: false,
-        expira_en: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(), // 48 horas
+        expira_en: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
       });
 
     if (insertError) {
-      console.error('Error insertando invitación:', insertError);
-      return new Response(JSON.stringify({ error: 'Error creando invitación' }), {
-        status: 500,
+      return new Response(JSON.stringify({ error: 'DB Insert Error', detail: insertError.message }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Construir link de invitación
     const invitationLink = `https://mvp-cowork.vercel.app/invitation?token=${invitationToken}`;
-
-    // Enviar email usando Resend
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
     
     if (!RESEND_API_KEY) {
-      console.error('RESEND_API_KEY no configurada');
-      return new Response(JSON.stringify({ error: 'Servicio de email no configurado' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        return new Response(JSON.stringify({ error: 'Configuration Error: RESEND_API_KEY missing' }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
     }
 
+    // Template HTML restaurado (Neon/Glassmorphism)
     const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -187,36 +182,36 @@ serve(async (req) => {
     `;
 
     const resendResponse = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: 'Cowork <invitaciones@urpeailab.com>',
-        to: [email],
-        subject: `Invitación a ${espacio.nombre} - Cowork`,
-        html: emailHtml,
-      }),
+        method: 'POST',
+        headers: {
+            'Authorization': `Bearer ${RESEND_API_KEY}`,
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            from: 'Cowork <onboarding@resend.dev>', // FIX: Mantener dominio permitido
+            to: [email],
+            subject: `Invitacion a ${espacio.nombre} - Cowork`,
+            html: emailHtml,
+        }),
     });
 
     if (!resendResponse.ok) {
-      const errorText = await resendResponse.text();
-      console.error('Error enviando email:', errorText);
-      return new Response(JSON.stringify({ error: 'Error enviando email' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+        const errText = await resendResponse.text();
+        return new Response(JSON.stringify({ 
+            error: `Resend API Error: ${resendResponse.status}`, 
+            detail: errText 
+        }), {
+            // Mantenemos 200 OK para que el frontend muestre el detalle del error en el modal
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
     }
 
     return new Response(JSON.stringify({ success: true }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error en enviar-invitacion:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: 'Function Error', detail: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
