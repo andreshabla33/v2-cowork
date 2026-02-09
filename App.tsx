@@ -235,10 +235,18 @@ const InvitationProcessor: React.FC = () => {
         return;
       }
 
+      // Validar que el JOIN con espacios_trabajo retornó datos (RLS puede bloquearlo)
+      const espacioData = data.espacio as any;
+      if (!espacioData || !espacioData.nombre) {
+        console.error('InvitationProcessor: espacio data is null (posible RLS)');
+        setEstado('error');
+        return;
+      }
+
       setInvitacion({
         email: data.email,
         rol: data.rol,
-        espacio: data.espacio as any,
+        espacio: espacioData,
         invitador: { nombre: (data.invitador as any)?.nombre || 'Un colega' }
       });
       setEstado('valido');
