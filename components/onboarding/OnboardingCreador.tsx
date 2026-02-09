@@ -17,6 +17,20 @@ import { supabase } from '@/lib/supabase';
 import { CargoSelector } from './CargoSelector';
 import type { CargoLaboral, CargoDB } from './CargoSelector';
 
+const INDUSTRIAS = [
+  'Tecnología', 'Finanzas', 'Salud', 'Educación', 'Comercio',
+  'Manufactura', 'Servicios', 'Consultoría', 'Marketing',
+  'Inmobiliaria', 'Legal', 'Energía', 'Transporte', 'Otro',
+];
+
+const TAMANOS = [
+  { value: 'startup', label: 'Startup (1-10)' },
+  { value: 'pequena', label: 'Pequeña (11-50)' },
+  { value: 'mediana', label: 'Mediana (51-200)' },
+  { value: 'grande', label: 'Grande (201-1000)' },
+  { value: 'enterprise', label: 'Enterprise (1000+)' },
+];
+
 interface OnboardingCreadorProps {
   userId: string;
   userEmail: string;
@@ -24,7 +38,7 @@ interface OnboardingCreadorProps {
   onComplete: () => void;
 }
 
-type Paso = 'bienvenida' | 'espacio' | 'cargo' | 'invitar' | 'completado';
+type Paso = 'bienvenida' | 'espacio' | 'empresa' | 'cargo' | 'invitar' | 'completado';
 
 interface EspacioData {
   nombre: string;
@@ -46,6 +60,12 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   const [espacioCreado, setEspacioCreado] = useState<{ id: string; nombre: string } | null>(null);
   const [cargosDB, setCargosDB] = useState<CargoDB[]>([]);
   const [miembroId, setMiembroId] = useState<string | null>(null);
+  const [empresaData, setEmpresaData] = useState({
+    nombre: '',
+    industria: '',
+    tamano: 'pequena',
+    sitio_web: '',
+  });
 
   const handleSelectCargo = async (cargo: CargoLaboral) => {
     if (!miembroId) return;
@@ -119,7 +139,8 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
       setCargosDB((cargosData || []) as CargoDB[]);
       setEspacioCreado({ id: espacio.id, nombre: espacio.nombre });
-      setPaso('cargo');
+      setEmpresaData(prev => ({ ...prev, nombre: espacioData.nombre }));
+      setPaso('empresa');
     } catch (err: any) {
       console.error('Error creando espacio:', err);
       if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
@@ -132,6 +153,43 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleGuardarEmpresa = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      if (empresaData.nombre.trim()) {
+        const { data: nuevaEmpresa, error: createError } = await supabase
+          .from('empresas')
+          .insert({
+            nombre: empresaData.nombre.trim(),
+            industria: empresaData.industria || null,
+            tamano: empresaData.tamano,
+            sitio_web: empresaData.sitio_web.trim() || null,
+            creado_por: userId,
+          })
+          .select()
+          .single();
+        if (createError) throw createError;
+
+        // Vincular empresa al espacio
+        await supabase
+          .from('espacios_trabajo')
+          .update({ empresa_id: nuevaEmpresa.id })
+          .eq('id', espacioCreado!.id);
+      }
+      setPaso('cargo');
+    } catch (err: any) {
+      console.error('Error guardando empresa:', err);
+      setError(err.message || 'Error al guardar empresa');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSkipEmpresa = () => {
+    setPaso('cargo');
   };
 
   const handleAddEmail = () => {
@@ -236,11 +294,17 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">2</span>
                 </div>
-                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Datos de tu empresa</span>
               </div>
               <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">3</span>
+                </div>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
+              </div>
+              <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
+                <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
+                  <span className="text-violet-400 font-black text-sm lg:text-xs">4</span>
                 </div>
                 <span className="text-zinc-300 font-medium text-sm lg:text-xs">Invita a tu equipo</span>
               </div>
@@ -278,7 +342,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
 
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 1 de 3
+                Paso 1 de 4
               </div>
               <div className="relative group mx-auto w-16 h-16 mb-4">
                 <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur-lg opacity-40" />
@@ -346,7 +410,120 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
           </motion.div>
         )}
 
-        {/* PASO: Selección de Cargo (después de crear espacio) */}
+        {/* PASO: Datos de Empresa (opcional) */}
+        {paso === 'empresa' && (
+          <motion.div
+            key="empresa"
+            initial={{ opacity: 0, x: 100 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -100 }}
+            className="w-full max-w-lg relative z-10"
+          >
+            <div className="text-center mb-8">
+              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
+                Paso 2 de 4
+              </div>
+              <div className="relative group mx-auto w-16 h-16 mb-4">
+                <div className="absolute -inset-2 bg-gradient-to-r from-fuchsia-500 to-violet-500 rounded-2xl blur-lg opacity-40" />
+                <div className="relative w-16 h-16 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-2xl flex items-center justify-center">
+                  <Building2 className="w-8 h-8 text-white" />
+                </div>
+              </div>
+              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-fuchsia-200 to-white mb-2">Datos de tu empresa</h2>
+              <p className="text-zinc-400">
+                Vincula tu organización a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
+              </p>
+            </div>
+
+            <div className="space-y-4 mb-6">
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Nombre de la empresa *</label>
+                <input
+                  type="text"
+                  value={empresaData.nombre}
+                  onChange={(e) => setEmpresaData({ ...empresaData, nombre: e.target.value })}
+                  placeholder="Mi Empresa S.A.S."
+                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Industria</label>
+                  <select
+                    value={empresaData.industria}
+                    onChange={(e) => setEmpresaData({ ...empresaData, industria: e.target.value })}
+                    className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                  >
+                    <option value="">Seleccionar...</option>
+                    {INDUSTRIAS.map(i => (
+                      <option key={i} value={i}>{i}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-zinc-300 mb-2">Tamaño</label>
+                  <select
+                    value={empresaData.tamano}
+                    onChange={(e) => setEmpresaData({ ...empresaData, tamano: e.target.value })}
+                    className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                  >
+                    {TAMANOS.map(t => (
+                      <option key={t.value} value={t.value}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-zinc-300 mb-2">Sitio web (opcional)</label>
+                <input
+                  type="url"
+                  value={empresaData.sitio_web}
+                  onChange={(e) => setEmpresaData({ ...empresaData, sitio_web: e.target.value })}
+                  placeholder="https://miempresa.com"
+                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            {error && (
+              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
+                {error}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <button
+                onClick={handleGuardarEmpresa}
+                disabled={loading || !empresaData.nombre.trim()}
+                className="relative w-full group overflow-hidden bg-gradient-to-r from-fuchsia-500 via-violet-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-400 via-violet-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Guardando...
+                    </>
+                  ) : (
+                    <>
+                      Continuar
+                      <ArrowRight className="w-5 h-5" />
+                    </>
+                  )}
+                </span>
+              </button>
+              <button
+                onClick={handleSkipEmpresa}
+                disabled={loading}
+                className="w-full py-3 text-zinc-500 hover:text-violet-400 transition-colors text-sm font-medium"
+              >
+                Omitir por ahora
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* PASO: Selección de Cargo (después de empresa) */}
         {paso === 'cargo' && (
           <motion.div
             key="cargo"
@@ -376,7 +553,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
           >
             <div className="text-center mb-8">
               <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 3 de 3
+                Paso 4 de 4
               </div>
               <div className="relative group mx-auto w-16 h-16 mb-4">
                 <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-lg opacity-40" />

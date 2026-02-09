@@ -17,8 +17,11 @@ import { SettingsSpace3D } from './sections/SettingsSpace3D';
 import { SettingsMembers } from './sections/SettingsMembers';
 import { SettingsGuests } from './sections/SettingsGuests';
 import { SettingsSecurity } from './sections/SettingsSecurity';
+import { SettingsCargos } from './sections/SettingsCargos';
+import { SettingsDepartamentos } from './sections/SettingsDepartamentos';
+import { SettingsEmpresa } from './sections/SettingsEmpresa';
 
-type SettingsTab = 'general' | 'calendar' | 'minimode' | 'audio' | 'video' | 'meetings' | 'notifications' | 'privacy' | 'performance' | 'space3d' | 'members' | 'guests' | 'security';
+type SettingsTab = 'general' | 'calendar' | 'minimode' | 'audio' | 'video' | 'meetings' | 'notifications' | 'privacy' | 'performance' | 'space3d' | 'members' | 'guests' | 'security' | 'cargos' | 'departamentos' | 'empresa';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -224,6 +227,9 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'members', label: t('settings.members.title', currentLang), Icon: Users2, category: t('settings.category.workspace', currentLang) },
     { id: 'guests', label: t('settings.guests.title', currentLang), Icon: UserPlus, category: t('settings.category.workspace', currentLang), adminOnly: true },
     { id: 'security', label: t('settings.security.title', currentLang), Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
+    { id: 'empresa', label: 'Empresa', Icon: Settings, category: t('settings.category.workspace', currentLang), adminOnly: true },
+    { id: 'cargos', label: 'Cargos', Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
+    { id: 'departamentos', label: 'Departamentos', Icon: Users2, category: t('settings.category.workspace', currentLang), adminOnly: true },
   ];
 
   const filteredTabs = tabs.filter(t => !t.adminOnly || isAdmin);
@@ -379,6 +385,24 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 settings={settings.security}
                 onSettingsChange={(security) => saveSettings({ ...settings, security })}
                 workspaceId={workspaceId}
+              />
+            )}
+            {activeTab === 'empresa' && isAdmin && (
+              <SettingsEmpresa
+                workspaceId={workspaceId}
+                isAdmin={isAdmin}
+              />
+            )}
+            {activeTab === 'cargos' && isAdmin && (
+              <SettingsCargos
+                workspaceId={workspaceId}
+                isAdmin={isAdmin}
+              />
+            )}
+            {activeTab === 'departamentos' && isAdmin && (
+              <SettingsDepartamentos
+                workspaceId={workspaceId}
+                isAdmin={isAdmin}
               />
             )}
           </div>
