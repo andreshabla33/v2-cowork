@@ -1581,7 +1581,7 @@ const ICE_SERVERS = [
 ];
 
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameHubOpen = false, isPlayingGame = false }) => {
-  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session, setActiveSubTab } = useStore();
+  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session, setActiveSubTab, activeSubTab } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -2331,7 +2331,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const pendingUpdateRef = useRef(false);
   // Ref para acceder al estado actual dentro de la función asíncrona
   const shouldHaveStreamRef = useRef(false);
-  shouldHaveStreamRef.current = hasActiveCall || currentUser.isScreenSharing || currentUser.isCameraOn || currentUser.isMicOn;
+  // En mini mode (no space tab): solo activar stream si hay llamada activa (proximidad)
+  // En space tab: activar si hay llamada activa O el usuario tiene cam/mic/screen encendido
+  const isOnSpaceTab = activeSubTab === 'space';
+  shouldHaveStreamRef.current = hasActiveCall || (isOnSpaceTab && (currentUser.isScreenSharing || currentUser.isCameraOn || currentUser.isMicOn));
 
   // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
@@ -2542,7 +2545,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       mounted = false;
       clearTimeout(timer);
     };
-  }, [currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, hasActiveCall]);
+  }, [currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, hasActiveCall, activeSubTab]);
 
   // Actualizar conexiones WebRTC cuando cambie el stream procesado (efectos de fondo)
   useEffect(() => {
