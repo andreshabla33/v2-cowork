@@ -1,18 +1,52 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import { useStore } from '../store/useStore';
+
+interface InvitacionBanner {
+  email: string;
+  espacioNombre: string;
+  invitadorNombre: string;
+  rol: string;
+}
 
 export const LoginScreen: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState(''); // Nuevo estado para registro completo
+  const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [isRegister, setIsRegister] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHelp, setShowHelp] = useState(false);
+  const [invitacionBanner, setInvitacionBanner] = useState<InvitacionBanner | null>(null);
   
   const { setSession, authFeedback, setAuthFeedback } = useStore();
+
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const token = urlParams.get('token');
+    if (token) {
+      supabase
+        .from('invitaciones_pendientes')
+        .select('email, rol, espacio:espacios_trabajo(nombre), invitador:usuarios!creada_por(nombre)')
+        .eq('token', token)
+        .eq('usada', false)
+        .single()
+        .then(({ data }) => {
+          if (data) {
+            const espacio = data.espacio as any;
+            const invitador = data.invitador as any;
+            setInvitacionBanner({
+              email: data.email,
+              espacioNombre: espacio?.nombre || '',
+              invitadorNombre: invitador?.nombre || '',
+              rol: data.rol,
+            });
+            if (!email) setEmail(data.email);
+          }
+        });
+    }
+  }, []);
 
   const handleGuestLogin = () => {
     const mockSession = {
@@ -33,7 +67,7 @@ export const LoginScreen: React.FC = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: { 
-          redirectTo: window.location.origin,
+          redirectTo: window.location.href,
           queryParams: { access_type: 'offline', prompt: 'select_account' },
         }
       });
@@ -124,6 +158,22 @@ export const LoginScreen: React.FC = () => {
             </h1>
             <p className="text-zinc-500 text-[9px] lg:text-[8px] font-bold uppercase tracking-[0.4em]">Virtual Collaboration Hub</p>
           </div>
+
+        {invitacionBanner && (
+          <div className="mb-4 lg:mb-3 p-3 lg:p-2.5 bg-violet-500/10 border border-violet-500/30 rounded-xl animate-in slide-in-from-top-2">
+            <div className="flex items-start gap-2">
+              <span className="text-lg">🎉</span>
+              <div className="flex-1">
+                <p className="text-violet-300 text-[10px] lg:text-[9px] font-black leading-tight">
+                  {invitacionBanner.invitadorNombre ? `${invitacionBanner.invitadorNombre} te invitó` : 'Te invitaron'} a <span className="text-white">{invitacionBanner.espacioNombre}</span>
+                </p>
+                <p className="text-zinc-500 text-[9px] lg:text-[8px] font-bold mt-0.5">
+                  Inicia sesión con <span className="text-violet-400">{invitacionBanner.email}</span> para aceptar
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {authFeedback && (
           <div className="mb-4 lg:mb-3 p-3 lg:p-2.5 bg-green-500/10 border border-green-500/30 rounded-xl animate-in slide-in-from-top-2 flex items-start gap-2 text-green-400">

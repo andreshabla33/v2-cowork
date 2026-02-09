@@ -143,8 +143,8 @@ const App: React.FC = () => {
     return <LoginScreen />;
   }
 
-  // Si no hay sesión, siempre pantalla de login (excepto si estamos procesando invitación)
-  if (!session && view !== 'invitation') {
+  // Si no hay sesión, siempre mostrar login (el token de invitación se preserva en la URL)
+  if (!session) {
     return <LoginScreen />;
   }
 
@@ -261,13 +261,6 @@ const InvitationProcessor: React.FC = () => {
     setErrorLocal('');
 
     try {
-      if (!session) {
-        setAuthFeedback({ type: 'success', message: 'Inicia sesión con tu correo para aceptar la invitación.' });
-        setView('loading');
-        setTimeout(() => setView('dashboard'), 100); 
-        return;
-      }
-
       if (session.user.email?.toLowerCase() !== invitacion.email.toLowerCase()) {
         setErrorLocal(`Debes iniciar sesión con ${invitacion.email}`);
         setProcesando(false);
