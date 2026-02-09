@@ -176,8 +176,14 @@ export const LoginScreen: React.FC = () => {
         )}
 
         {authFeedback && (
-          <div className="mb-4 lg:mb-3 p-3 lg:p-2.5 bg-green-500/10 border border-green-500/30 rounded-xl animate-in slide-in-from-top-2 flex items-start gap-2 text-green-400">
-            <div className="shrink-0 w-5 h-5 lg:w-4 lg:h-4 rounded-full bg-green-500/20 flex items-center justify-center font-bold text-[10px] lg:text-[9px]">✓</div>
+          <div className={`mb-4 lg:mb-3 p-3 lg:p-2.5 rounded-xl animate-in slide-in-from-top-2 flex items-start gap-2 ${
+            authFeedback.type === 'error'
+              ? 'bg-red-500/10 border border-red-500/30 text-red-400'
+              : 'bg-green-500/10 border border-green-500/30 text-green-400'
+          }`}>
+            <div className={`shrink-0 w-5 h-5 lg:w-4 lg:h-4 rounded-full flex items-center justify-center font-bold text-[10px] lg:text-[9px] ${
+              authFeedback.type === 'error' ? 'bg-red-500/20' : 'bg-green-500/20'
+            }`}>{authFeedback.type === 'error' ? '!' : '✓'}</div>
             <p className="text-[10px] lg:text-[9px] font-bold leading-tight flex-1">{authFeedback.message}</p>
             <button onClick={() => setAuthFeedback(null)} className="opacity-50 hover:opacity-100 text-sm">×</button>
           </div>

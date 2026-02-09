@@ -12,18 +12,44 @@ import { MeetingLobby, MeetingRoom } from './components/meetings/videocall';
 import type { CargoLaboral, CargoDB } from './components/onboarding/CargoSelector';
 
 const App: React.FC = () => {
-  const { session, setSession, view, setView, initialize, initialized } = useStore();
+  const { session, setSession, view, setView, initialize, initialized, setAuthFeedback } = useStore();
 
   useEffect(() => {
-    // Inicialización al montar
-    initialize();
+    // Verificar confirmación de email via token_hash en URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenHash = urlParams.get('token_hash');
+    const type = urlParams.get('type');
+
+    const verifyAndInit = async () => {
+      if (tokenHash && (type === 'signup' || type === 'email')) {
+        try {
+          const { data, error } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: type === 'signup' ? 'signup' : 'email',
+          });
+          if (error) {
+            console.error('Error verificando email:', error.message);
+            setAuthFeedback({ type: 'error', message: 'Error al confirmar email. Intenta registrarte de nuevo.' });
+          } else if (data.session) {
+            setSession(data.session);
+            setAuthFeedback({ type: 'success', message: '¡Email confirmado! Bienvenido a Cowork.' });
+          }
+          // Limpiar URL params después de verificar
+          window.history.replaceState({}, '', window.location.pathname);
+        } catch (err) {
+          console.error('Error en verifyOtp:', err);
+        }
+      }
+      await initialize();
+    };
+
+    verifyAndInit();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       console.log("Auth Event:", event);
       setSession(session);
       
       if (event === 'SIGNED_IN') {
-        // Al entrar, forzamos inicialización profunda para traer espacios
         await initialize();
       } else if (event === 'SIGNED_OUT') {
         setView('dashboard');
