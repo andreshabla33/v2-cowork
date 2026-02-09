@@ -114,7 +114,13 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
       setPaso('invitar');
     } catch (err: any) {
       console.error('Error creando espacio:', err);
-      setError(err.message || 'Error al crear el espacio');
+      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
+        setError('Error de conexión. Verifica tu internet e intenta de nuevo.');
+      } else if (err.code === '23503') {
+        setError('Error de usuario. Cierra sesión, vuelve a entrar e intenta de nuevo.');
+      } else {
+        setError(err.message || 'Error al crear el espacio. Intenta de nuevo.');
+      }
     } finally {
       setLoading(false);
     }
