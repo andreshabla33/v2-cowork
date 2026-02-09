@@ -330,83 +330,86 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-lg relative z-10"
+            className="w-full max-w-md lg:max-w-sm relative z-10"
           >
-            <button
-              onClick={() => setPaso('bienvenida')}
-              className="mb-6 text-zinc-500 hover:text-violet-400 flex items-center gap-2 text-sm transition-colors"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              Volver
-            </button>
+            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600/20 via-cyan-600/20 to-violet-500/20 rounded-[40px] lg:rounded-[32px] blur-xl opacity-60" />
+            <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
+              <button
+                onClick={() => setPaso('bienvenida')}
+                className="mb-4 lg:mb-3 text-zinc-500 hover:text-violet-400 flex items-center gap-2 text-xs transition-colors"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                Volver
+              </button>
 
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 1 de 4
+              <div className="text-center mb-6 lg:mb-5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
+                  Paso 1 de 4
+                </div>
+                <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl blur-lg opacity-40" />
+                  <div className="relative w-12 h-12 lg:w-10 lg:h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-6 h-6 lg:w-5 lg:h-5 text-white" />
+                  </div>
+                </div>
+                <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-1">Crea tu espacio</h2>
+                <p className="text-zinc-500 text-xs lg:text-[10px]">Dale un nombre a tu espacio de trabajo</p>
               </div>
-              <div className="relative group mx-auto w-16 h-16 mb-4">
-                <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-2xl blur-lg opacity-40" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-2xl flex items-center justify-center">
-                  <Building2 className="w-8 h-8 text-white" />
+
+              <div className="space-y-3 lg:space-y-2.5 mb-5 lg:mb-4">
+                <div>
+                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">
+                    Nombre del espacio *
+                  </label>
+                  <input
+                    type="text"
+                    value={espacioData.nombre}
+                    onChange={(e) => setEspacioData({ ...espacioData, nombre: e.target.value })}
+                    placeholder="Ej: Mi Empresa, Equipo Marketing..."
+                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">
+                    Descripción (opcional)
+                  </label>
+                  <textarea
+                    value={espacioData.descripcion}
+                    onChange={(e) => setEspacioData({ ...espacioData, descripcion: e.target.value })}
+                    placeholder="¿De qué trata este espacio?"
+                    rows={2}
+                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all resize-none"
+                  />
                 </div>
               </div>
-              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-2">Crea tu espacio de trabajo</h2>
-              <p className="text-zinc-400">Dale un nombre a tu espacio donde colaborará tu equipo</p>
+
+              {error && (
+                <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-[10px] font-bold">
+                  {error}
+                </div>
+              )}
+
+              <button
+                onClick={handleCrearEspacio}
+                disabled={loading || !espacioData.nombre.trim()}
+                className="relative w-full group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white py-3.5 lg:py-3 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-[0.15em] transition-all shadow-2xl shadow-emerald-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                <span className="relative flex items-center justify-center gap-2">
+                  {loading ? (
+                    <>
+                      <div className="w-4 h-4 lg:w-3.5 lg:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Creando...
+                    </>
+                  ) : (
+                    <>
+                      Crear espacio
+                      <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
+                    </>
+                  )}
+                </span>
+              </button>
             </div>
-
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Nombre del espacio *
-                </label>
-                <input
-                  type="text"
-                  value={espacioData.nombre}
-                  onChange={(e) => setEspacioData({ ...espacioData, nombre: e.target.value })}
-                  placeholder="Ej: Mi Empresa, Equipo Marketing..."
-                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">
-                  Descripción (opcional)
-                </label>
-                <textarea
-                  value={espacioData.descripcion}
-                  onChange={(e) => setEspacioData({ ...espacioData, descripcion: e.target.value })}
-                  placeholder="¿De qué trata este espacio?"
-                  rows={3}
-                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all resize-none"
-                />
-              </div>
-            </div>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              onClick={handleCrearEspacio}
-              disabled={loading || !espacioData.nombre.trim()}
-              className="relative w-full group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-emerald-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-              <span className="relative flex items-center justify-center gap-2">
-                {loading ? (
-                  <>
-                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                    Creando...
-                  </>
-                ) : (
-                  <>
-                    Crear espacio
-                    <ArrowRight className="w-5 h-5" />
-                  </>
-                )}
-              </span>
-            </button>
           </motion.div>
         )}
 
@@ -417,108 +420,111 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-lg relative z-10"
+            className="w-full max-w-md lg:max-w-sm relative z-10"
           >
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 2 de 4
-              </div>
-              <div className="relative group mx-auto w-16 h-16 mb-4">
-                <div className="absolute -inset-2 bg-gradient-to-r from-fuchsia-500 to-violet-500 rounded-2xl blur-lg opacity-40" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-2xl flex items-center justify-center">
-                  <Building2 className="w-8 h-8 text-white" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-fuchsia-600/20 via-violet-600/20 to-cyan-500/20 rounded-[40px] lg:rounded-[32px] blur-xl opacity-60" />
+            <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
+              <div className="text-center mb-6 lg:mb-5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
+                  Paso 2 de 4
                 </div>
+                <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-fuchsia-500 to-violet-500 rounded-xl blur-lg opacity-40" />
+                  <div className="relative w-12 h-12 lg:w-10 lg:h-10 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-xl flex items-center justify-center">
+                    <Building2 className="w-6 h-6 lg:w-5 lg:h-5 text-white" />
+                  </div>
+                </div>
+                <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-fuchsia-200 to-white mb-1">Datos de tu empresa</h2>
+                <p className="text-zinc-500 text-xs lg:text-[10px]">
+                  Vincula tu organización a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
+                </p>
               </div>
-              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-fuchsia-200 to-white mb-2">Datos de tu empresa</h2>
-              <p className="text-zinc-400">
-                Vincula tu organización a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
-              </p>
-            </div>
 
-            <div className="space-y-4 mb-6">
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Nombre de la empresa *</label>
-                <input
-                  type="text"
-                  value={empresaData.nombre}
-                  onChange={(e) => setEmpresaData({ ...empresaData, nombre: e.target.value })}
-                  placeholder="Mi Empresa S.A.S."
-                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-3 lg:space-y-2.5 mb-5 lg:mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Industria</label>
-                  <select
-                    value={empresaData.industria}
-                    onChange={(e) => setEmpresaData({ ...empresaData, industria: e.target.value })}
-                    className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                  >
-                    <option value="">Seleccionar...</option>
-                    {INDUSTRIAS.map(i => (
-                      <option key={i} value={i}>{i}</option>
-                    ))}
-                  </select>
+                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">Nombre de la empresa *</label>
+                  <input
+                    type="text"
+                    value={empresaData.nombre}
+                    onChange={(e) => setEmpresaData({ ...empresaData, nombre: e.target.value })}
+                    placeholder="Mi Empresa S.A.S."
+                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">Industria</label>
+                    <select
+                      value={empresaData.industria}
+                      onChange={(e) => setEmpresaData({ ...empresaData, industria: e.target.value })}
+                      className="w-full px-3 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                    >
+                      <option value="">Seleccionar...</option>
+                      {INDUSTRIAS.map(i => (
+                        <option key={i} value={i}>{i}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">Tamaño</label>
+                    <select
+                      value={empresaData.tamano}
+                      onChange={(e) => setEmpresaData({ ...empresaData, tamano: e.target.value })}
+                      className="w-full px-3 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                    >
+                      {TAMANOS.map(t => (
+                        <option key={t.value} value={t.value}>{t.label}</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-zinc-300 mb-2">Tamaño</label>
-                  <select
-                    value={empresaData.tamano}
-                    onChange={(e) => setEmpresaData({ ...empresaData, tamano: e.target.value })}
-                    className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                  >
-                    {TAMANOS.map(t => (
-                      <option key={t.value} value={t.value}>{t.label}</option>
-                    ))}
-                  </select>
+                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">Sitio web (opcional)</label>
+                  <input
+                    type="url"
+                    value={empresaData.sitio_web}
+                    onChange={(e) => setEmpresaData({ ...empresaData, sitio_web: e.target.value })}
+                    placeholder="https://miempresa.com"
+                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                  />
                 </div>
               </div>
-              <div>
-                <label className="block text-sm font-medium text-zinc-300 mb-2">Sitio web (opcional)</label>
-                <input
-                  type="url"
-                  value={empresaData.sitio_web}
-                  onChange={(e) => setEmpresaData({ ...empresaData, sitio_web: e.target.value })}
-                  placeholder="https://miempresa.com"
-                  className="w-full px-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                />
-              </div>
-            </div>
 
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                {error}
-              </div>
-            )}
+              {error && (
+                <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-[10px] font-bold">
+                  {error}
+                </div>
+              )}
 
-            <div className="space-y-3">
-              <button
-                onClick={handleGuardarEmpresa}
-                disabled={loading || !empresaData.nombre.trim()}
-                className="relative w-full group overflow-hidden bg-gradient-to-r from-fuchsia-500 via-violet-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-400 via-violet-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {loading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Guardando...
-                    </>
-                  ) : (
-                    <>
-                      Continuar
-                      <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </span>
-              </button>
-              <button
-                onClick={handleSkipEmpresa}
-                disabled={loading}
-                className="w-full py-3 text-zinc-500 hover:text-violet-400 transition-colors text-sm font-medium"
-              >
-                Omitir por ahora
-              </button>
+              <div className="space-y-2.5">
+                <button
+                  onClick={handleGuardarEmpresa}
+                  disabled={loading || !empresaData.nombre.trim()}
+                  className="relative w-full group overflow-hidden bg-gradient-to-r from-fuchsia-500 via-violet-600 to-cyan-500 text-white py-3.5 lg:py-3 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-[0.15em] transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-fuchsia-400 via-violet-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 lg:w-3.5 lg:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        Continuar
+                        <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
+                      </>
+                    )}
+                  </span>
+                </button>
+                <button
+                  onClick={handleSkipEmpresa}
+                  disabled={loading}
+                  className="w-full py-2 text-zinc-500 hover:text-violet-400 transition-colors text-[10px] lg:text-[9px] font-bold uppercase tracking-widest"
+                >
+                  Omitir por ahora
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -549,92 +555,95 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             initial={{ opacity: 0, x: 100 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-lg relative z-10"
+            className="w-full max-w-md lg:max-w-sm relative z-10"
           >
-            <div className="text-center mb-8">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-xs font-bold uppercase tracking-wider mb-4">
-                Paso 4 de 4
-              </div>
-              <div className="relative group mx-auto w-16 h-16 mb-4">
-                <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-2xl blur-lg opacity-40" />
-                <div className="relative w-16 h-16 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-2xl flex items-center justify-center">
-                  <Users className="w-8 h-8 text-white" />
+            <div className="absolute -inset-1 bg-gradient-to-r from-violet-600/20 via-fuchsia-600/20 to-cyan-500/20 rounded-[40px] lg:rounded-[32px] blur-xl opacity-60" />
+            <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
+              <div className="text-center mb-6 lg:mb-5">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
+                  Paso 4 de 4
                 </div>
-              </div>
-              <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">Invita a tu equipo</h2>
-              <p className="text-zinc-400">
-                Añade los emails de las personas que quieres invitar a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
-              </p>
-            </div>
-
-            <div className="space-y-3 mb-6">
-              {invitaciones.map((email, index) => (
-                <div key={index} className="flex gap-2">
-                  <div className="flex-1 relative">
-                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-zinc-600" />
-                    <input
-                      type="email"
-                      value={email}
-                      onChange={(e) => handleEmailChange(index, e.target.value)}
-                      placeholder="email@ejemplo.com"
-                      className="w-full pl-12 pr-4 py-4 bg-black/40 border border-white/[0.08] rounded-2xl text-white placeholder-zinc-600 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                    />
+                <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
+                  <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl blur-lg opacity-40" />
+                  <div className="relative w-12 h-12 lg:w-10 lg:h-10 bg-gradient-to-br from-violet-600 via-fuchsia-600 to-cyan-500 rounded-xl flex items-center justify-center">
+                    <Users className="w-6 h-6 lg:w-5 lg:h-5 text-white" />
                   </div>
-                  {invitaciones.length > 1 && (
-                    <button
-                      onClick={() => handleRemoveEmail(index)}
-                      className="p-4 bg-black/40 border border-white/[0.08] rounded-2xl text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition-all"
-                    >
-                      <X className="w-5 h-5" />
-                    </button>
-                  )}
                 </div>
-              ))}
-            </div>
-
-            <button
-              onClick={handleAddEmail}
-              className="w-full py-4 border-2 border-dashed border-white/[0.08] rounded-2xl text-zinc-500 hover:text-violet-400 hover:border-violet-500/30 transition-all flex items-center justify-center gap-2 mb-6"
-            >
-              <Plus className="w-5 h-5" />
-              Añadir otro email
-            </button>
-
-            {error && (
-              <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-sm">
-                {error}
+                <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-1">Invita a tu equipo</h2>
+                <p className="text-zinc-500 text-xs lg:text-[10px]">
+                  Añade los emails para invitar a <span className="text-violet-400 font-medium">{espacioCreado?.nombre}</span>
+                </p>
               </div>
-            )}
 
-            <div className="space-y-3">
+              <div className="space-y-2.5 mb-4 lg:mb-3">
+                {invitaciones.map((email, index) => (
+                  <div key={index} className="flex gap-2">
+                    <div className="flex-1 relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-600" />
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => handleEmailChange(index, e.target.value)}
+                        placeholder="email@ejemplo.com"
+                        className="w-full pl-10 pr-3 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
+                      />
+                    </div>
+                    {invitaciones.length > 1 && (
+                      <button
+                        onClick={() => handleRemoveEmail(index)}
+                        className="p-3.5 lg:p-3 bg-black/40 border border-white/5 rounded-xl text-zinc-500 hover:text-red-400 hover:border-red-500/50 transition-all"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+
               <button
-                onClick={handleEnviarInvitaciones}
-                disabled={loading}
-                className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50"
+                onClick={handleAddEmail}
+                className="w-full py-3 lg:py-2.5 border-2 border-dashed border-white/[0.06] rounded-xl text-zinc-600 hover:text-violet-400 hover:border-violet-500/30 transition-all flex items-center justify-center gap-2 mb-4 lg:mb-3 text-xs"
               >
-                <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {loading ? (
-                    <>
-                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      Enviar invitaciones
-                      <ArrowRight className="w-5 h-5" />
-                    </>
-                  )}
-                </span>
+                <Plus className="w-4 h-4" />
+                Añadir otro email
               </button>
 
-              <button
-                onClick={handleSkipInvitaciones}
-                disabled={loading}
-                className="w-full py-3 text-zinc-500 hover:text-violet-400 transition-colors text-sm font-medium"
-              >
-                Omitir por ahora
-              </button>
+              {error && (
+                <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-[10px] font-bold">
+                  {error}
+                </div>
+              )}
+
+              <div className="space-y-2.5">
+                <button
+                  onClick={handleEnviarInvitaciones}
+                  disabled={loading}
+                  className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-3.5 lg:py-3 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-[0.15em] transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98] disabled:opacity-50"
+                >
+                  <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                  <span className="relative flex items-center justify-center gap-2">
+                    {loading ? (
+                      <>
+                        <div className="w-4 h-4 lg:w-3.5 lg:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        Enviar invitaciones
+                        <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
+                      </>
+                    )}
+                  </span>
+                </button>
+
+                <button
+                  onClick={handleSkipInvitaciones}
+                  disabled={loading}
+                  className="w-full py-2 text-zinc-500 hover:text-violet-400 transition-colors text-[10px] lg:text-[9px] font-bold uppercase tracking-widest"
+                >
+                  Omitir por ahora
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -645,22 +654,22 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             key="completado"
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-md text-center relative z-10"
+            className="w-full max-w-md lg:max-w-sm text-center relative z-10"
           >
-            <div className="relative mx-auto w-24 h-24 mb-6">
-              <div className="absolute -inset-3 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full blur-xl opacity-50 animate-pulse" />
-              <div className="relative w-24 h-24 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center shadow-2xl">
-                <Check className="w-12 h-12 text-white" />
+            <div className="relative mx-auto w-16 h-16 lg:w-14 lg:h-14 mb-4">
+              <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-full blur-xl opacity-50 animate-pulse" />
+              <div className="relative w-16 h-16 lg:w-14 lg:h-14 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-full flex items-center justify-center shadow-2xl">
+                <Check className="w-8 h-8 lg:w-7 lg:h-7 text-white" />
               </div>
             </div>
-            <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-4">¡Todo listo!</h2>
-            <p className="text-zinc-300 mb-2">
+            <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-2">¡Todo listo!</h2>
+            <p className="text-zinc-300 text-sm lg:text-xs mb-1">
               Tu espacio <span className="text-emerald-400 font-medium">{espacioCreado?.nombre}</span> está listo
             </p>
-            <p className="text-zinc-600 text-sm">Redirigiendo...</p>
+            <p className="text-zinc-600 text-[10px]">Redirigiendo...</p>
             
-            <div className="mt-8">
-              <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="mt-6">
+              <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>
           </motion.div>
         )}
