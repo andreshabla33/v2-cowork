@@ -50,6 +50,9 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
       
       if (!session) throw new Error('Debes iniciar sesión');
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(
         `https://lcryrsdyrzotjqdxcwtp.supabase.co/functions/v1/enviar-invitacion`,
         {
@@ -64,8 +67,11 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
             rol,
             nombre_invitado: nombre.trim() || undefined,
           }),
+          signal: controller.signal,
         }
       );
+
+      clearTimeout(timeoutId);
 
       const result = await response.json();
       if (!response.ok || (result.success === false)) {
@@ -84,7 +90,11 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
       }, 2000);
 
     } catch (err: any) {
-      setError(err.message || 'Error al enviar la invitación');
+      if (err.name === 'AbortError') {
+        setError('Tiempo de espera agotado. Intenta de nuevo.');
+      } else {
+        setError(err.message || 'Error al enviar la invitación');
+      }
     } finally {
       setEnviando(false);
     }
