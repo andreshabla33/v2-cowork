@@ -163,16 +163,16 @@ export const CargoSelector: React.FC<CargoSelectorProps> = ({
   );
   const [hoveredCargo, setHoveredCargo] = useState<string | null>(null);
 
-  // Filtrar categorías según el rol del usuario (members no ven liderazgo)
-  const esMember = rolUsuario === 'member' || rolUsuario === 'miembro';
+  // Filtrar categorías según el rol del usuario (solo admins ven liderazgo)
+  const esAdmin = rolUsuario === 'admin' || rolUsuario === 'super_admin';
   const categoriasVisibles = Object.entries(CATEGORIAS).filter(
-    ([catId]) => !esMember || catId !== 'liderazgo'
+    ([catId]) => esAdmin || catId !== 'liderazgo'
   );
 
-  // Filtrar cargos restringidos para members (solo_admin)
-  const cargosPermitidos = esMember
-    ? cargosInfo.filter(c => !c.soloAdmin)
-    : cargosInfo;
+  // Filtrar cargos restringidos para no admins (solo_admin)
+  const cargosPermitidos = esAdmin
+    ? cargosInfo
+    : cargosInfo.filter(c => !c.soloAdmin);
 
   const handleSelectCargo = useCallback((cargo: string) => {
     setCargoSeleccionado(cargo);

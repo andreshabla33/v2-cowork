@@ -228,7 +228,7 @@ const InvitationProcessor: React.FC = () => {
   const [procesando, setProcesando] = useState(false);
   const [errorLocal, setErrorLocal] = useState('');
   const [tokenHashLocal, setTokenHashLocal] = useState<string>('');
-  const { session, setAuthFeedback, setView, theme } = useStore();
+  const { session, setAuthFeedback, setView, theme, fetchWorkspaces } = useStore();
 
   const token = new URLSearchParams(window.location.search).get('token');
 
@@ -329,6 +329,9 @@ const InvitationProcessor: React.FC = () => {
       
       // Limpiar token de la URL por seguridad
       window.history.replaceState({}, '', window.location.pathname);
+
+      // Actualizar lista de workspaces para evitar redirect a "Crear Espacio"
+      await fetchWorkspaces();
 
       setTimeout(() => {
         setAuthFeedback({ type: 'success', message: `¡Bienvenido a ${invitacion.espacio.nombre}!` });
@@ -468,7 +471,7 @@ interface OnboardingCargoState {
 }
 
 const OnboardingCargoView: React.FC = () => {
-  const { session, setView, setAuthFeedback } = useStore();
+  const { session, setView, setAuthFeedback, fetchWorkspaces } = useStore();
   const [state, setState] = useState<OnboardingCargoState>({
     isLoading: true,
     error: null,
@@ -584,6 +587,7 @@ const OnboardingCargoView: React.FC = () => {
           })
           .eq('id', state.miembroId);
         if (error) throw error;
+        await fetchWorkspaces();
         setAuthFeedback({ type: 'success', message: '¡Perfil configurado!' });
         setView('dashboard');
       } catch (err) {
@@ -615,6 +619,7 @@ const OnboardingCargoView: React.FC = () => {
       if (error) throw error;
 
       const deptNombre = state.departamentos.find(d => d.id === departamentoId)?.nombre || '';
+      await fetchWorkspaces();
       setAuthFeedback({ type: 'success', message: `¡Perfil configurado! ${deptNombre}` });
       setView('dashboard');
     } catch (err) {

@@ -51,6 +51,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   userName,
   onComplete
 }) => {
+  const { fetchWorkspaces } = useStore();
   const [paso, setPaso] = useState<Paso>('bienvenida');
   const [cargoSeleccionado, setCargoSeleccionado] = useState<CargoLaboral | null>(null);
   const [espacioData, setEspacioData] = useState<EspacioData>({ nombre: '', descripcion: '' });
@@ -77,6 +78,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
         .update({ cargo })
         .eq('id', miembroId);
       if (updateError) throw updateError;
+      await fetchWorkspaces();
       setCargoSeleccionado(cargo);
       setPaso('invitar');
     } catch (err: any) {
@@ -137,6 +139,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
         .eq('activo', true)
         .order('orden');
 
+      await fetchWorkspaces();
       setCargosDB((cargosData || []) as CargoDB[]);
       setEspacioCreado({ id: espacio.id, nombre: espacio.nombre });
       setEmpresaData(prev => ({ ...prev, nombre: espacioData.nombre }));
