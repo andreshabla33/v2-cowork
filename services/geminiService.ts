@@ -1,10 +1,11 @@
 /**
- * Servicio de IA para Mónica - Usa OpenRouter API
- * Soporta múltiples modelos via OpenRouter
+ * Servicio de IA para Mónica - Usa Edge Function proxy en Supabase
+ * La Edge Function llama a OpenAI (sin CORS, key segura server-side)
  */
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-const OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+const SUPABASE_URL = 'https://lcryrsdyrzotjqdxcwtp.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imxjcnlyc2R5cnpvdGpxZHhjd3RwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2NDg0MTgsImV4cCI6MjA4MzIyNDQxOH0.8fsqkKHHOVCZMi8tAb85HN_It2QCSWP0delcFn56vd4';
+const EDGE_FUNCTION_URL = `${SUPABASE_URL}/functions/v1/monica-ai-proxy`;
 
 const SYSTEM_PROMPT = (context: any) => `Eres Mónica, la asistente de IA del espacio de trabajo virtual "Cowork".
 
@@ -32,131 +33,63 @@ Instrucciones:
 - Usa emojis con moderación para hacer la conversación más amigable.
 - Sé breve, máximo 2-3 oraciones por respuesta a menos que se pida algo detallado.`;
 
-// Modelos en orden de preferencia (fallback si el primero falla)
-const MODELS = [
-  'google/gemini-2.0-flash-001',
-  'google/gemini-2.0-flash-exp:free',
-  'google/gemini-flash-1.5',
-];
-
 export const generateChatResponse = async (prompt: string, context: any) => {
-  const openrouterKey = process.env.OPENROUTER_API_KEY;
-  const openaiKey = process.env.OPEN_AI;
-  
-  if (!openrouterKey && !openaiKey) {
-    console.error('❌ Mónica AI: Ni OPENROUTER_API_KEY ni OPEN_AI configuradas');
-    throw new Error('API Key de IA no configurada');
-  }
-  console.log('🔑 Mónica AI: OpenRouter:', openrouterKey ? openrouterKey.substring(0, 12) + '...' : 'NO');
-  console.log('🔑 Mónica AI: OpenAI:', openaiKey ? openaiKey.substring(0, 12) + '...' : 'NO');
+  console.log('🤖 Mónica AI: Enviando a Edge Function proxy...');
 
-  let lastError: Error | null = null;
-
-  // Intentar primero con OpenRouter (múltiples modelos)
-  if (openrouterKey) {
-    for (const model of MODELS) {
-      try {
-        console.log(`🤖 Mónica AI [OpenRouter]: Intentando ${model}...`);
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-        const response = await fetch(OPENROUTER_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openrouterKey}`,
-            'Content-Type': 'application/json',
-            'HTTP-Referer': window.location.origin,
-            'X-Title': 'Cowork - Mónica AI',
-          },
-          body: JSON.stringify({
-            model,
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT(context) },
-              { role: 'user', content: prompt },
-            ],
-            temperature: 0.7,
-            max_tokens: 500,
-          }),
-          signal: controller.signal,
-        });
-
-        clearTimeout(timeoutId);
-
-        if (!response.ok) {
-          const errorData = await response.text();
-          console.warn(`⚠️ [OpenRouter] ${model} falló (${response.status}):`, errorData);
-          lastError = new Error(`OpenRouter ${response.status}: ${errorData}`);
-          continue;
-        }
-
-        console.log(`✅ [OpenRouter] Respuesta exitosa con ${model}`);
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        return parseResponse(content);
-      } catch (error: any) {
-        if (error.name === 'AbortError') {
-          console.warn(`⚠️ [OpenRouter] Timeout con ${model}`);
-          lastError = new Error(`Timeout OpenRouter ${model}`);
-        } else {
-          console.error(`❌ [OpenRouter] Error ${model}:`, error);
-          lastError = error;
-        }
-        continue;
-      }
+  // Obtener token JWT del usuario logueado para autenticar la Edge Function
+  let authToken = SUPABASE_ANON_KEY;
+  try {
+    const { supabase } = await import('../lib/supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session?.access_token) {
+      authToken = session.access_token;
     }
+  } catch (e) {
+    console.warn('⚠️ No se pudo obtener JWT, usando anon key');
   }
 
-  // Fallback: OpenAI directo
-  if (openaiKey) {
-    try {
-      console.log('🤖 Mónica AI [OpenAI]: Intentando gpt-4o-mini...');
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 20000);
 
-      const response = await fetch(OPENAI_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${openaiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT(context) },
-            { role: 'user', content: prompt },
-          ],
-          temperature: 0.7,
-          max_tokens: 500,
-        }),
-        signal: controller.signal,
-      });
+    const response = await fetch(EDGE_FUNCTION_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${authToken}`,
+        'Content-Type': 'application/json',
+        'apikey': SUPABASE_ANON_KEY,
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT(context) },
+          { role: 'user', content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 500,
+      }),
+      signal: controller.signal,
+    });
 
-      clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.warn(`⚠️ [OpenAI] gpt-4o-mini falló (${response.status}):`, errorData);
-        lastError = new Error(`OpenAI ${response.status}: ${errorData}`);
-      } else {
-        console.log('✅ [OpenAI] Respuesta exitosa con gpt-4o-mini');
-        const data = await response.json();
-        const content = data.choices?.[0]?.message?.content || '';
-        return parseResponse(content);
-      }
-    } catch (error: any) {
-      if (error.name === 'AbortError') {
-        console.warn('⚠️ [OpenAI] Timeout gpt-4o-mini');
-        lastError = new Error('Timeout OpenAI');
-      } else {
-        console.error('❌ [OpenAI] Error:', error);
-        lastError = error;
-      }
+    if (!response.ok) {
+      const errorData = await response.text();
+      console.error(`❌ Edge Function falló (${response.status}):`, errorData);
+      throw new Error(`Edge Function ${response.status}: ${errorData}`);
     }
-  }
 
-  // Si todo falló
-  console.error('❌ Mónica AI: Todos los proveedores/modelos fallaron');
-  throw lastError || new Error('No se pudo conectar con ningún modelo de IA');
+    const data = await response.json();
+    console.log(`✅ Mónica AI: Respuesta exitosa (modelo: ${data.model || 'gpt-4o-mini'})`);
+    return parseResponse(data.content || '');
+  } catch (error: any) {
+    if (error.name === 'AbortError') {
+      console.error('❌ Mónica AI: Timeout (20s)');
+      throw new Error('Timeout: Mónica tardó demasiado en responder');
+    }
+    console.error('❌ Mónica AI: Error:', error);
+    throw error;
+  }
 };
 
 // Parsear respuesta y detectar comandos
