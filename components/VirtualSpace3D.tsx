@@ -404,29 +404,36 @@ const RemoteAvatarInterpolated: React.FC<{
   }, [user.x, user.y]);
 
   // Interpolar suavemente hacia la posición destino
-  useFrame(() => {
+  useFrame((state, delta) => {
     if (!groupRef.current || remoteTeleport) return;
 
     const dx = targetPos.current.x - currentPos.current.x;
     const dz = targetPos.current.z - currentPos.current.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
 
-    if (dist > 0.02) {
-      // Lerp suave hacia el destino
-      const lerpFactor = Math.min(0.12, dist * 0.5);
-      currentPos.current.x += dx * lerpFactor;
-      currentPos.current.z += dz * lerpFactor;
+    // Umbral para considerar que se está moviendo
+    if (dist > 0.01) {
+      // Interpolación exponencial suavizada independiente del framerate
+      // Un valor de 10-15 da un seguimiento rápido pero suave (aprox 100-150ms de lag de suavizado)
+      const smoothing = 12.0; 
+      const t = 1.0 - Math.exp(-smoothing * delta);
+      
+      currentPos.current.x += dx * t;
+      currentPos.current.z += dz * t;
       
       groupRef.current.position.x = currentPos.current.x;
       groupRef.current.position.z = currentPos.current.z;
 
-      if (!isMoving) setIsMoving(true);
+      // Activar animación de caminar si hay distancia significativa
+      if (!isMoving && dist > 0.05) setIsMoving(true);
     } else {
-      // Llegó al destino
-      currentPos.current.x = targetPos.current.x;
-      currentPos.current.z = targetPos.current.z;
-      groupRef.current.position.x = currentPos.current.x;
-      groupRef.current.position.z = currentPos.current.z;
+      // Snap final al destino para asegurar precisión
+      if (Math.abs(dx) > 0 || Math.abs(dz) > 0) {
+        currentPos.current.x = targetPos.current.x;
+        currentPos.current.z = targetPos.current.z;
+        groupRef.current.position.x = currentPos.current.x;
+        groupRef.current.position.z = currentPos.current.z;
+      }
 
       if (isMoving) setIsMoving(false);
     }
