@@ -2481,9 +2481,25 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                 const newVideoTrack = videoStream.getVideoTracks()[0];
                 if (newVideoTrack && activeStreamRef.current) {
                   activeStreamRef.current.addTrack(newVideoTrack);
-                  // Agregar a peers existentes
-                  peerConnectionsRef.current.forEach((pc) => {
+                  // Agregar a peers existentes y RENEGOCIAR
+                  peerConnectionsRef.current.forEach(async (pc, peerId) => {
                     pc.addTrack(newVideoTrack, activeStreamRef.current!);
+                    
+                    // Renegociar para notificar el nuevo track
+                    try {
+                      const offer = await pc.createOffer();
+                      await pc.setLocalDescription(offer);
+                      if (webrtcChannelRef.current) {
+                        console.log('Sending renegotiation offer (video ON) to', peerId);
+                        webrtcChannelRef.current.send({
+                          type: 'broadcast',
+                          event: 'offer',
+                          payload: { offer, to: peerId, from: session?.user?.id }
+                        });
+                      }
+                    } catch (err) {
+                      console.error('Error renegotiating video ON with peer', peerId, err);
+                    }
                   });
                   setStream(new MediaStream(activeStreamRef.current.getTracks()));
                 }
