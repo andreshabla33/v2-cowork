@@ -24,6 +24,13 @@ export const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
   isSpeaking = false,
   className = '',
 }) => {
+  const [imageError, setImageError] = React.useState(false);
+
+  // Reset error state when url changes
+  React.useEffect(() => {
+    setImageError(false);
+  }, [avatarUrl]);
+
   const getInitials = (name: string): string => {
     const parts = name.trim().split(' ');
     if (parts.length >= 2) {
@@ -46,6 +53,8 @@ export const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
     const index = name.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0) % colors.length;
     return colors[index];
   };
+
+  const showImage = avatarUrl && !imageError;
 
   return (
     <div className={`relative ${className}`}>
@@ -70,14 +79,12 @@ export const ParticipantAvatar: React.FC<ParticipantAvatarProps> = ({
           transition-all duration-300
         `}
       >
-        {avatarUrl ? (
+        {showImage ? (
           <img
             src={avatarUrl}
             alt={name}
             className="w-full h-full object-cover"
-            onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
-            }}
+            onError={() => setImageError(true)}
           />
         ) : (
           <div
