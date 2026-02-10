@@ -364,17 +364,32 @@ const RemoteAvatarInterpolated: React.FC<{
   showVideoBubble?: boolean;
   message?: string;
   reaction?: string | null;
-}> = ({ user, remoteStream, showVideoBubble, message, reaction }) => {
+  realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
+}> = ({ user, remoteStream, showVideoBubble, message, reaction, realtimePositionsRef }) => {
   const groupRef = useRef<THREE.Group>(null);
   const targetPos = useRef({ x: user.x / 16, z: user.y / 16 });
   const currentPos = useRef({ x: user.x / 16, z: user.y / 16 });
   const [isMoving, setIsMoving] = useState(false);
   const [remoteTeleport, setRemoteTeleport] = useState<{ phase: 'out' | 'in'; origin: [number, number, number]; dest: [number, number, number] } | null>(null);
+  
+  // Estado local para dirección y animación (puede venir del broadcast)
+  const remoteStateRef = useRef({ direction: user.direction, isMoving: false });
 
-  // Actualizar posición destino cuando cambia
+  // Actualizar posición destino cuando cambia user.x/y (Presence - Fallback lento)
   useEffect(() => {
-    const newX = user.x / 16;
-    const newZ = user.y / 16;
+    // Solo actualizar si NO tenemos datos realtime recientes (para evitar conflicto)
+    const hasRealtime = realtimePositionsRef?.current?.has(user.id);
+    const realtimeData = hasRealtime ? realtimePositionsRef!.current.get(user.id) : null;
+    const isRecent = realtimeData && (Date.now() - realtimeData.timestamp < 2000); // 2s timeout
+
+    if (!isRecent) {
+      const newX = user.x / 16;
+      const newZ = user.y / 16;
+      updateTargetPosition(newX, newZ);
+    }
+  }, [user.x, user.y, user.id]);
+
+  const updateTargetPosition = (newX: number, newZ: number) => {
     const dx = newX - currentPos.current.x;
     const dz = newZ - currentPos.current.z;
     const jumpDist = Math.sqrt(dx * dx + dz * dz);
@@ -401,10 +416,30 @@ const RemoteAvatarInterpolated: React.FC<{
     } else {
       targetPos.current = { x: newX, z: newZ };
     }
-  }, [user.x, user.y]);
+  };
 
   // Interpolar suavemente hacia la posición destino
   useFrame((state, delta) => {
+    // 1. Verificar datos realtime (Broadcast - Rápido)
+    if (realtimePositionsRef && realtimePositionsRef.current.has(user.id)) {
+      const data = realtimePositionsRef.current.get(user.id);
+      // Usar datos si son frescos (< 500ms)
+      if (Date.now() - data.timestamp < 500) {
+        const rX = data.x / 16;
+        const rZ = data.y / 16;
+        
+        // Actualizar target si ha cambiado significativamente
+        if (Math.abs(rX - targetPos.current.x) > 0.01 || Math.abs(rZ - targetPos.current.z) > 0.01) {
+          targetPos.current = { x: rX, z: rZ };
+        }
+        
+        // Actualizar estado (dirección, movimiento)
+        remoteStateRef.current.direction = data.direction;
+        remoteStateRef.current.isMoving = data.isMoving;
+        if (isMoving !== data.isMoving) setIsMoving(data.isMoving);
+      }
+    }
+
     if (!groupRef.current || remoteTeleport) return;
 
     const dx = targetPos.current.x - currentPos.current.x;
@@ -414,7 +449,7 @@ const RemoteAvatarInterpolated: React.FC<{
     // Umbral para considerar que se está moviendo
     if (dist > 0.01) {
       // Interpolación exponencial suavizada independiente del framerate
-      // Un valor de 10-15 da un seguimiento rápido pero suave (aprox 100-150ms de lag de suavizado)
+      // Un valor de 10-15 da un seguimiento rápido pero suave
       const smoothing = 12.0; 
       const t = 1.0 - Math.exp(-smoothing * delta);
       
@@ -424,8 +459,9 @@ const RemoteAvatarInterpolated: React.FC<{
       groupRef.current.position.x = currentPos.current.x;
       groupRef.current.position.z = currentPos.current.z;
 
-      // Activar animación de caminar si hay distancia significativa
-      if (!isMoving && dist > 0.05) setIsMoving(true);
+      // Activar animación de caminar si hay distancia significativa o el broadcast dice que se mueve
+      const shouldMove = dist > 0.05 || remoteStateRef.current.isMoving;
+      if (!isMoving && shouldMove) setIsMoving(true);
     } else {
       // Snap final al destino para asegurar precisión
       if (Math.abs(dx) > 0 || Math.abs(dz) > 0) {
@@ -435,7 +471,7 @@ const RemoteAvatarInterpolated: React.FC<{
         groupRef.current.position.z = currentPos.current.z;
       }
 
-      if (isMoving) setIsMoving(false);
+      if (isMoving && !remoteStateRef.current.isMoving) setIsMoving(false);
     }
   });
 
@@ -452,7 +488,7 @@ const RemoteAvatarInterpolated: React.FC<{
             status={user.status}
             isCurrentUser={false}
             animationState={isMoving ? 'walk' : 'idle'}
-            direction={user.direction}
+            direction={remoteStateRef.current.direction || user.direction}
             reaction={reaction}
             videoStream={remoteStream}
             camOn={user.isCameraOn}
@@ -478,9 +514,10 @@ interface RemoteUsersProps {
   showVideoBubble?: boolean;
   remoteMessages: Map<string, string>;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
+  realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
 }
 
-const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, remoteMessages, remoteReaction }) => {
+const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, remoteMessages, remoteReaction, realtimePositionsRef }) => {
   const { currentUser } = useStore();
   
   // Limitar videos simultáneos según settings de rendimiento
@@ -511,6 +548,7 @@ const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVid
           showVideoBubble={showVideoBubble}
           message={remoteMessages.get(u.id)}
           reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}
+          realtimePositionsRef={realtimePositionsRef}
         />
       ))}
     </>
@@ -698,9 +736,10 @@ interface PlayerProps {
   onReachTarget?: () => void;
   teleportTarget?: { x: number; z: number } | null;
   onTeleportDone?: () => void;
+  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean) => void;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget, teleportTarget, onTeleportDone }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget, teleportTarget, onTeleportDone, broadcastMovement }) => {
   const groupRef = useRef<THREE.Group>(null);
   const positionRef = useRef({
     x: (currentUser.x || 400) / 16,
@@ -925,6 +964,17 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         animationState === 'sit',
         moving
       );
+      
+      // Broadcast movement (WebRTC High Frequency)
+      if (broadcastMovement) {
+        broadcastMovement(
+          positionRef.current.x * 16, 
+          positionRef.current.z * 16, 
+          newDirection, 
+          moving
+        );
+      }
+      
       lastSyncTime.current = now;
     }
   });
@@ -996,9 +1046,11 @@ interface SceneProps {
   cameraSensitivity?: number;
   invertYAxis?: boolean;
   cameraMode?: string;
+  realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
+  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean) => void;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true, cameraSensitivity = 5, invertYAxis = false, cameraMode = 'free' }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true, cameraSensitivity = 5, invertYAxis = false, cameraMode = 'free', realtimePositionsRef, broadcastMovement }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
 
   return (
@@ -1116,10 +1168,11 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         onReachTarget={onReachTarget}
         teleportTarget={teleportTarget}
         onTeleportDone={onTeleportDone}
+        broadcastMovement={broadcastMovement}
       />
       
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} remoteReaction={remoteReaction} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} remoteReaction={remoteReaction} realtimePositionsRef={realtimePositionsRef} />
     </>
   );
 };
@@ -1729,6 +1782,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [localReactions, setLocalReactions] = useState<Array<{ id: string; emoji: string }>>([]);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
   const orbitControlsRef = useRef<any>(null);
+  const realtimePositionsRef = useRef<Map<string, any>>(new Map());
   
   // Estado de grabación
   const [isRecording, setIsRecording] = useState(false);
@@ -1881,6 +1935,24 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       });
     }
   }, [session?.user?.id, currentUser.name]);
+
+  // Función para broadcast de movimiento (alta frecuencia)
+  const broadcastMovement = useCallback((x: number, y: number, direction: string, isMoving: boolean) => {
+    if (webrtcChannelRef.current && session?.user?.id) {
+      webrtcChannelRef.current.send({
+        type: 'broadcast',
+        event: 'movement',
+        payload: { 
+          id: session.user.id,
+          x, 
+          y, 
+          direction, 
+          isMoving,
+          timestamp: Date.now()
+        }
+      });
+    }
+  }, [session?.user?.id]);
 
   // Activar mic/cam cuando hay usuarios cerca (respetando settings de reuniones)
   useEffect(() => {
@@ -2193,6 +2265,18 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           console.log('Received reaction from', payload.fromName, ':', payload.emoji);
           setRemoteReaction({ emoji: payload.emoji, from: payload.from, fromName: payload.fromName });
           setTimeout(() => setRemoteReaction(null), 3000);
+        }
+      })
+      .on('broadcast', { event: 'movement' }, ({ payload }) => {
+        // Recibir movimiento de alta frecuencia
+        if (payload.id !== session.user.id) {
+          realtimePositionsRef.current.set(payload.id, {
+            x: payload.x,
+            y: payload.y,
+            direction: payload.direction,
+            isMoving: payload.isMoving,
+            timestamp: payload.timestamp
+          });
         }
       })
       .on('broadcast', { event: 'chat' }, ({ payload }) => {
@@ -2798,6 +2882,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             cameraSensitivity={space3dSettings.cameraSensitivity}
             invertYAxis={space3dSettings.invertYAxis}
             cameraMode={space3dSettings.cameraMode}
+            realtimePositionsRef={realtimePositionsRef}
+            broadcastMovement={broadcastMovement}
             onDoubleClickFloor={(point) => {
               // Calcular distancia desde posición actual del avatar
               const playerX = (currentUser.x || 400) / 16;
