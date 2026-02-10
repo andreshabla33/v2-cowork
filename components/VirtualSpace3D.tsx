@@ -965,8 +965,8 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         moving
       );
       
-      // Broadcast movement (WebRTC High Frequency)
-      if (broadcastMovement) {
+      // Broadcast movement (WebRTC High Frequency) - solo cuando hay movimiento real
+      if (broadcastMovement && moving) {
         broadcastMovement(
           positionRef.current.x * 16, 
           positionRef.current.z * 16, 
@@ -1943,8 +1943,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   }, [session?.user?.id, currentUser.name]);
 
   // Función para broadcast de movimiento (alta frecuencia)
+  const webrtcChannelSubscribedRef = useRef(false);
   const broadcastMovement = useCallback((x: number, y: number, direction: string, isMoving: boolean) => {
-    if (webrtcChannelRef.current && session?.user?.id) {
+    if (webrtcChannelRef.current && session?.user?.id && webrtcChannelSubscribedRef.current) {
       webrtcChannelRef.current.send({
         type: 'broadcast',
         event: 'movement',
@@ -2339,9 +2340,12 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           }, 5000);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        webrtcChannelSubscribedRef.current = status === 'SUBSCRIBED';
+      });
     webrtcChannelRef.current = webrtcChannel;
     return () => {
+      webrtcChannelSubscribedRef.current = false;
       supabase.removeChannel(webrtcChannel);
       peerConnectionsRef.current.forEach(pc => pc.close());
       peerConnectionsRef.current.clear();
