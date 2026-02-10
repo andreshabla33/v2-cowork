@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { 
   useParticipantTile,
   TrackReferenceOrPlaceholder,
@@ -35,6 +35,22 @@ export const CustomParticipantTile: React.FC<CustomParticipantTileProps> = ({
   const trackReference = useEnsureTrackRef(trackRef ?? maybeTrackRef);
   
   const participant = participantProp || trackReference?.participant;
+  
+  // Obtener avatar de metadata si no se pasa como prop
+  const metadataAvatar = useMemo(() => {
+    if (participant?.metadata) {
+      try {
+        const meta = JSON.parse(participant.metadata);
+        return meta.avatarUrl || meta.avatar_url || meta.profilePhoto;
+      } catch (e) {
+        return null;
+      }
+    }
+    return null;
+  }, [participant?.metadata]);
+
+  const finalAvatarUrl = avatarUrl || metadataAvatar;
+
   const isVideoEnabled = trackReference?.publication?.isSubscribed && 
                          trackReference?.publication?.track?.isMuted === false;
   const isAudioEnabled = participant?.isMicrophoneEnabled;
@@ -53,7 +69,7 @@ export const CustomParticipantTile: React.FC<CustomParticipantTileProps> = ({
       <TrackRefContextIfNeeded trackRef={trackReference}>
         <div
           className={`
-            relative w-full h-full bg-zinc-900 overflow-hidden
+            relative w-fullfin lAh-full bg-zinc-900 overflow-hidden
             ${isSpeaking ? 'ring-2 ring-green-500 ring-offset-2 ring-offset-zinc-900' : ''}
             ${className}
           `}

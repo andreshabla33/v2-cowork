@@ -410,6 +410,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
           espacioId={activeWorkspace?.id || ''}
           userId={currentUser?.id || ''}
           userName={currentUser?.name || nombreInvitado || 'Participante'}
+          userAvatar={currentUser?.profilePhoto}
           cargoUsuario={cargoUsuario}
           invitadosExternos={invitadoExterno ? [invitadoExterno] : []}
         />
@@ -433,6 +434,7 @@ interface MeetingRoomContentProps {
   espacioId: string;
   userId: string;
   userName: string;
+  userAvatar?: string;
   cargoUsuario: CargoLaboral;
   invitadosExternos?: InvitadoExterno[];
 }
@@ -450,6 +452,7 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   espacioId,
   userId,
   userName,
+  userAvatar,
   cargoUsuario,
   invitadosExternos = [],
 }) => {
@@ -458,6 +461,26 @@ const MeetingRoomContent: React.FC<MeetingRoomContentProps> = ({
   const [remoteRecording, setRemoteRecording] = useState<{isRecording: boolean; by: string} | null>(null);
   const [reactions, setReactions] = useState<{id: string; emoji: string; by: string}[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('gallery');
+
+  // Publicar metadata del usuario (avatar)
+  useEffect(() => {
+    if (room.state === 'connected' && localParticipant && userAvatar) {
+      const updateMetadata = async () => {
+        try {
+          const currentMeta = localParticipant.metadata ? JSON.parse(localParticipant.metadata) : {};
+          // Solo actualizar si cambiÃ³ o no existe
+          if (currentMeta.avatarUrl !== userAvatar) {
+            const newMeta = { ...currentMeta, avatarUrl: userAvatar };
+            await localParticipant.setMetadata(JSON.stringify(newMeta));
+            console.log('📸 Avatar publicado en metadata:', userAvatar);
+          }
+        } catch (e) {
+          console.error('Error actualizando metadata:', e);
+        }
+      };
+      updateMetadata();
+    }
+  }, [room.state, localParticipant, userAvatar]);
 
   // Estados de grabación internos (manejados por RecordingManager)
   const [isRecording, setIsRecording] = useState(false);
