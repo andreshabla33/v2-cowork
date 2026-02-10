@@ -26,9 +26,10 @@ interface ChatPanelProps {
   sidebarOnly?: boolean;
   chatOnly?: boolean;
   onChannelSelect?: () => void;
+  showNotifications?: boolean;
 }
 
-export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatOnly = false, onChannelSelect }) => {
+export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatOnly = false, onChannelSelect, showNotifications = false }) => {
   const { activeWorkspace, currentUser, setActiveSubTab, theme, onlineUsers, incrementUnreadChat, activeSubTab, activeChatGroupId, setActiveChatGroupId, userRoleInActiveWorkspace } = useStore();
   const [grupos, setGrupos] = useState<ChatGroup[]>([]);
   const grupoActivo = activeChatGroupId;
@@ -185,7 +186,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
   // SuscripciÃ³n global para toast notifications (todos los canales)
   useEffect(() => {
-    if (!activeWorkspace || !currentUser.id) return;
+    if (!activeWorkspace || !currentUser.id || !showNotifications) return;
     
     if (globalNotifChannelRef.current) {
       supabase.removeChannel(globalNotifChannelRef.current);
@@ -868,12 +869,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         }} />}
         
         {/* Toast Notifications */}
-        <ChatToast 
-          notifications={toastNotifications}
-          onDismiss={dismissToast}
-          onOpen={handleChannelSelect}
-          theme={theme}
-        />
+        {showNotifications && (
+          <ChatToast 
+            notifications={toastNotifications}
+            onDismiss={dismissToast}
+            onOpen={handleChannelSelect}
+            theme={theme}
+          />
+        )}
       </div>
     );
   }
@@ -1245,14 +1248,15 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       {activeThread && (
         <div className="fixed inset-0 bg-black/30 z-40" onClick={closeThread} />
       )}
-      
       {/* Toast Notifications */}
-      <ChatToast 
-        notifications={toastNotifications}
-        onDismiss={dismissToast}
-        onOpen={(groupId) => { setGrupoActivo(groupId); }}
-        theme={theme}
-      />
+      {showNotifications && (
+        <ChatToast 
+          notifications={toastNotifications}
+          onDismiss={dismissToast}
+          onOpen={(groupId) => { setGrupoActivo(groupId); }}
+          theme={theme}
+        />
+      )}
     </div>
   );
 };

@@ -377,7 +377,7 @@ export const WorkspaceLayout: React.FC = () => {
       {/* Sidebar Workspace */}
       <aside className={`w-[260px] ${s.sidebar} flex flex-col shrink-0 border-r ${s.border} z-90 shadow-2xl relative overflow-hidden`} data-tour-step="sidebar-chat">
         {theme === 'arcade' && <div className="absolute top-0 left-0 w-full h-1 bg-[#00ff41] animate-pulse" />}
-        <ChatPanel sidebarOnly={true} />
+        <ChatPanel sidebarOnly={true} showNotifications={true} />
       </aside>
 
       {/* Main Content */}

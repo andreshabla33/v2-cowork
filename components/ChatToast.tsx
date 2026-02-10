@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface ToastNotification {
   id: string;
@@ -19,8 +20,8 @@ interface ChatToastProps {
 }
 
 export const ChatToast: React.FC<ChatToastProps> = ({ notifications, onDismiss, onOpen, theme }) => {
-  return (
-    <div className="fixed top-4 right-4 z-[200] flex flex-col gap-3 pointer-events-none">
+  return createPortal(
+    <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-3 pointer-events-none">
       {notifications.map((notif) => (
         <ToastItem 
           key={notif.id} 
@@ -30,7 +31,8 @@ export const ChatToast: React.FC<ChatToastProps> = ({ notifications, onDismiss, 
           theme={theme}
         />
       ))}
-    </div>
+    </div>,
+    document.body
   );
 };
 
