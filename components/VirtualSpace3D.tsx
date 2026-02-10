@@ -2937,6 +2937,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       {usersInCall.length > 0 && (
         <VideoHUD
           userName={currentUser.name}
+          userAvatar={currentUser.profilePhoto}
           visitorId={session?.user?.id || 'visitor'}
           camOn={currentUser.isCameraOn}
           sharingOn={currentUser.isScreenSharing}
@@ -3163,6 +3164,20 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
               </button>
+            </div>
+
+            {/* Body - AvatarCustomizer3D */}
+            <div className="flex-1 overflow-hidden">
+              <AvatarCustomizer3D compact={false} onClose={() => setShowAvatarModal(false)} />
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default VirtualSpace3D;
             </div>
 
             {/* Body - AvatarCustomizer3D */}

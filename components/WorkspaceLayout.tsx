@@ -217,6 +217,7 @@ export const WorkspaceLayout: React.FC = () => {
         name: currentUser.name,
         role: currentUser.role,
         avatarConfig: currentUser.avatarConfig,
+        profilePhoto: currentUser.profilePhoto,
         x: privacy.showLocationInSpace ? currentUser.x : 0,
         y: privacy.showLocationInSpace ? currentUser.y : 0,
         direction: currentUser.direction,
