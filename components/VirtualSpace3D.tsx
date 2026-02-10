@@ -2399,9 +2399,23 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       const theirIdHash = user.id.split('').reduce((a: number, b: string) => a + b.charCodeAt(0), 0);
       const shouldInitiate = myIdHash < theirIdHash || (myIdHash === theirIdHash && session.user.id < user.id);
       
-      if (!peerConnectionsRef.current.has(user.id) && shouldInitiate) {
+      const existingPc = peerConnectionsRef.current.get(user.id);
+      
+      if (!existingPc && shouldInitiate) {
+        // No hay conexión → iniciar nueva
         console.log('Initiating call to (global):', user.id, user.name);
         initiateCall(user.id);
+      } else if (existingPc && shouldInitiate) {
+        // Conexión existe → verificar si está en estado zombie (no connected/connecting)
+        const state = existingPc.connectionState;
+        if (state !== 'connected' && state !== 'connecting') {
+          console.log(`Re-initiating call to ${user.name} (state: ${state})`);
+          // Cerrar la conexión zombie y crear una nueva
+          existingPc.close();
+          peerConnectionsRef.current.delete(user.id);
+          peerVideoTrackCountRef.current.delete(user.id);
+          initiateCall(user.id);
+        }
       }
     });
   }, [onlineUsers, initiateCall, session?.user?.id, stream]);
