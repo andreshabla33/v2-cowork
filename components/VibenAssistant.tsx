@@ -37,7 +37,7 @@ export const VibenAssistant: React.FC<VibenAssistantProps> = ({ onClose }) => {
     const loadChannels = async () => {
       if (!activeWorkspace?.id || !currentUser?.id) return;
       const { data } = await supabase
-        .from('chat_grupos')
+        .from('grupos_chat')
         .select('nombre')
         .eq('espacio_id', activeWorkspace.id);
       if (data) setChannels(data.map((g: any) => g.nombre));

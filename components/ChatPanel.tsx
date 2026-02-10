@@ -259,16 +259,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
 
   useEffect(() => {
     if (!grupoActivo) return;
-    console.log('Loading messages for grupo:', grupoActivo);
+    // Solo cargar mensajes y suscribirse a realtime si NO es sidebarOnly
+    // Esto evita suscripciones duplicadas cuando hay dos instancias de ChatPanel
+    if (sidebarOnly) return;
+    
+    const currentGrupo = grupoActivo; // Capturar para evitar stale closures
+    console.log('Loading messages for grupo:', currentGrupo);
     const cargarMensajes = async () => {
       const { data, error } = await supabase
         .from('mensajes_chat')
         .select(`id, contenido, creado_en, usuario_id, tipo, respuesta_a, menciones, usuario:usuarios!mensajes_chat_usuario_id_fkey(id, nombre)`)
-        .eq('grupo_id', grupoActivo)
+        .eq('grupo_id', currentGrupo)
         .is('respuesta_a', null)
         .order('creado_en', { ascending: true });
       
-      console.log('Messages loaded:', data?.length, 'for grupo:', grupoActivo);
+      console.log('Messages loaded:', data?.length, 'for grupo:', currentGrupo);
       if (!error && data) { 
         setMensajes(data as any); 
         scrollToBottom();
@@ -298,12 +303,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
       channelRef.current = null;
     }
     
-    const channel = supabase.channel(`chat_realtime_${grupoActivo}_${Date.now()}`)
+    const channel = supabase.channel(`chat_realtime_${currentGrupo}_${Date.now()}`)
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'mensajes_chat', 
-        filter: `grupo_id=eq.${grupoActivo}` 
+        filter: `grupo_id=eq.${currentGrupo}` 
       }, async (payload) => {
         console.log('Nuevo mensaje recibido en canal activo:', payload.new);
         
@@ -311,7 +316,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         const { data } = await supabase
           .from('mensajes_chat')
           .select(`id, contenido, creado_en, usuario_id, tipo, usuario:usuarios!mensajes_chat_usuario_id_fkey(id, nombre)`)
-          .eq('grupo_id', grupoActivo)
+          .eq('grupo_id', currentGrupo)
           .order('creado_en', { ascending: true });
         
         if (data) {
@@ -320,6 +325,13 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         }
       }).subscribe((status) => {
         console.log('Chat realtime status:', status);
+        if (status === 'CHANNEL_ERROR') {
+          // Reintentar suscripción después de 2s
+          setTimeout(() => {
+            console.log('Retrying chat subscription for grupo:', currentGrupo);
+            channel.subscribe();
+          }, 2000);
+        }
       });
     
     channelRef.current = channel;
@@ -328,14 +340,14 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
     if (typingChannelRef.current) {
       supabase.removeChannel(typingChannelRef.current);
     }
-    const typingChannel = supabase.channel(`typing_${grupoActivo}`)
+    const typingChannel = supabase.channel(`typing_${currentGrupo}`)
       .on('broadcast', { event: 'typing' }, ({ payload }) => {
         if (payload.user_id !== currentUser.id) {
           setTypingUsers(prev => {
             if (!prev.includes(payload.user_name)) return [...prev, payload.user_name];
             return prev;
           });
-          // Remover despuÃ©s de 3 segundos
+          // Remover después de 3 segundos
           setTimeout(() => {
             setTypingUsers(prev => prev.filter(u => u !== payload.user_name));
           }, 3000);
@@ -354,7 +366,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({ sidebarOnly = false, chatO
         typingChannelRef.current = null;
       }
     };
-  }, [grupoActivo]);
+  }, [grupoActivo, sidebarOnly]);
 
   // Broadcast typing cuando el usuario escribe
   const handleTyping = () => {
