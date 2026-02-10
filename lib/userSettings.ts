@@ -57,7 +57,6 @@ export interface UserSettings {
     showActivityStatus: boolean;
     allowDirectMessages: boolean;
     showLocationInSpace: boolean;
-    sharePresenceWithTeam: boolean;
     activityHistoryEnabled: boolean;
     activityRetentionDays: number;
   };
@@ -176,7 +175,6 @@ const defaultSettings: UserSettings = {
     showActivityStatus: true,
     allowDirectMessages: true,
     showLocationInSpace: true,
-    sharePresenceWithTeam: false,
     activityHistoryEnabled: true,
     activityRetentionDays: 30
   },

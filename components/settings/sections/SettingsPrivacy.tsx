@@ -9,7 +9,6 @@ interface PrivacySettings {
   showActivityStatus: boolean;
   allowDirectMessages: boolean;
   showLocationInSpace: boolean;
-  sharePresenceWithTeam: boolean;
   activityHistoryEnabled: boolean;
   activityRetentionDays: number;
 }
@@ -91,12 +90,6 @@ export const SettingsPrivacy: React.FC<SettingsPrivacyProps> = ({
           description={currentLang === 'en' ? 'Any member can send you private messages' : currentLang === 'pt' ? 'Qualquer membro pode enviar mensagens privadas' : 'Cualquier miembro puede enviarte mensajes privados'}
           checked={settings.allowDirectMessages}
           onChange={(v) => updateSetting('allowDirectMessages', v)}
-        />
-        <SettingToggle
-          label={currentLang === 'en' ? 'Share presence with team' : currentLang === 'pt' ? 'Compartilhar presença com equipe' : 'Compartir presencia con el equipo'}
-          description={currentLang === 'en' ? 'Your status syncs with integrations (Slack, etc.)' : currentLang === 'pt' ? 'Seu status sincroniza com integrações (Slack, etc.)' : 'Tu estado se sincroniza con integraciones (Slack, etc.)'}
-          checked={settings.sharePresenceWithTeam}
-          onChange={(v) => updateSetting('sharePresenceWithTeam', v)}
         />
       </SettingSection>
 

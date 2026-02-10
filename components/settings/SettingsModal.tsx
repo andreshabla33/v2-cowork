@@ -88,7 +88,6 @@ const defaultSettings = {
     showActivityStatus: true,
     allowDirectMessages: true,
     showLocationInSpace: true,
-    sharePresenceWithTeam: false,
     activityHistoryEnabled: true,
     activityRetentionDays: 30
   },

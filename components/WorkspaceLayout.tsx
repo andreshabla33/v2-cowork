@@ -127,8 +127,8 @@ export const WorkspaceLayout: React.FC = () => {
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           const privacy = getSettingsSection('privacy');
-          // Si sharePresenceWithTeam está desactivado, no hacer track (invisible para el equipo)
-          if (privacy.sharePresenceWithTeam === false) return;
+          // Siempre hacer track de presencia básica para aparecer en el espacio
+          // La ubicación exacta depende de showLocationInSpace
           await channel.track({
             user_id: session.user.id,
             name: currentUser.name,
@@ -211,7 +211,7 @@ export const WorkspaceLayout: React.FC = () => {
   useEffect(() => {
     if (presenceChannelRef.current && session?.user?.id && presenceChannelRef.current.state === 'joined') {
       const privacy = getSettingsSection('privacy');
-      if (privacy.sharePresenceWithTeam === false) return;
+      // Siempre actualizar estado (track), la privacidad de ubicación se maneja en las propiedades x/y
       presenceChannelRef.current.track({
         user_id: session.user.id,
         name: currentUser.name,
