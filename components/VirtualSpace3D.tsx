@@ -1828,9 +1828,9 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       const wasInCall = connectedUsersRef.current.has(u.id);
       
       // HISTÉRESIS: 
-      // Si ya estaba conectado, usamos un radio mayor (1.2x) para desconectar.
+      // Si ya estaba conectado, usamos un radio mayor (1.5x) para desconectar.
       // Esto evita que la conexión oscile cuando se está en el borde.
-      const threshold = wasInCall ? userProximityRadius * 1.2 : userProximityRadius;
+      const threshold = wasInCall ? userProximityRadius * 1.5 : userProximityRadius;
       
       const inProximity = dist < threshold;
       
@@ -2181,9 +2181,33 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       }
     };
 
+    // Ref local para timeout de disconnected
+    let disconnectTimeout: NodeJS.Timeout | null = null;
+    
     pc.onconnectionstatechange = () => {
       console.log('Connection state with', peerId, ':', pc.connectionState);
-      if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+      
+      if (pc.connectionState === 'connected') {
+        // Limpiar timeout si se reconectó
+        if (disconnectTimeout) { clearTimeout(disconnectTimeout); disconnectTimeout = null; }
+      } else if (pc.connectionState === 'disconnected') {
+        // 'disconnected' es transitorio - dar 5s para recuperar antes de cerrar
+        if (!disconnectTimeout) {
+          disconnectTimeout = setTimeout(() => {
+            if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+              console.log('Peer', peerId, 'still disconnected after 5s, closing');
+              pc.close();
+              peerConnectionsRef.current.delete(peerId);
+              peerVideoTrackCountRef.current.delete(peerId);
+              setRemoteStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+              setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
+            }
+            disconnectTimeout = null;
+          }, 5000);
+        }
+      } else if (pc.connectionState === 'failed') {
+        // 'failed' es definitivo - cerrar inmediatamente
+        if (disconnectTimeout) { clearTimeout(disconnectTimeout); disconnectTimeout = null; }
         pc.close();
         peerConnectionsRef.current.delete(peerId);
         peerVideoTrackCountRef.current.delete(peerId);
@@ -2344,7 +2368,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     // Programar desconexiones para usuarios que ya no están ONLINE
     peerConnectionsRef.current.forEach((pc, peerId) => {
       if (!onlineUserIds.has(peerId) && !pendingDisconnectsRef.current.has(peerId)) {
-        console.log('Scheduling disconnect for user (3s delay):', peerId);
+        console.log('Scheduling disconnect for user (5s delay):', peerId);
         const timeout = setTimeout(() => {
           // Verificar de nuevo si el usuario sigue sin estar online
           const stillMissing = !onlineUsers.some(u => u.id === peerId);
@@ -2357,7 +2381,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             setRemoteScreenStreams(prev => { const m = new Map(prev); m.delete(peerId); return m; });
           }
           pendingDisconnectsRef.current.delete(peerId);
-        }, 3000);
+        }, 5000);
         pendingDisconnectsRef.current.set(peerId, timeout);
       }
     });
