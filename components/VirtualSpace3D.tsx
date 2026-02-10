@@ -1180,6 +1180,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
 // ============== VIDEO HUD COMPONENT ==============
 interface VideoHUDProps {
   userName: string;
+  userAvatar?: string;
   visitorId: string;
   camOn: boolean;
   sharingOn: boolean;
@@ -1202,6 +1203,7 @@ interface VideoHUDProps {
 
 const VideoHUD: React.FC<VideoHUDProps> = ({
   userName,
+  userAvatar,
   visitorId,
   camOn,
   sharingOn,
@@ -1398,8 +1400,12 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
           </div>
           {!camOn && (
             <div className="absolute inset-0 bg-zinc-900 flex items-center justify-center">
-              <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black text-2xl bg-black/50">
-                {userName.charAt(0)}
+              <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center text-indigo-400 font-black text-2xl bg-black/50 overflow-hidden">
+                {userAvatar ? (
+                  <img src={userAvatar} alt={userName} className="w-full h-full object-cover" />
+                ) : (
+                  userName.charAt(0)
+                )}
               </div>
             </div>
           )}
