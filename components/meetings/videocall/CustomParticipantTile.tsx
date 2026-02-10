@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { 
   useParticipantTile,
   TrackReferenceOrPlaceholder,
@@ -10,8 +10,9 @@ import {
   useEnsureTrackRef,
   ParticipantContextIfNeeded,
   TrackRefContextIfNeeded,
+  useRoomContext,
 } from '@livekit/components-react';
-import { Track, Participant } from 'livekit-client';
+import { Track, Participant, RoomEvent } from 'livekit-client';
 import { ParticipantAvatar } from './ParticipantAvatar';
 
 interface CustomParticipantTileProps {
@@ -31,23 +32,47 @@ export const CustomParticipantTile: React.FC<CustomParticipantTileProps> = ({
   disableVideo = false,
   className = '',
 }) => {
+  const room = useRoomContext();
   const maybeTrackRef = useMaybeTrackRefContext();
   const trackReference = useEnsureTrackRef(trackRef ?? maybeTrackRef);
   
   const participant = participantProp || trackReference?.participant;
+  const [currentMetadata, setCurrentMetadata] = useState<string | undefined>(participant?.metadata);
+
+  // Escuchar cambios en metadata desde la sala
+  useEffect(() => {
+    if (!participant || !room) return;
+
+    const onMetadataChanged = (metadata: string | undefined, p: Participant | undefined) => {
+      // Verificar si el cambio es para este participante
+      if (p?.identity === participant.identity) {
+        console.log(`🔄 Metadata actualizada para ${p.identity}:`, metadata);
+        setCurrentMetadata(metadata);
+      }
+    };
+
+    // Set initial value
+    setCurrentMetadata(participant.metadata);
+
+    // Escuchar evento a nivel de sala (más seguro que evento de participante individual)
+    room.on(RoomEvent.ParticipantMetadataChanged, onMetadataChanged);
+    return () => {
+      room.off(RoomEvent.ParticipantMetadataChanged, onMetadataChanged);
+    };
+  }, [participant, room]);
   
   // Obtener avatar de metadata si no se pasa como prop
   const metadataAvatar = useMemo(() => {
-    if (participant?.metadata) {
+    if (currentMetadata) {
       try {
-        const meta = JSON.parse(participant.metadata);
+        const meta = JSON.parse(currentMetadata);
         return meta.avatarUrl || meta.avatar_url || meta.profilePhoto;
       } catch (e) {
         return null;
       }
     }
     return null;
-  }, [participant?.metadata]);
+  }, [currentMetadata]);
 
   const finalAvatarUrl = avatarUrl || metadataAvatar;
 
