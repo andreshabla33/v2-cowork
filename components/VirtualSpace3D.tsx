@@ -3178,17 +3178,3 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
 };
 
 export default VirtualSpace3D;
-            </div>
-
-            {/* Body - AvatarCustomizer3D */}
-            <div className="flex-1 overflow-hidden">
-              <AvatarCustomizer3D compact={false} onClose={() => setShowAvatarModal(false)} />
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
-
-export default VirtualSpace3D;
