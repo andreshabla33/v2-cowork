@@ -30,11 +30,29 @@ export const WorkspaceLayout: React.FC = () => {
   const [showGameHub, setShowGameHub] = useState(false);
   const [isPlayingGame, setIsPlayingGame] = useState(false);
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
+  const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
   const presenceChannelsRef = useRef<Map<string, any>>(new Map());
   const prevOnlineUsersRef = useRef<Set<string>>(new Set());
   const lastNotificationRef = useRef<Map<string, number>>(new Map());
   const currentUserRef = useRef(currentUser);
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
+
+  // Responsive: detectar mobile con resize listener
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = window.innerWidth < 768;
+      setIsMobile(mobile);
+      if (!mobile) setMobileDrawerOpen(false);
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Cerrar drawer al cambiar de tab en mobile
+  useEffect(() => {
+    if (isMobile) setMobileDrawerOpen(false);
+  }, [activeSubTab, isMobile]);
 
   // Mini Mode: auto-show al salir del espacio virtual, auto-hide al volver
   useEffect(() => {
@@ -477,8 +495,8 @@ export const WorkspaceLayout: React.FC = () => {
   return (
     <div className={`flex h-screen w-screen overflow-hidden transition-all duration-500 ${s.bg} ${s.text}`}>
       
-      {/* Sidebar Global - 2026 Minimal Style */}
-      <aside className={`w-[52px] ${s.globalNav} flex flex-col items-center py-5 gap-4 shrink-0 z-[100] border-r ${s.border}`}>
+      {/* Sidebar Global - 2026 Minimal Style — oculto en mobile */}
+      <aside className={`w-[52px] ${s.globalNav} hidden md:flex flex-col items-center py-5 gap-4 shrink-0 z-[100] border-r ${s.border}`}>
         <div 
           onClick={() => setView('dashboard')}
           className={`w-9 h-9 rounded-xl flex items-center justify-center cursor-pointer hover:scale-105 transition-all shadow-lg overflow-hidden ${theme === 'arcade' ? 'bg-[#00ff41] border border-[#00ff41]' : 'bg-white'}`}
@@ -553,15 +571,35 @@ export const WorkspaceLayout: React.FC = () => {
         </div>
       </aside>
 
-      {/* Sidebar Workspace */}
-      <aside className={`w-[260px] ${s.sidebar} flex flex-col shrink-0 border-r ${s.border} z-90 shadow-2xl relative overflow-hidden`} data-tour-step="sidebar-chat">
-        {theme === 'arcade' && <div className="absolute top-0 left-0 w-full h-1 bg-[#00ff41] animate-pulse" />}
-        <ChatPanel sidebarOnly={true} showNotifications={true} />
-      </aside>
+      {/* Sidebar Workspace — desktop: fija, mobile: drawer overlay */}
+      {!isMobile ? (
+        <aside className={`w-[260px] ${s.sidebar} flex flex-col shrink-0 border-r ${s.border} z-90 shadow-2xl relative overflow-hidden`} data-tour-step="sidebar-chat">
+          {theme === 'arcade' && <div className="absolute top-0 left-0 w-full h-1 bg-[#00ff41] animate-pulse" />}
+          <ChatPanel sidebarOnly={true} showNotifications={true} />
+        </aside>
+      ) : mobileDrawerOpen ? (
+        <>
+          {/* Backdrop oscuro */}
+          <div className="fixed inset-0 bg-black/60 z-[200] backdrop-blur-sm" onClick={() => setMobileDrawerOpen(false)} />
+          {/* Drawer sidebar mobile — slide from left */}
+          <aside className={`fixed inset-y-0 left-0 w-[85vw] max-w-[320px] ${s.sidebar} flex flex-col z-[201] shadow-2xl border-r ${s.border} animate-in slide-in-from-left duration-300 overflow-hidden`}>
+            {/* Header del drawer con botón cerrar */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/5">
+              <span className="text-xs font-black uppercase tracking-wider opacity-60">{activeWorkspace?.name}</span>
+              <button onClick={() => setMobileDrawerOpen(false)} className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center">
+                <svg className="w-4 h-4 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+              <ChatPanel sidebarOnly={true} showNotifications={true} onChannelSelect={() => setMobileDrawerOpen(false)} />
+            </div>
+          </aside>
+        </>
+      ) : null}
 
       {/* Main Content */}
       <main className={`flex-1 relative h-full flex flex-col min-w-0 ${s.bg}`}>
-        <header className={`h-16 border-b ${s.border} flex items-center px-8 justify-between shrink-0 ${s.header} z-50`}>
+        <header className={`h-16 border-b ${s.border} hidden md:flex items-center px-8 justify-between shrink-0 ${s.header} z-50`}>
           <div className="flex items-center gap-4">
              {/* Título con efecto gradient text estilo onboarding */}
              <div className="flex items-center gap-3">
@@ -719,6 +757,60 @@ export const WorkspaceLayout: React.FC = () => {
             espacioId={activeWorkspace.id}
             onAccept={handleGameInvitationAccepted}
           />
+        )}
+
+        {/* ===== MOBILE BOTTOM TAB BAR — Tendencia 2026: nav inferior minimalista ===== */}
+        {isMobile && (
+          <nav className={`fixed bottom-0 left-0 right-0 z-[180] flex items-center justify-around h-14 border-t backdrop-blur-2xl safe-area-bottom ${
+            theme === 'arcade'
+              ? 'bg-black/90 border-[#00ff41]/30'
+              : theme === 'light'
+                ? 'bg-white/90 border-zinc-200'
+                : 'bg-black/80 border-white/[0.08]'
+          }`}>
+            {[
+              { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Espacio' },
+              { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chat', badge: unreadChatCount },
+              { id: '_drawer', icon: 'M4 6h16M4 12h16M4 18h16', label: 'Menú' },
+              { id: '_games', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: 'Juegos' },
+              { id: '_settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z', label: 'Ajustes' },
+            ].map(tab => {
+              const isActive = tab.id === activeSubTab || (tab.id === '_drawer' && mobileDrawerOpen);
+              const handleTabClick = () => {
+                if (tab.id === '_drawer') { setMobileDrawerOpen(!mobileDrawerOpen); return; }
+                if (tab.id === '_games') { setShowGameHub(true); return; }
+                if (tab.id === '_settings') { setShowSettings(true); return; }
+                setActiveSubTab(tab.id as any);
+                if (tab.id === 'chat') clearUnreadChat();
+              };
+              return (
+                <button
+                  key={tab.id}
+                  onClick={handleTabClick}
+                  className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors relative ${
+                    isActive
+                      ? theme === 'arcade' ? 'text-[#00ff41]' : theme === 'light' ? 'text-violet-600' : 'text-white'
+                      : theme === 'light' ? 'text-zinc-400' : 'text-white/30'
+                  }`}
+                >
+                  {isActive && (
+                    <span className={`absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full ${
+                      theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-gradient-to-r from-violet-500 to-cyan-500'
+                    }`} />
+                  )}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? 2 : 1.5} d={tab.icon} />
+                  </svg>
+                  <span className="text-[9px] font-bold">{tab.label}</span>
+                  {tab.badge && tab.badge > 0 && tab.id !== activeSubTab && (
+                    <span className="absolute top-1 right-1/2 translate-x-3 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">
+                      {tab.badge > 9 ? '9+' : tab.badge}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
         )}
       </main>
 

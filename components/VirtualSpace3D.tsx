@@ -1642,23 +1642,22 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       {/* Usuarios remotos */}
       <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} usersInCallIds={usersInCallIds} usersInAudioRangeIds={usersInAudioRangeIds} remoteMessages={remoteMessages} remoteReaction={remoteReaction} realtimePositionsRef={realtimePositionsRef} interpolacionWorkerRef={interpolacionWorkerRef} posicionesInterpoladasRef={posicionesInterpoladasRef} ecsStateRef={ecsStateRef} frustumRef={frustumRef} />
 
-      {/* Objetos interactivos del espacio (pizarra, café, reloj, planta) */}
+      {/* Objetos interactivos — ocultos hasta tener modelos GLB reales
       <ObjetosInteractivos
         playerPosition={playerColliderPositionRef.current}
         onInteract={(tipo) => {
           if (tipo === 'coffee') {
-            // +5 XP por tomar café
-            if (currentUser?.id) {
-              // Se maneja en el componente padre via callback
-            }
+            if (currentUser?.id) {}
           }
         }}
       />
+      */}
 
-      {/* Partículas clima/temporada (auto-detecta por mes) */}
+      {/* Partículas clima — ocultas hasta ajuste visual
       <ParticulasClima
         centro={playerColliderPositionRef.current}
       />
+      */}
     </>
   );
 };
