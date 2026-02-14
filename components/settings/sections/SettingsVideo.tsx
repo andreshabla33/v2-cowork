@@ -57,11 +57,11 @@ export const SettingsVideo: React.FC<SettingsVideoProps> = ({
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
+      <div className="mb-8 lg:mb-6">
+        <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2 lg:mb-1">
           {t('settings.video.title', currentLang)}
         </h2>
-        <p className="text-sm text-zinc-400">
+        <p className="text-sm lg:text-xs text-zinc-400">
           {t('settings.video.description', currentLang)}
         </p>
       </div>

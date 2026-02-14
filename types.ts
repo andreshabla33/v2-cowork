@@ -39,6 +39,9 @@ export interface User {
   avatar: string;
   avatarConfig?: AvatarConfig;
   profilePhoto?: string;
+  empresa_id?: string;
+  departamento_id?: string;
+  esFantasma?: boolean;
   x: number;
   y: number;
   direction: 'front' | 'left' | 'right' | 'back';
@@ -82,6 +85,41 @@ export interface SpaceItem {
   x: number;
   y: number;
   rotation?: number;
+}
+
+export interface ZonaEmpresa {
+  id: string;
+  empresa_id?: string | null;
+  espacio_id: string;
+  nombre_zona?: string | null;
+  posicion_x: number;
+  posicion_y: number;
+  ancho: number;
+  alto: number;
+  color?: string | null;
+  estado: string;
+  es_comun?: boolean;
+  spawn_x?: number;
+  spawn_y?: number;
+  modelo_url?: string | null;
+  empresa?: {
+    nombre?: string | null;
+    logo_url?: string | null;
+  } | null;
+}
+
+export interface AutorizacionEmpresa {
+  id: string;
+  empresa_origen_id: string;
+  empresa_destino_id: string;
+  espacio_id: string;
+  estado: string;
+  canal_compartido_id?: string | null;
+  solicitada_por?: string | null;
+  aprobada_por?: string | null;
+  creada_en: string;
+  actualizada_en: string;
+  expira_en?: string | null;
 }
 
 export interface Attachment {

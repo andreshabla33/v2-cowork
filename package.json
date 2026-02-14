@@ -19,6 +19,7 @@
     "@react-three/rapier": "^2.2.0",
     "@supabase/supabase-js": "^2.47.10",
     "@types/three": "^0.182.0",
+    "bitecs": "^0.4.0",
     "chess.js": "^1.4.0",
     "driver.js": "^1.4.0",
     "framer-motion": "^11.15.0",

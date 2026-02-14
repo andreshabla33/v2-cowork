@@ -16,11 +16,11 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
   disabled = false
 }) => {
   return (
-    <div className="flex items-center justify-between py-4 border-b border-white/[0.05] last:border-b-0">
-      <div className="flex-1 pr-4">
-        <p className="text-sm font-medium text-white">{label}</p>
+    <div className="flex items-center justify-between py-4 lg:py-3 border-b border-white/[0.05] last:border-b-0">
+      <div className="flex-1 pr-4 lg:pr-3">
+        <p className="text-sm lg:text-xs font-medium text-white">{label}</p>
         {description && (
-          <p className="text-xs text-zinc-400 mt-0.5">{description}</p>
+          <p className="text-xs lg:text-[11px] text-zinc-400 mt-0.5">{description}</p>
         )}
       </div>
       <button

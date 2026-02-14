@@ -11,8 +11,10 @@ import { OnboardingCreador } from './components/onboarding/OnboardingCreador';
 import { MeetingLobby, MeetingRoom } from './components/meetings/videocall';
 import type { CargoLaboral, CargoDB } from './components/onboarding/CargoSelector';
 
+const ESPACIO_GLOBAL_ID = '91887e81-1f26-448c-9d6d-9839e7d83b5d';
+
 const App: React.FC = () => {
-  const { session, setSession, view, setView, initialize, initialized, setAuthFeedback } = useStore();
+  const { session, setSession, view, setView, initialize, initialized, setAuthFeedback, fetchWorkspaces, setActiveWorkspace } = useStore();
 
   useEffect(() => {
     // Verificar confirmación de email via token_hash en URL
@@ -195,8 +197,15 @@ const App: React.FC = () => {
           userId={session.user.id}
           userEmail={session.user.email || ''}
           userName={session.user.user_metadata?.full_name || session.user.email?.split('@')[0] || 'Usuario'}
-          onComplete={() => {
-            initialize();
+          onComplete={async () => {
+            await initialize();
+            const workspaces = await fetchWorkspaces();
+            const espacioGlobal = workspaces.find(ws => ws.id === ESPACIO_GLOBAL_ID) || workspaces[0];
+            if (espacioGlobal) {
+              setActiveWorkspace(espacioGlobal, (espacioGlobal as any).userRole);
+              setView('workspace');
+              return;
+            }
             setView('dashboard');
           }}
         />
@@ -210,6 +219,7 @@ type InvitationState = 'cargando' | 'valido' | 'expirado' | 'usado' | 'error' | 
 interface InvitacionInfo {
   email: string;
   rol: string;
+  empresa_id: string;
   espacio: { nombre: string; slug: string; id: string };
   invitador: { nombre: string };
 }
@@ -251,6 +261,7 @@ const InvitationProcessor: React.FC = () => {
         .select(`
           email,
           rol,
+          empresa_id,
           usada,
           expira_en,
           espacio:espacios_trabajo (id, nombre, slug),
@@ -285,6 +296,7 @@ const InvitationProcessor: React.FC = () => {
       setInvitacion({
         email: data.email,
         rol: data.rol,
+        empresa_id: data.empresa_id,
         espacio: espacioData,
         invitador: { nombre: (data.invitador as any)?.nombre || 'Un colega' }
       });
@@ -306,15 +318,18 @@ const InvitationProcessor: React.FC = () => {
         return;
       }
 
-      const { error: insertError } = await supabase
-        .from('miembros_espacio')
-        .insert({
+      const insertPayload = {
           espacio_id: invitacion.espacio.id,
           usuario_id: session.user.id,
           rol: invitacion.rol,
           aceptado: true,
-          aceptado_en: new Date().toISOString()
-        });
+          aceptado_en: new Date().toISOString(),
+          empresa_id: invitacion.empresa_id
+        };
+      console.log('[INVITATION] Insert payload:', JSON.stringify(insertPayload));
+      const { error: insertError } = await supabase
+        .from('miembros_espacio')
+        .insert(insertPayload);
 
       if (insertError) {
         if (insertError.code !== '23505') throw insertError;
@@ -549,7 +564,9 @@ const OnboardingCargoView: React.FC = () => {
         .select('cargo_sugerido, creada_por, invitador:usuarios!creada_por(nombre)')
         .eq('email', session.user.email)
         .eq('usada', true)
-        .single();
+        .order('expira_en', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       const espacioData = miembro.espacios_trabajo as any;
       const invitadorData = invitacion?.invitador as any;

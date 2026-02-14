@@ -17,6 +17,7 @@ const GAME_INFO: Record<GameType, { name: string; icon: React.ReactNode; color: 
   'speed-networking': { name: 'Speed Networking', icon: <MessageCircle className="w-5 h-5" />, color: 'pink' },
   'mystery-roleplay': { name: 'Mystery Roleplay', icon: <Star className="w-5 h-5" />, color: 'indigo' },
   'building-challenge': { name: 'Building Challenge', icon: <Building2 className="w-5 h-5" />, color: 'cyan' },
+  chess: { name: 'Ajedrez', icon: <Gamepad2 className="w-5 h-5" />, color: 'emerald' },
 };
 
 export const GamePortalUI: React.FC<GamePortalUIProps> = ({ onOpenGameHub }) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, memo } from 'react';
+import React, { useEffect, useRef, useState, memo, useCallback } from 'react';
 import { SelfieSegmentation } from '@mediapipe/selfie_segmentation';
 
 export type BackgroundEffectType = 'none' | 'blur' | 'image';
@@ -13,6 +13,16 @@ interface VideoWithBackgroundProps {
   onProcessedStreamReady?: (stream: MediaStream) => void;
   mirrorVideo?: boolean;
 }
+
+const supportsOffscreenCanvas = (): boolean => {
+  try {
+    return typeof OffscreenCanvas !== 'undefined' && typeof (new OffscreenCanvas(1, 1)).transferToImageBitmap === 'function';
+  } catch {
+    return false;
+  }
+};
+
+const USE_OFFSCREEN = supportsOffscreenCanvas();
 
 export const VideoWithBackground = memo(({
   stream,
@@ -29,6 +39,9 @@ export const VideoWithBackground = memo(({
   const segmentationRef = useRef<SelfieSegmentation | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const backgroundImageRef = useRef<HTMLImageElement | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const workerReadyRef = useRef(false);
+  const workerBusyRef = useRef(false);
   const [isInitialized, setIsInitialized] = useState(false);
   const [showCanvas, setShowCanvas] = useState(false);
 
@@ -39,6 +52,21 @@ export const VideoWithBackground = memo(({
       img.crossOrigin = 'anonymous';
       img.onload = () => {
         backgroundImageRef.current = img;
+        // Si hay worker, enviar la imagen como blob
+        if (workerRef.current && workerReadyRef.current) {
+          const tmpCanvas = document.createElement('canvas');
+          tmpCanvas.width = img.naturalWidth;
+          tmpCanvas.height = img.naturalHeight;
+          const tmpCtx = tmpCanvas.getContext('2d');
+          if (tmpCtx) {
+            tmpCtx.drawImage(img, 0, 0);
+            tmpCanvas.toBlob((blob) => {
+              if (blob && workerRef.current) {
+                workerRef.current.postMessage({ type: 'config', backgroundImageBlob: blob });
+              }
+            });
+          }
+        }
       };
       img.onerror = () => {
         console.error('Error loading background image');
@@ -47,8 +75,57 @@ export const VideoWithBackground = memo(({
       img.src = backgroundImage;
     } else {
       backgroundImageRef.current = null;
+      if (workerRef.current && workerReadyRef.current) {
+        workerRef.current.postMessage({ type: 'config', clearBackground: true });
+      }
     }
   }, [backgroundImage, effectType]);
+
+  // Enviar config al worker cuando cambian parámetros
+  useEffect(() => {
+    if (!USE_OFFSCREEN || !workerRef.current || !workerReadyRef.current) return;
+    workerRef.current.postMessage({ type: 'config', effectType, blurAmount, mirrorVideo });
+  }, [effectType, blurAmount, mirrorVideo]);
+
+  // Callback para composición en main thread (fallback)
+  const compositeFallback = useCallback((
+    ctx: CanvasRenderingContext2D,
+    canvas: HTMLCanvasElement,
+    image: CanvasImageSource,
+    mask: CanvasImageSource,
+  ) => {
+    ctx.save();
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    if (mirrorVideo) {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+
+    if (effectType === 'blur') {
+      ctx.filter = `blur(${blurAmount}px)`;
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      ctx.filter = 'none';
+      ctx.globalCompositeOperation = 'destination-out';
+      ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'destination-over';
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    } else if (effectType === 'image' && backgroundImageRef.current) {
+      ctx.drawImage(mask, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'source-in';
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'destination-over';
+      if (mirrorVideo) {
+        ctx.scale(-1, 1);
+        ctx.translate(-canvas.width, 0);
+      }
+      ctx.drawImage(backgroundImageRef.current, 0, 0, canvas.width, canvas.height);
+    } else {
+      ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+    }
+
+    ctx.restore();
+  }, [effectType, blurAmount, mirrorVideo]);
 
   // Inicializar segmentación
   useEffect(() => {
@@ -60,6 +137,7 @@ export const VideoWithBackground = memo(({
 
     let mounted = true;
     let processingActive = false;
+    let worker: Worker | null = null;
 
     const initSegmentation = async () => {
       try {
@@ -76,11 +154,61 @@ export const VideoWithBackground = memo(({
           }
         });
 
-        canvas.width = video.videoWidth || 640;
-        canvas.height = video.videoHeight || 480;
+        const w = video.videoWidth || 640;
+        const h = video.videoHeight || 480;
+        canvas.width = w;
+        canvas.height = h;
 
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
+
+        // Inicializar worker si soporta OffscreenCanvas
+        if (USE_OFFSCREEN) {
+          try {
+            worker = new Worker(
+              new URL('../workers/videoCompositorWorker.ts', import.meta.url),
+              { type: 'module' }
+            );
+            workerRef.current = worker;
+            workerBusyRef.current = false;
+
+            worker.onmessage = (ev) => {
+              if (ev.data.type === 'ready') {
+                workerReadyRef.current = true;
+                worker!.postMessage({ type: 'config', effectType, blurAmount, mirrorVideo });
+                // Si hay imagen de fondo cargada, enviarla al worker ahora
+                if (effectType === 'image' && backgroundImageRef.current) {
+                  const tmpCanvas = document.createElement('canvas');
+                  tmpCanvas.width = backgroundImageRef.current.naturalWidth;
+                  tmpCanvas.height = backgroundImageRef.current.naturalHeight;
+                  const tmpCtx = tmpCanvas.getContext('2d');
+                  if (tmpCtx) {
+                    tmpCtx.drawImage(backgroundImageRef.current, 0, 0);
+                    tmpCanvas.toBlob((blob) => {
+                      if (blob && worker) {
+                        worker.postMessage({ type: 'config', backgroundImageBlob: blob });
+                        console.log('🖼️ Background image enviada al worker (on ready)');
+                      }
+                    });
+                  }
+                }
+                console.log('🖼️ OffscreenCanvas compositor worker listo');
+              } else if (ev.data.type === 'composited') {
+                workerBusyRef.current = false;
+                const bitmap = ev.data.bitmap as ImageBitmap;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+                bitmap.close();
+              }
+            };
+
+            worker.postMessage({ type: 'init', width: w, height: h });
+          } catch (err) {
+            console.warn('⚠️ No se pudo crear compositor worker, usando fallback:', err);
+            worker = null;
+            workerRef.current = null;
+          }
+        }
 
         // Inicializar MediaPipe
         const selfieSegmentation = new SelfieSegmentation({
@@ -95,45 +223,32 @@ export const VideoWithBackground = memo(({
         });
 
         selfieSegmentation.onResults((results) => {
-          if (!mounted || !ctx) return;
+          if (!mounted) return;
 
-          ctx.save();
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-          // Aplicar transformación de espejo si está habilitado
-          if (mirrorVideo) {
-            ctx.translate(canvas.width, 0);
-            ctx.scale(-1, 1);
-          }
-
-          if (effectType === 'blur') {
-            // Fondo con blur
-            ctx.filter = `blur(${blurAmount}px)`;
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-            ctx.filter = 'none';
-
-            // Persona sin blur usando máscara
-            ctx.globalCompositeOperation = 'destination-out';
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'destination-over';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-          } else if (effectType === 'image' && backgroundImageRef.current) {
-            // Persona con imagen de fondo
-            ctx.drawImage(results.segmentationMask, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'source-in';
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
-            ctx.globalCompositeOperation = 'destination-over';
-            // La imagen de fondo no debe espejarse
-            if (mirrorVideo) {
-              ctx.scale(-1, 1);
-              ctx.translate(-canvas.width, 0);
-            }
-            ctx.drawImage(backgroundImageRef.current, 0, 0, canvas.width, canvas.height);
+          if (worker && workerReadyRef.current && !workerBusyRef.current) {
+            // OffscreenCanvas path: enviar bitmaps al worker
+            Promise.all([
+              createImageBitmap(results.image as ImageBitmapSource),
+              createImageBitmap(results.segmentationMask as ImageBitmapSource),
+            ]).then(([imgBitmap, maskBitmap]) => {
+              if (!mounted || !worker) {
+                imgBitmap.close();
+                maskBitmap.close();
+                return;
+              }
+              workerBusyRef.current = true;
+              worker.postMessage(
+                { type: 'frame', image: imgBitmap, mask: maskBitmap },
+                [imgBitmap, maskBitmap]
+              );
+            }).catch(() => {
+              // Fallback si createImageBitmap falla
+              compositeFallback(ctx, canvas, results.image, results.segmentationMask);
+            });
           } else {
-            ctx.drawImage(results.image, 0, 0, canvas.width, canvas.height);
+            // Fallback: composición en main thread
+            compositeFallback(ctx, canvas, results.image, results.segmentationMask);
           }
-
-          ctx.restore();
         });
 
         segmentationRef.current = selfieSegmentation;
@@ -160,7 +275,7 @@ export const VideoWithBackground = memo(({
         if (mounted) {
           setIsInitialized(true);
           setShowCanvas(true);
-          console.log('Background effect initialized:', effectType);
+          console.log('Background effect initialized:', effectType, USE_OFFSCREEN ? '(OffscreenCanvas)' : '(main thread)');
           
           // Crear stream del canvas para transmitir
           if (onProcessedStreamReady) {
@@ -194,9 +309,15 @@ export const VideoWithBackground = memo(({
         segmentationRef.current.close();
         segmentationRef.current = null;
       }
+      if (workerRef.current) {
+        workerRef.current.postMessage({ type: 'destroy' });
+        workerRef.current.terminate();
+        workerRef.current = null;
+        workerReadyRef.current = false;
+      }
       setIsInitialized(false);
     };
-  }, [stream, effectType, blurAmount, onProcessedStreamReady, mirrorVideo]);
+  }, [stream, effectType, blurAmount, onProcessedStreamReady, mirrorVideo, compositeFallback]);
 
   // Actualizar video source
   useEffect(() => {

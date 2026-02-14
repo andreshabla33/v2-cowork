@@ -2,10 +2,12 @@
 
 import React, { useRef, useEffect, useMemo, Suspense, useState, useCallback } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrthographicCamera, PerspectiveCamera, Grid, Text, OrbitControls, Html } from '@react-three/drei';
+import { OrthographicCamera, PerspectiveCamera, Grid, Text, OrbitControls, Html, PerformanceMonitor } from '@react-three/drei';
+import { Physics, RigidBody, CuboidCollider } from '@react-three/rapier';
 import * as THREE from 'three';
+import { Room, RoomEvent, Track, VideoPresets, LocalAudioTrack, LocalVideoTrack, RemoteTrackPublication } from 'livekit-client';
 import { useStore } from '@/store/useStore';
-import { User, PresenceStatus } from '@/types';
+import { AutorizacionEmpresa, User, PresenceStatus, ZonaEmpresa } from '@/types';
 import { supabase } from '@/lib/supabase';
 import { GLTFAvatar, useAvatarControls, AnimationState } from './Avatar3DGLTF';
 import { RecordingManager } from './meetings/recording/RecordingManager';
@@ -16,7 +18,26 @@ import { CameraSettingsMenu, loadCameraSettings, saveCameraSettings, type Camera
 import { VideoWithBackground } from './VideoWithBackground';
 import { loadAudioSettings, saveAudioSettings, type AudioSettings } from './BottomControlBar';
 import { AvatarCustomizer3D } from './AvatarCustomizer3D';
+import { SpatialAudio } from './3d/SpatialAudio';
+import { GhostAvatar } from './3d/GhostAvatar';
+import { ZonaEmpresa as ZonaEmpresa3D } from './3d/ZonaEmpresa';
 import { getUserSettings, getSettingsSection, sendDesktopNotification, requestDesktopNotificationPermission } from '../lib/userSettings';
+import { obtenerChunk, obtenerChunksVecinos } from '../lib/chunkSystem';
+import { filtrarUsuariosPorChunks, aplicarInteresEmpresa } from '../lib/interestManager';
+import { crearSalaLivekitPorEspacio, obtenerTokenLivekitEspacio } from '../lib/livekitService';
+import { cargarAutorizacionesActivas, cargarSolicitudesEnviadas, cargarZonasEmpresa, solicitarAccesoEmpresa } from '../lib/autorizacionesEmpresa';
+import { RealtimeChunkManager, crearRealtimeChunkManager, type EventoRealtime } from '../lib/realtimeChunkManager';
+import { actualizarEstadoUsuarioEcs, crearEstadoEcsEspacio, limpiarEstadoEcs, obtenerEstadoUsuarioEcs, sincronizarUsuariosEcs, type EstadoEcsEspacio } from '@/lib/ecs/espacioEcs';
+import { detectGpuCapabilities, adaptiveConfigFromTier, type GpuInfo } from '@/lib/gpuCapabilities';
+import { MobileJoystick, type JoystickInput } from './3d/MobileJoystick';
+import { EmoteWheel } from './3d/EmoteWheel';
+import { DayNightCycle } from './3d/DayNightCycle';
+import { isTouchDevice, isMobileDevice, hapticFeedback } from '@/lib/mobileDetect';
+import { GamificacionPanel } from './GamificacionPanel';
+import { registrarLoginDiario, otorgarXP, XP_POR_ACCION } from '@/lib/gamificacion';
+import { ObjetosInteractivos } from './3d/ObjetosInteractivos';
+import { ParticulasClima } from './3d/ParticulasClima';
+import { EmoteSync, useSyncEffects } from './3d/EmoteSync';
 // GameHub ahora se importa en WorkspaceLayout
 
 // Constantes (defaults, pueden ser sobreescritas por settings del usuario en VirtualSpace3D)
@@ -24,7 +45,16 @@ const MOVE_SPEED = 4;
 const RUN_SPEED = 8;
 const WORLD_SIZE = 100;
 const PROXIMITY_RADIUS = 180; // 180px para detectar proximidad
+const AUDIO_SPATIAL_RADIUS_FACTOR = 2; // Audio espacial se escucha hasta 2x el radio de proximidad
 const TELEPORT_DISTANCE = 15; // Distancia 3D para activar teletransportación
+const ZONA_SOLICITUD_RADIO = 140; // Distancia en px para solicitar acceso a una zona privada
+const LOD_NEAR_DISTANCE = 25;
+const LOD_MID_DISTANCE = 60;
+const MOVEMENT_BROADCAST_MS = 100;
+const USAR_LIVEKIT = true;
+
+type AvatarLodLevel = 'high' | 'mid' | 'low';
+type DireccionAvatar = User['direction'] | 'up' | 'down' | 'front-left' | 'front-right' | 'up-left' | 'up-right';
 
 // Sonido de teletransportación (estilo LOL - mágico/etéreo)
 const playTeleportSound = () => {
@@ -122,8 +152,8 @@ const IconExpand = ({ on }: { on: boolean }) => (
   </svg>
 );
 
-// --- Minimap Component ---
-const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = ({ currentUser, users, workspace }) => {
+// --- Minimap Component (tap-to-teleport) ---
+const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any; onTeleport?: (x: number, z: number) => void }> = ({ currentUser, users, workspace, onTeleport }) => {
   if (!workspace) return null;
   const size = 140;
   const mapWidth = workspace.width || 2000;
@@ -131,12 +161,28 @@ const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any }> = 
   const scaleX = size / mapWidth;
   const scaleY = size / mapHeight;
 
+  const handleMinimapClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!onTeleport) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+    // Convertir coordenadas del minimap a coordenadas del mundo (px)
+    const worldX = (clickX / size) * mapWidth;
+    const worldY = (clickY / size) * mapHeight;
+    // Convertir a coordenadas 3D (mundo 3D usa /16)
+    onTeleport(worldX / 16, worldY / 16);
+  };
+
   return (
-    <div className="absolute bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden pointer-events-none shadow-2xl z-20">
-      <div className="absolute inset-0 opacity-10">
+    <div
+      className="absolute bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl z-20 cursor-pointer hover:border-indigo-500/40 transition-colors"
+      onClick={handleMinimapClick}
+      title="Clic para teletransportarte"
+    >
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
         <div className="w-full h-full" style={{ backgroundImage: 'radial-gradient(circle, #6366f1 1px, transparent 1px)', backgroundSize: '20px 20px' }} />
       </div>
-      <div className="relative w-full h-full">
+      <div className="relative w-full h-full pointer-events-none">
         <div 
           className="absolute w-2.5 h-2.5 bg-indigo-500 rounded-full shadow-[0_0_10px_rgba(99,102,241,1)] z-10"
           style={{ 
@@ -237,6 +283,8 @@ interface AvatarProps {
   mirrorVideo?: boolean;
   hideSelfView?: boolean;
   showName?: boolean;
+  lodLevel?: AvatarLodLevel;
+  esFantasma?: boolean;
 }
 
 // Labels de estado para mostrar al hacer clic
@@ -247,8 +295,9 @@ const STATUS_LABELS: Record<PresenceStatus, string> = {
   [PresenceStatus.DND]: 'No molestar',
 };
 
-const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar, mirrorVideo: mirrorVideoProp, hideSelfView: hideSelfViewProp, showName: showNameProp }) => {
+const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurrentUser, animationState = 'idle', direction, reaction, videoStream, camOn, showVideoBubble = true, message, onClickAvatar, mirrorVideo: mirrorVideoProp, hideSelfView: hideSelfViewProp, showName: showNameProp, lodLevel: lodLevelProp, esFantasma = false }) => {
   const [showStatusLabel, setShowStatusLabel] = useState(false);
+  const { avatar3DConfig } = useStore();
   
   // Leer video settings, space3d settings y performance settings desde localStorage
   const videoSettings = useMemo(() => getSettingsSection('video'), []);
@@ -257,6 +306,22 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   const mirrorVideo = mirrorVideoProp ?? videoSettings.mirrorVideo ?? true;
   const hideSelfView = hideSelfViewProp ?? videoSettings.hideSelfView ?? false;
   const showName = showNameProp ?? space3dS.showNamesAboveAvatars ?? true;
+  const lodLevel = lodLevelProp ?? 'high';
+  const showHigh = lodLevel === 'high';
+  const showMid = lodLevel === 'mid';
+  const showLow = lodLevel === 'low';
+  // Misma empresa: siempre GLTF (nunca sprites) — estilo Gather.town
+  const esMismaEmpresa = !esFantasma && !isCurrentUser;
+  const renderGLTF = showHigh || (esMismaEmpresa && (showMid || showLow));
+  const renderSprite = !renderGLTF && (showMid || showLow);
+  const gltfScale = showHigh ? 1.2 : showMid ? 0.9 : 0.6; // Escala reducida a distancia
+  const allowDetails = showHigh;
+  // Misma empresa: nombre visible a cualquier distancia, video bubble visible a cualquier LOD (estilo LOL/Roblox)
+  const allowName = showName && (!camOn || !(showHigh || showMid)) && (esMismaEmpresa || lodLevel !== 'low');
+  const allowVideo = (showHigh || showMid || (esMismaEmpresa && showLow)) && camOn;
+  const allowMessage = allowDetails && message;
+  const allowReaction = (showHigh || showMid) && reaction;
+  const spriteColor = isCurrentUser ? '#60a5fa' : statusColors[status];
   // Si animaciones desactivadas, forzar idle
   const effectiveAnimState = perfS.showAvatarAnimations === false ? 'idle' as AnimationState : animationState;
   
@@ -270,15 +335,27 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
   
   return (
     <group position={position} onClick={(e) => { if (isCurrentUser && onClickAvatar) { e.stopPropagation(); onClickAvatar(); } }}>
-      {/* Avatar 3D GLTF desde Supabase */}
-      <GLTFAvatar
-        animationState={effectiveAnimState}
-        direction={direction}
-        scale={1.2}
-      />
+      {/* Avatar 3D GLTF — misma empresa siempre GLTF (estilo Gather) */}
+      {renderGLTF && (
+        <GLTFAvatar
+          key={isCurrentUser ? (avatar3DConfig?.modelo_url || 'default') : 'remote'}
+          avatarConfig={isCurrentUser ? avatar3DConfig : undefined}
+          animationState={effectiveAnimState}
+          direction={direction}
+          skinColor={config?.skinColor}
+          clothingColor={config?.clothingColor}
+          scale={gltfScale}
+        />
+      )}
+      {/* Sprites solo para otras empresas o LOD bajo sin empresa */}
+      {renderSprite && (
+        <sprite scale={showMid ? [1.6, 1.6, 1.6] : [0.8, 0.8, 0.8]}>
+          <spriteMaterial color={spriteColor} />
+        </sprite>
+      )}
       
       {/* Mensaje de Chat - Burbuja moderna 2026 (glassmorphism + pill shape) */}
-      {message && (
+      {allowMessage && (
         <Html position={[0, camOn ? 5.8 : 3.2, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
           <div className="animate-chat-bubble">
             <div className="bg-white/95 backdrop-blur-sm text-gray-800 px-3 py-1.5 rounded-full shadow-lg max-w-[180px] text-xs font-medium whitespace-nowrap overflow-hidden text-ellipsis">
@@ -293,7 +370,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Video Bubble above avatar (Gather style) */}
-      {camOn && showVideoBubble && !(isCurrentUser && hideSelfView) && (
+      {allowVideo && showVideoBubble && !(isCurrentUser && hideSelfView) && (
         <Html position={[0, 3.5, 0]} center distanceFactor={12} zIndexRange={[100, 0]}>
           <div className="w-24 h-16 rounded-[12px] overflow-hidden border-[2px] border-[#6366f1] shadow-lg bg-black relative transform transition-all hover:scale-125 flex items-center justify-center">
              {videoStream && videoStream.getVideoTracks().length > 0 ? (
@@ -314,7 +391,7 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Reacción emoji encima del avatar - Animación 2026 */}
-      {reaction && (
+      {allowReaction && (
         <Html position={[0, camOn ? 4.5 : 2.8, 0]} center distanceFactor={8} zIndexRange={[200, 0]}>
           <div className="animate-emoji-float text-5xl drop-shadow-[0_4px_12px_rgba(0,0,0,0.4)]">
             {reaction}
@@ -323,10 +400,11 @@ const Avatar: React.FC<AvatarProps> = ({ position, config, name, status, isCurre
       )}
       
       {/* Nombre flotante con indicador de estado - Clickeable para ver estado */}
-      {!camOn && showName && (
-        <Html position={[0, 2.4, 0]} center distanceFactor={10} zIndexRange={[100, 0]}>
+      {!allowVideo && allowName && (
+        <Html position={[0, 2.4, 0]} center distanceFactor={10} zIndexRange={[100, 0]} sprite>
           <div 
             className={`flex items-center gap-1 whitespace-nowrap ${!isCurrentUser ? 'cursor-pointer hover:scale-105 transition-transform' : ''}`}
+            style={{ willChange: 'transform' }}
             onClick={() => !isCurrentUser && setShowStatusLabel(true)}
           >
             <span 
@@ -365,15 +443,39 @@ const RemoteAvatarInterpolated: React.FC<{
   message?: string;
   reaction?: string | null;
   realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
-}> = ({ user, remoteStream, showVideoBubble, message, reaction, realtimePositionsRef }) => {
+  interpolacionWorkerRef?: React.MutableRefObject<Worker | null>;
+  posicionesInterpoladasRef?: React.MutableRefObject<Map<string, { x: number; z: number; direction?: DireccionAvatar; isMoving?: boolean }>>;
+  ecsStateRef?: React.MutableRefObject<EstadoEcsEspacio>;
+  lodLevel?: AvatarLodLevel;
+  frustumRef?: React.MutableRefObject<THREE.Frustum>;
+}> = ({ user, remoteStream, showVideoBubble, message, reaction, realtimePositionsRef, interpolacionWorkerRef, posicionesInterpoladasRef, ecsStateRef, lodLevel, frustumRef }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const targetPos = useRef({ x: user.x / 16, z: user.y / 16 });
-  const currentPos = useRef({ x: user.x / 16, z: user.y / 16 });
+  const initialPos = useMemo(() => {
+    const ecsData = ecsStateRef?.current ? obtenerEstadoUsuarioEcs(ecsStateRef.current, user.id) : null;
+    if (ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000) {
+      return { x: ecsData.x, z: ecsData.z };
+    }
+    return { x: user.x / 16, z: user.y / 16 };
+  }, [ecsStateRef, user.id, user.x, user.y]);
+  const targetPos = useRef({ ...initialPos });
+  const currentPos = useRef({ ...initialPos });
   const [isMoving, setIsMoving] = useState(false);
+  const [remoteAnimState, setRemoteAnimState] = useState<string>('idle');
   const [remoteTeleport, setRemoteTeleport] = useState<{ phase: 'out' | 'in'; origin: [number, number, number]; dest: [number, number, number] } | null>(null);
+  const [isVisible, setIsVisible] = useState(true);
+  const lastVisibleRef = useRef(true);
+  const tempVec = useMemo(() => new THREE.Vector3(), []);
+  const lastDirectionRef = useRef<DireccionAvatar>(user.direction as DireccionAvatar);
+  const lastMovingRef = useRef(false);
+  const lastTargetRef = useRef<{ x: number; z: number } | null>(null);
   
-  // Estado local para dirección y animación (puede venir del broadcast)
-  const remoteStateRef = useRef({ direction: user.direction, isMoving: false });
+  // Estado local para dirección, movimiento y animación (viene del broadcast)
+  const remoteStateRef = useRef<{ direction: DireccionAvatar; isMoving: boolean; animState: string; renderedAnim: string }>({ 
+    direction: user.direction as DireccionAvatar, 
+    isMoving: false, 
+    animState: 'idle',
+    renderedAnim: 'idle'
+  });
 
   // Actualizar posición destino cuando cambia user.x/y (Presence - Fallback lento)
   useEffect(() => {
@@ -381,15 +483,40 @@ const RemoteAvatarInterpolated: React.FC<{
     const hasRealtime = realtimePositionsRef?.current?.has(user.id);
     const realtimeData = hasRealtime ? realtimePositionsRef!.current.get(user.id) : null;
     const isRecent = realtimeData && (Date.now() - realtimeData.timestamp < 2000); // 2s timeout
+    const ecsData = ecsStateRef?.current ? obtenerEstadoUsuarioEcs(ecsStateRef.current, user.id) : null;
+    const ecsFresh = ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000;
 
-    if (!isRecent) {
+    if (!isRecent && !ecsFresh) {
       const newX = user.x / 16;
       const newZ = user.y / 16;
       updateTargetPosition(newX, newZ);
     }
-  }, [user.x, user.y, user.id]);
+  }, [ecsStateRef, user.x, user.y, user.id]);
 
-  const updateTargetPosition = (newX: number, newZ: number) => {
+  const enviarEstadoWorker = (payload: { x: number; z: number; direction?: string; isMoving?: boolean; teleport?: boolean }) => {
+    if (!interpolacionWorkerRef?.current) return;
+    interpolacionWorkerRef.current.postMessage({
+      type: 'upsert',
+      payload: {
+        id: user.id,
+        x: payload.x,
+        z: payload.z,
+        direction: payload.direction,
+        isMoving: payload.isMoving,
+        teleport: payload.teleport,
+      }
+    });
+  };
+
+  useEffect(() => {
+    enviarEstadoWorker({ x: currentPos.current.x, z: currentPos.current.z, direction: user.direction, isMoving: false });
+    return () => {
+      if (!interpolacionWorkerRef?.current) return;
+      interpolacionWorkerRef.current.postMessage({ type: 'remove', payload: { id: user.id } });
+    };
+  }, [user.id]);
+
+  const updateTargetPosition = (newX: number, newZ: number, direction?: string, remoteMoving?: boolean) => {
     const dx = newX - currentPos.current.x;
     const dz = newZ - currentPos.current.z;
     const jumpDist = Math.sqrt(dx * dx + dz * dz);
@@ -398,10 +525,11 @@ const RemoteAvatarInterpolated: React.FC<{
       // Salto grande detectado → teleport visual
       const origin: [number, number, number] = [currentPos.current.x, 0, currentPos.current.z];
       const dest: [number, number, number] = [newX, 0, newZ];
-      
+
       setRemoteTeleport({ phase: 'out', origin, dest });
       playTeleportSound();
-      
+      enviarEstadoWorker({ x: newX, z: newZ, direction, isMoving: remoteMoving, teleport: true });
+
       setTimeout(() => {
         currentPos.current = { x: newX, z: newZ };
         targetPos.current = { x: newX, z: newZ };
@@ -410,97 +538,156 @@ const RemoteAvatarInterpolated: React.FC<{
           groupRef.current.position.z = newZ;
         }
         setRemoteTeleport(prev => prev ? { ...prev, phase: 'in' } : null);
-        
+
         setTimeout(() => setRemoteTeleport(null), 400);
       }, 300);
     } else {
       targetPos.current = { x: newX, z: newZ };
+      enviarEstadoWorker({ x: newX, z: newZ, direction, isMoving: remoteMoving });
     }
   };
 
   // Interpolar suavemente hacia la posición destino
   useFrame((state, delta) => {
+    let usoRealtime = false;
+    let ecsData: ReturnType<typeof obtenerEstadoUsuarioEcs> | null = null;
     // 1. Verificar datos realtime (Broadcast - Rápido)
     if (realtimePositionsRef && realtimePositionsRef.current.has(user.id)) {
       const data = realtimePositionsRef.current.get(user.id);
-      // Usar datos si son frescos (< 500ms)
-      if (Date.now() - data.timestamp < 500) {
+      // Usar datos si son frescos (< 1500ms) - Aumentado para soportar heartbeat de 400ms + jitter
+      if (Date.now() - data.timestamp < 1500) {
         const rX = data.x / 16;
         const rZ = data.y / 16;
-        
-        // Actualizar target si ha cambiado significativamente
-        if (Math.abs(rX - targetPos.current.x) > 0.01 || Math.abs(rZ - targetPos.current.z) > 0.01) {
-          targetPos.current = { x: rX, z: rZ };
+        const directionChanged = data.direction !== lastDirectionRef.current;
+        const movingChanged = data.isMoving !== lastMovingRef.current;
+        const shouldUpdateTarget = Math.abs(rX - targetPos.current.x) > 0.01 || Math.abs(rZ - targetPos.current.z) > 0.01;
+
+        if (shouldUpdateTarget || directionChanged || movingChanged) {
+          updateTargetPosition(rX, rZ, data.direction, data.isMoving);
+          lastDirectionRef.current = data.direction;
+          lastMovingRef.current = data.isMoving;
+          lastTargetRef.current = { x: rX, z: rZ };
         }
-        
-        // Actualizar estado (dirección, movimiento)
+
         remoteStateRef.current.direction = data.direction;
         remoteStateRef.current.isMoving = data.isMoving;
-        if (isMoving !== data.isMoving) setIsMoving(data.isMoving);
+        const newAnim = data.animState || (data.isMoving ? 'walk' : 'idle');
+        remoteStateRef.current.animState = newAnim;
+        
+        // Bug 4 Fix: Usar ref para chequear el último anim renderizado y evitar stale closures
+        if (newAnim !== remoteStateRef.current.renderedAnim) {
+          remoteStateRef.current.renderedAnim = newAnim;
+          setRemoteAnimState(newAnim);
+        }
+        usoRealtime = true;
+      }
+    }
+
+    if (!usoRealtime && ecsStateRef?.current) {
+      ecsData = obtenerEstadoUsuarioEcs(ecsStateRef.current, user.id);
+      if (ecsData) {
+        const ecsAge = Date.now() - (ecsData.timestamp ?? 0);
+        if (ecsAge <= 2000) {
+          const directionChanged = ecsData.direction !== lastDirectionRef.current;
+          const movingChanged = ecsData.isMoving !== lastMovingRef.current;
+          const shouldUpdateTarget =
+            !lastTargetRef.current ||
+            Math.abs(ecsData.x - lastTargetRef.current.x) > 0.01 ||
+            Math.abs(ecsData.z - lastTargetRef.current.z) > 0.01;
+          if (shouldUpdateTarget || directionChanged || movingChanged) {
+            updateTargetPosition(ecsData.x, ecsData.z, ecsData.direction, ecsData.isMoving);
+            lastDirectionRef.current = ecsData.direction as DireccionAvatar;
+            lastMovingRef.current = ecsData.isMoving;
+            lastTargetRef.current = { x: ecsData.x, z: ecsData.z };
+          }
+          remoteStateRef.current.direction = ecsData.direction as DireccionAvatar;
+          remoteStateRef.current.isMoving = ecsData.isMoving;
+          // ECS no tiene animState, inferir de isMoving
+          const ecsAnim = ecsData.isMoving ? 'walk' : 'idle';
+          remoteStateRef.current.animState = ecsAnim;
+          
+          if (ecsAnim !== remoteStateRef.current.renderedAnim) {
+            remoteStateRef.current.renderedAnim = ecsAnim;
+            setRemoteAnimState(ecsAnim);
+          }
+        }
       }
     }
 
     if (!groupRef.current || remoteTeleport) return;
 
-    const dx = targetPos.current.x - currentPos.current.x;
-    const dz = targetPos.current.z - currentPos.current.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
+    const workerData = posicionesInterpoladasRef?.current?.get(user.id);
+    if (workerData) {
+      currentPos.current.x = workerData.x;
+      currentPos.current.z = workerData.z;
+      groupRef.current.position.x = workerData.x;
+      groupRef.current.position.z = workerData.z;
 
-    // Umbral para considerar que se está moviendo
-    if (dist > 0.01) {
-      // Interpolación exponencial suavizada independiente del framerate
-      // Un valor de 10-15 da un seguimiento rápido pero suave
-      const smoothing = 12.0; 
-      const t = 1.0 - Math.exp(-smoothing * delta);
-      
-      currentPos.current.x += dx * t;
-      currentPos.current.z += dz * t;
-      
-      groupRef.current.position.x = currentPos.current.x;
-      groupRef.current.position.z = currentPos.current.z;
-
-      // Activar animación de caminar si hay distancia significativa o el broadcast dice que se mueve
-      const shouldMove = dist > 0.05 || remoteStateRef.current.isMoving;
-      if (!isMoving && shouldMove) setIsMoving(true);
-    } else {
-      // Snap final al destino para asegurar precisión
-      if (Math.abs(dx) > 0 || Math.abs(dz) > 0) {
-        currentPos.current.x = targetPos.current.x;
-        currentPos.current.z = targetPos.current.z;
-        groupRef.current.position.x = currentPos.current.x;
-        groupRef.current.position.z = currentPos.current.z;
+      if (workerData.direction) {
+        remoteStateRef.current.direction = workerData.direction;
       }
+      const nuevoEstadoMov = !!workerData.isMoving;
+      if (isMoving !== nuevoEstadoMov) setIsMoving(nuevoEstadoMov);
+    } else if (ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000) {
+      currentPos.current.x = ecsData.x;
+      currentPos.current.z = ecsData.z;
+      groupRef.current.position.x = ecsData.x;
+      groupRef.current.position.z = ecsData.z;
+      remoteStateRef.current.direction = ecsData.direction as DireccionAvatar;
+      const nuevoEstadoMov = !!ecsData.isMoving;
+      if (isMoving !== nuevoEstadoMov) setIsMoving(nuevoEstadoMov);
+    }
 
-      if (isMoving && !remoteStateRef.current.isMoving) setIsMoving(false);
+    if (frustumRef?.current && groupRef.current) {
+      groupRef.current.getWorldPosition(tempVec);
+      const visible = frustumRef.current.containsPoint(tempVec);
+      if (visible !== lastVisibleRef.current) {
+        lastVisibleRef.current = visible;
+        setIsVisible(visible);
+      }
     }
   });
 
   const isHiddenByTeleport = remoteTeleport?.phase === 'out';
+  const hasVideoStream = remoteStream && remoteStream.getVideoTracks().length > 0;
+  const shouldShowCamera = user.isCameraOn || (hasVideoStream && !user.esFantasma); // Fallback: si hay stream, mostrar aunque isCameraOn tenga lag
 
   return (
     <>
-      <group ref={groupRef} position={[currentPos.current.x, 0, currentPos.current.z]}>
+      <group ref={groupRef} position={[currentPos.current.x, 0, currentPos.current.z]} visible={isVisible}>
         {!isHiddenByTeleport && (
-          <Avatar
-            position={new THREE.Vector3(0, 0, 0)}
-            config={user.avatarConfig}
-            name={user.name}
-            status={user.status}
-            isCurrentUser={false}
-            animationState={isMoving ? 'walk' : 'idle'}
-            direction={remoteStateRef.current.direction || user.direction}
-            reaction={reaction}
-            videoStream={remoteStream}
-            camOn={user.isCameraOn}
-            showVideoBubble={showVideoBubble}
-            message={message}
-          />
+          user.esFantasma ? (
+            <GhostAvatar
+              position={[0, 0, 0]}
+              escala={0.95}
+              opacidad={0.3}
+              mostrarEtiqueta={true}
+              etiqueta="Hay alguien aquí"
+            />
+          ) : (
+            <Avatar
+              position={new THREE.Vector3(0, 0, 0)}
+              config={user.avatarConfig}
+              name={user.name}
+              status={user.status}
+              isCurrentUser={false}
+              animationState={(remoteAnimState || (isMoving ? 'walk' : 'idle')) as AnimationState}
+              direction={remoteStateRef.current.direction || user.direction}
+              reaction={reaction}
+              videoStream={remoteStream}
+              camOn={shouldShowCamera}
+              showVideoBubble={showVideoBubble}
+              message={message}
+              lodLevel={isVisible ? lodLevel : 'low'}
+              esFantasma={!!user.esFantasma}
+            />
+          )
         )}
       </group>
-      {remoteTeleport?.phase === 'out' && (
+      {isVisible && remoteTeleport?.phase === 'out' && (
         <TeleportEffect position={remoteTeleport.origin} phase="out" />
       )}
-      {remoteTeleport?.phase === 'in' && (
+      {isVisible && remoteTeleport?.phase === 'in' && (
         <TeleportEffect position={remoteTeleport.dest} phase="in" />
       )}
     </>
@@ -512,43 +699,55 @@ interface RemoteUsersProps {
   users: User[];
   remoteStreams: Map<string, MediaStream>;
   showVideoBubble?: boolean;
+  usersInCallIds?: Set<string>;
+  usersInAudioRangeIds?: Set<string>;
   remoteMessages: Map<string, string>;
   remoteReaction: { emoji: string; from: string; fromName: string } | null;
   realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
+  interpolacionWorkerRef?: React.MutableRefObject<Worker | null>;
+  posicionesInterpoladasRef?: React.MutableRefObject<Map<string, { x: number; z: number; direction?: DireccionAvatar; isMoving?: boolean }>>;
+  ecsStateRef?: React.MutableRefObject<EstadoEcsEspacio>;
+  frustumRef?: React.MutableRefObject<THREE.Frustum>;
 }
 
-const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, remoteMessages, remoteReaction, realtimePositionsRef }) => {
+const RemoteUsers: React.FC<RemoteUsersProps> = ({ users, remoteStreams, showVideoBubble, usersInCallIds, usersInAudioRangeIds, remoteMessages, remoteReaction, realtimePositionsRef, interpolacionWorkerRef, posicionesInterpoladasRef, ecsStateRef, frustumRef }) => {
   const { currentUser } = useStore();
-  
-  // Limitar videos simultáneos según settings de rendimiento
-  const perfSettings = useMemo(() => getSettingsSection('performance'), []);
-  const maxStreams = perfSettings.maxVideoStreams || 8;
-  
-  // Ordenar usuarios por distancia y solo dar stream a los N más cercanos
-  const usersWithStreamLimit = useMemo(() => {
-    const sorted = users
-      .filter(u => u.id !== currentUser.id)
-      .map(u => {
-        const dist = Math.sqrt(Math.pow((u.x || 0) - (currentUser.x || 0), 2) + Math.pow((u.y || 0) - (currentUser.y || 0), 2));
-        return { user: u, dist };
-      })
-      .sort((a, b) => a.dist - b.dist);
-    
-    const allowedIds = new Set(sorted.slice(0, maxStreams).map(s => s.user.id));
-    return { sorted, allowedIds };
-  }, [users, currentUser.x, currentUser.y, maxStreams]);
-  
+
+  const obtenerPosicionEcs = useCallback((usuario: User) => {
+    const ecsData = ecsStateRef?.current ? obtenerEstadoUsuarioEcs(ecsStateRef.current, usuario.id) : null;
+    if (ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000) {
+      return { x: ecsData.x, z: ecsData.z };
+    }
+    return { x: usuario.x / 16, z: usuario.y / 16 };
+  }, [ecsStateRef]);
+
+  const calcularLod = useCallback((usuario: User): AvatarLodLevel => {
+    const usuarioPos = obtenerPosicionEcs(usuario);
+    const currentPos = obtenerPosicionEcs(currentUser);
+    const dx = usuarioPos.x - currentPos.x;
+    const dz = usuarioPos.z - currentPos.z;
+    const dist = Math.sqrt(dx * dx + dz * dz);
+    if (dist < LOD_NEAR_DISTANCE) return 'high';
+    if (dist < LOD_MID_DISTANCE) return 'mid';
+    return 'low';
+  }, [currentUser, obtenerPosicionEcs]);
+
   return (
     <>
-      {usersWithStreamLimit.sorted.map(({ user: u }) => (
+      {users.filter(u => u.id !== currentUser.id).map(u => (
         <RemoteAvatarInterpolated
           key={u.id}
           user={u}
-          remoteStream={usersWithStreamLimit.allowedIds.has(u.id) ? (remoteStreams.get(u.id) || null) : null}
-          showVideoBubble={showVideoBubble}
+          remoteStream={remoteStreams.get(u.id) || null}
+          showVideoBubble={showVideoBubble && !usersInCallIds?.has(u.id) && !!usersInAudioRangeIds?.has(u.id)}
           message={remoteMessages.get(u.id)}
           reaction={remoteReaction?.from === u.id ? remoteReaction.emoji : null}
           realtimePositionsRef={realtimePositionsRef}
+          interpolacionWorkerRef={interpolacionWorkerRef}
+          posicionesInterpoladasRef={posicionesInterpoladasRef}
+          ecsStateRef={ecsStateRef}
+          lodLevel={calcularLod(u)}
+          frustumRef={frustumRef}
         />
       ))}
     </>
@@ -559,13 +758,14 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
   const { camera } = useThree();
   const lastPlayerPos = useRef<{ x: number; z: number } | null>(null);
   const initialized = useRef(false);
-  
+
+  // NOTA: este componente debe montarse DESPUÉS de Player en el JSX para que su useFrame lea la posición actualizada del mismo frame
   useFrame(() => {
     const playerPos = (camera as any).userData?.playerPosition;
     if (!playerPos || !orbitControlsRef.current) return;
-    
+
     const controls = orbitControlsRef.current;
-    
+
     // Primera vez: centrar cámara en el jugador
     if (!initialized.current) {
       controls.target.set(playerPos.x, 0, playerPos.z);
@@ -574,151 +774,61 @@ const CameraFollow: React.FC<{ orbitControlsRef: React.MutableRefObject<any> }> 
       initialized.current = true;
       return;
     }
-    
+
     // Detectar si el jugador se movió
     if (!lastPlayerPos.current) {
       lastPlayerPos.current = { x: playerPos.x, z: playerPos.z };
       return;
     }
-    
+
     const deltaX = playerPos.x - lastPlayerPos.current.x;
     const deltaZ = playerPos.z - lastPlayerPos.current.z;
     const moved = Math.abs(deltaX) > 0.001 || Math.abs(deltaZ) > 0.001;
-    
+
     if (moved) {
       // Mover target y cámara juntos (mantiene la rotación actual)
       controls.target.x += deltaX;
       controls.target.z += deltaZ;
       camera.position.x += deltaX;
       camera.position.z += deltaZ;
-      
+
       lastPlayerPos.current = { x: playerPos.x, z: playerPos.z };
     }
   });
-  
+
   return null;
 };
-// ============== JUGADOR CONTROLABLE CON ANIMACIONES ==============
-// ============== EFECTO VISUAL TELETRANSPORTACIÓN (Estilo LOL Simplificado) ==============
+
+// ============== EFECTO VISUAL TELETRANSPORTACIÓN ==============
 const TeleportEffect: React.FC<{ position: [number, number, number]; phase: 'out' | 'in' }> = ({ position, phase }) => {
-  const groupRef = useRef<THREE.Group>(null);
-  const beamRef = useRef<THREE.Mesh>(null);
-  const beamMatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const ring1Ref = useRef<THREE.Mesh>(null);
-  const ring1MatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const ring2Ref = useRef<THREE.Mesh>(null);
-  const ring2MatRef = useRef<THREE.MeshBasicMaterial>(null);
-  const flashRef = useRef<THREE.PointLight>(null);
+  const meshRef = useRef<THREE.Mesh>(null);
+  const materialRef = useRef<THREE.MeshBasicMaterial>(null);
   const startTime = useRef(Date.now());
 
   useFrame(() => {
+    if (!meshRef.current || !materialRef.current) return;
     const elapsed = (Date.now() - startTime.current) / 1000;
-    const duration = phase === 'out' ? 0.4 : 0.45;
+    const duration = 0.35;
     const t = Math.min(elapsed / duration, 1);
 
-    // === BEAM VERTICAL (rayo de luz central) ===
-    if (beamRef.current && beamMatRef.current) {
-      if (phase === 'out') {
-        // Aparece rápido, se estira, luego se desvanece
-        const scaleX = Math.max(0.01, 0.8 * (1 - t * t));
-        const scaleY = 0.5 + t * 8;
-        beamRef.current.scale.set(scaleX, scaleY, scaleX);
-        beamMatRef.current.opacity = t < 0.7 ? 0.9 : 0.9 * (1 - (t - 0.7) / 0.3);
-      } else {
-        // Aparece desde arriba, se contrae
-        const scaleX = 0.01 + 0.7 * t * (1 - t * 0.6);
-        const scaleY = 8 - t * 6;
-        beamRef.current.scale.set(scaleX, Math.max(0.1, scaleY), scaleX);
-        beamMatRef.current.opacity = t < 0.3 ? t / 0.3 * 0.9 : 0.9 * (1 - (t - 0.3) / 0.7);
-      }
-    }
-
-    // === ANILLO 1 (expansión principal) ===
-    if (ring1Ref.current && ring1MatRef.current) {
-      if (phase === 'out') {
-        const ringScale = 1 + t * 4;
-        ring1Ref.current.scale.setScalar(ringScale);
-        ring1MatRef.current.opacity = 0.7 * (1 - t * t);
-      } else {
-        // Anillos se contraen hacia el centro (estilo LOL arrival)
-        const ringScale = 5 * (1 - t);
-        ring1Ref.current.scale.setScalar(Math.max(0.1, ringScale));
-        ring1MatRef.current.opacity = 0.6 * t * (1 - t);
-      }
-    }
-
-    // === ANILLO 2 (con delay, más grande) ===
-    if (ring2Ref.current && ring2MatRef.current) {
-      const delayed = Math.max(0, (elapsed - 0.08) / duration);
-      const t2 = Math.min(delayed, 1);
-      if (phase === 'out') {
-        ring2Ref.current.scale.setScalar(0.5 + t2 * 5);
-        ring2MatRef.current.opacity = 0.5 * (1 - t2);
-      } else {
-        ring2Ref.current.scale.setScalar(Math.max(0.1, 6 * (1 - t2)));
-        ring2MatRef.current.opacity = 0.4 * t2 * (1 - t2);
-      }
-    }
-
-    // === FLASH DE LUZ ===
-    if (flashRef.current) {
-      if (phase === 'out') {
-        // Flash intenso al inicio, se apaga
-        flashRef.current.intensity = t < 0.2 ? 12 * (t / 0.2) : 12 * (1 - (t - 0.2) / 0.8);
-      } else {
-        // Flash al aparecer
-        flashRef.current.intensity = t < 0.15 ? 15 * (t / 0.15) : 15 * Math.max(0, 1 - (t - 0.15) / 0.5);
-      }
+    if (phase === 'out') {
+      // Anillo que se expande y desvanece
+      meshRef.current.scale.setScalar(1 + t * 3);
+      materialRef.current.opacity = 0.8 * (1 - t);
+    } else {
+      // Anillo que se contrae y aparece
+      meshRef.current.scale.setScalar(4 - t * 3);
+      materialRef.current.opacity = 0.8 * t * (1 - t * 0.5);
     }
   });
 
   return (
-    <group ref={groupRef} position={position}>
-      {/* Beam vertical (rayo de luz central estilo LOL) */}
-      <mesh ref={beamRef} position={[0, 2.5, 0]}>
-        <cylinderGeometry args={[0.15, 0.15, 1, 16, 1, true]} />
-        <meshBasicMaterial
-          ref={beamMatRef}
-          color="#a5b4fc"
-          transparent
-          opacity={0.9}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
+    <group position={position}>
+      <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.1, 0]}>
+        <ringGeometry args={[0.5, 1.2, 32]} />
+        <meshBasicMaterial ref={materialRef} color="#818cf8" transparent opacity={0.8} side={THREE.DoubleSide} />
       </mesh>
-
-      {/* Anillo 1 - principal */}
-      <mesh ref={ring1Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.08, 0]}>
-        <ringGeometry args={[0.4, 0.7, 48]} />
-        <meshBasicMaterial
-          ref={ring1MatRef}
-          color="#818cf8"
-          transparent
-          opacity={0.7}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-
-      {/* Anillo 2 - secundario con delay */}
-      <mesh ref={ring2Ref} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.05, 0]}>
-        <ringGeometry args={[0.6, 0.85, 48]} />
-        <meshBasicMaterial
-          ref={ring2MatRef}
-          color="#c7d2fe"
-          transparent
-          opacity={0.5}
-          side={THREE.DoubleSide}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
-
-      {/* Flash de luz puntual (simula bloom) */}
-      <pointLight ref={flashRef} color="#a5b4fc" intensity={0} distance={10} />
-      <pointLight color="#818cf8" intensity={phase === 'out' ? 3 : 5} distance={4} />
+      <pointLight color="#818cf8" intensity={phase === 'out' ? 5 : 8} distance={6} />
     </group>
   );
 };
@@ -736,23 +846,121 @@ interface PlayerProps {
   onReachTarget?: () => void;
   teleportTarget?: { x: number; z: number } | null;
   onTeleportDone?: () => void;
-  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean) => void;
+  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean, animState?: string, reliable?: boolean) => void;
+  moveSpeed?: number;
+  runSpeed?: number;
+  ecsStateRef?: React.MutableRefObject<EstadoEcsEspacio>;
+  onPositionUpdate?: (x: number, z: number) => void;
+  zonasEmpresa?: ZonaEmpresa[];
+  empresasAutorizadas?: string[];
+  usersInCallIds?: Set<string>;
+  mobileInputRef?: React.MutableRefObject<JoystickInput>;
 }
 
-const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget, teleportTarget, onTeleportDone, broadcastMovement }) => {
+const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showVideoBubble = true, message, orbitControlsRef, reactions = [], onClickAvatar, moveTarget, onReachTarget, teleportTarget, onTeleportDone, broadcastMovement, moveSpeed, runSpeed, ecsStateRef, onPositionUpdate, zonasEmpresa = [], empresasAutorizadas = [], usersInCallIds, mobileInputRef }) => {
   const groupRef = useRef<THREE.Group>(null);
-  const positionRef = useRef({
-    x: (currentUser.x || 400) / 16,
-    z: (currentUser.y || 400) / 16
-  });
+  // Refs para acceso seguro dentro de useFrame
+  const zonasRef = useRef(zonasEmpresa);
+  const empresasAuthRef = useRef(empresasAutorizadas);
+
+  // Sincronizar refs
+  useEffect(() => { zonasRef.current = zonasEmpresa; }, [zonasEmpresa]);
+  useEffect(() => { empresasAuthRef.current = empresasAutorizadas; }, [empresasAutorizadas]);
+
+  const initialPosition = useMemo(() => {
+    // 1. Persistencia ECS (prioridad si es reciente - < 2s)
+    const ecsData = ecsStateRef?.current ? obtenerEstadoUsuarioEcs(ecsStateRef.current, currentUser.id) : null;
+    if (ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000) {
+      return { x: ecsData.x, z: ecsData.z };
+    }
+
+    // 2. Spawn Point de Empresa (Gemelo Digital)
+    if (currentUser.empresa_id && zonasEmpresa.length > 0) {
+      // Buscar zona activa de mi empresa
+      const miZona = zonasEmpresa.find(z => z.empresa_id === currentUser.empresa_id && z.estado === 'activa');
+      // Si tiene spawn definido (y no es 0,0 que es el default si no se ha configurado)
+      if (miZona && (Number(miZona.spawn_x) !== 0 || Number(miZona.spawn_y) !== 0)) {
+        return { 
+          x: Number(miZona.spawn_x) / 16, 
+          z: Number(miZona.spawn_y) / 16 
+        };
+      }
+    }
+
+    // 3. Posición guardada o Default
+    return { x: (currentUser.x || 400) / 16, z: (currentUser.y || 400) / 16 };
+  }, [currentUser.id, currentUser.x, currentUser.y, currentUser.empresa_id, ecsStateRef, zonasEmpresa]);
+  const initialDirection = useMemo(() => {
+    const ecsData = ecsStateRef?.current ? obtenerEstadoUsuarioEcs(ecsStateRef.current, currentUser.id) : null;
+    if (ecsData && Date.now() - (ecsData.timestamp ?? 0) <= 2000) {
+      return ecsData.direction ?? 'front';
+    }
+    return currentUser.direction ?? 'front';
+  }, [currentUser.direction, currentUser.id, ecsStateRef]);
+  const positionRef = useRef({ ...initialPosition });
   const [animationState, setAnimationState] = useState<AnimationState>('idle');
-  const [direction, setDirection] = useState('front');
+  const animationStateRef = useRef<AnimationState>('idle');
+  
+  // === SISTEMA DE ANIMACIONES CONTEXTUALES ===
+  const [contextualAnim, setContextualAnim] = useState<AnimationState | null>(null);
+  const contextualTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const previousUsersInCallRef = useRef<Set<string>>(new Set());
+  const wavedToUsersRef = useRef<Set<string>>(new Set());
+
+  // Auto-wave: detectar nuevos usuarios que entran en proximidad
+  useEffect(() => {
+    if (!usersInCallIds || usersInCallIds.size === 0) {
+      previousUsersInCallRef.current = new Set();
+      return;
+    }
+    const prev = previousUsersInCallRef.current;
+    const newEntries: string[] = [];
+    usersInCallIds.forEach(id => {
+      if (!prev.has(id) && !wavedToUsersRef.current.has(id)) {
+        newEntries.push(id);
+        wavedToUsersRef.current.add(id);
+      }
+    });
+    previousUsersInCallRef.current = new Set(usersInCallIds);
+
+    // Si hay nuevos usuarios y no estamos en movimiento → wave
+    if (newEntries.length > 0 && animationStateRef.current !== 'walk' && animationStateRef.current !== 'run') {
+      setContextualAnim('wave');
+      if (contextualTimerRef.current) clearTimeout(contextualTimerRef.current);
+      contextualTimerRef.current = setTimeout(() => {
+        setContextualAnim(null);
+      }, 3000);
+    }
+    return () => {
+      if (contextualTimerRef.current) clearTimeout(contextualTimerRef.current);
+    };
+  }, [usersInCallIds]);
+
+  // Cancelar animación contextual si el usuario se mueve
+  useEffect(() => {
+    if ((animationState === 'walk' || animationState === 'run') && contextualAnim) {
+      setContextualAnim(null);
+      if (contextualTimerRef.current) clearTimeout(contextualTimerRef.current);
+    }
+  }, [animationState, contextualAnim]);
+
+  // Estado efectivo: contextual > keyboard
+  const effectiveAnimState = contextualAnim || animationState;
+  
+  // Sincronizar ref con state
+  useEffect(() => {
+    animationStateRef.current = effectiveAnimState;
+  }, [effectiveAnimState]);
+
+  const [direction, setDirection] = useState<string>(initialDirection);
   const [isRunning, setIsRunning] = useState(false);
   const keysPressed = useRef<Set<string>>(new Set());
   const lastSyncTime = useRef(0);
+  const lastBroadcastTime = useRef(0);
   const autoMoveTimeRef = useRef(0);
+  const lastBroadcastRef = useRef<{ x: number; y: number; direction: string; isMoving: boolean; animState?: string } | null>(null);
   const { camera } = useThree();
-  
+
   // Teletransportación
   const [teleportPhase, setTeleportPhase] = useState<'none' | 'out' | 'in'>('none');
   const [teleportOrigin, setTeleportOrigin] = useState<[number, number, number] | null>(null);
@@ -762,16 +970,16 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   // Manejar teleport cuando llega un teleportTarget
   useEffect(() => {
     if (!teleportTarget) return;
-    
+
     const originPos: [number, number, number] = [positionRef.current.x, 0, positionRef.current.z];
     const destPos: [number, number, number] = [teleportTarget.x, 0, teleportTarget.z];
-    
+
     // Fase 1: Desaparición
     setTeleportOrigin(originPos);
     setTeleportDest(destPos);
     setTeleportPhase('out');
     playTeleportSound();
-    
+
     // Fase 2: Mover al destino después de 300ms
     teleportTimerRef.current = setTimeout(() => {
       positionRef.current.x = teleportTarget.x;
@@ -783,9 +991,9 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       // Sincronizar posición inmediatamente
       setPosition(teleportTarget.x * 16, teleportTarget.z * 16, 'front', false, false);
       (camera as any).userData.playerPosition = { x: teleportTarget.x, z: teleportTarget.z };
-      
+
       setTeleportPhase('in');
-      
+
       // Fase 3: Limpiar efecto
       setTimeout(() => {
         setTeleportPhase('none');
@@ -794,7 +1002,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         if (onTeleportDone) onTeleportDone();
       }, 400);
     }, 300);
-    
+
     return () => {
       if (teleportTimerRef.current) clearTimeout(teleportTimerRef.current);
     };
@@ -805,19 +1013,18 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       const activeEl = document.activeElement;
       const isTyping = activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || (activeEl as HTMLElement).isContentEditable);
       if (isTyping) return;
-      
+
       keysPressed.current.add(e.code);
-      
+
       // Shift para correr
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsRunning(true);
       }
-      
-      // Teclas de acción especiales
+
+      // Teclas de acción especiales (dance/cheer manuales, sit es contextual)
       if (e.code === 'KeyE') setAnimationState('cheer');
       if (e.code === 'KeyQ') setAnimationState('dance');
-      if (e.code === 'KeyC') setAnimationState('sit');
-      
+
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
         e.preventDefault();
       }
@@ -825,14 +1032,14 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
 
     const handleKeyUp = (e: KeyboardEvent) => {
       keysPressed.current.delete(e.code);
-      
+
       // Soltar shift
       if (e.code === 'ShiftLeft' || e.code === 'ShiftRight') {
         setIsRunning(false);
       }
-      
+
       // Volver a idle cuando se sueltan teclas de acción
-      if (['KeyE', 'KeyQ', 'KeyC'].includes(e.code)) {
+      if (['KeyE', 'KeyQ'].includes(e.code)) {
         setAnimationState('idle');
       }
     };
@@ -848,9 +1055,11 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   useFrame((state, delta) => {
     let dx = 0, dy = 0;
     let newDirection = direction;
-    
+
     // Velocidad según si corre o camina
-    const speed = isRunning ? RUN_SPEED : MOVE_SPEED;
+    const baseMoveSpeed = moveSpeed ?? MOVE_SPEED;
+    const baseRunSpeed = runSpeed ?? RUN_SPEED;
+    const speed = isRunning ? baseRunSpeed : baseMoveSpeed;
 
     // Movimiento por teclado
     const keyW = keysPressed.current.has('KeyW') || keysPressed.current.has('ArrowUp');
@@ -858,6 +1067,39 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
     const keyA = keysPressed.current.has('KeyA') || keysPressed.current.has('ArrowLeft');
     const keyD = keysPressed.current.has('KeyD') || keysPressed.current.has('ArrowRight');
     const hasKeyboardInput = keyW || keyS || keyA || keyD;
+
+    // Movimiento por joystick mobile (solo si no hay input de teclado)
+    const joystick = mobileInputRef?.current;
+    const hasJoystickInput = !hasKeyboardInput && joystick && joystick.active && joystick.magnitude > 0;
+
+    // Función auxiliar para verificar colisión con zonas prohibidas
+    const isPositionValid = (x: number, z: number) => {
+      const zonas = zonasRef.current;
+      const auth = empresasAuthRef.current;
+      const myEmpresa = currentUser.empresa_id;
+
+      for (const zona of zonas) {
+        if (zona.estado !== 'activa') continue;
+        if (zona.es_comun) continue;
+        if (myEmpresa && zona.empresa_id === myEmpresa) continue;
+        if (zona.empresa_id && auth.includes(zona.empresa_id)) continue;
+
+        // Verificar bounding box
+        const zX = Number(zona.posicion_x) / 16;
+        const zZ = Number(zona.posicion_y) / 16;
+        const halfW = (Number(zona.ancho) / 16) / 2;
+        const halfH = (Number(zona.alto) / 16) / 2;
+
+        // Padding pequeño para evitar entrar justo al borde
+        const padding = 0.2; 
+        
+        if (x > zX - halfW - padding && x < zX + halfW + padding && 
+            z > zZ - halfH - padding && z < zZ + halfH + padding) {
+          return false; // Posición prohibida
+        }
+      }
+      return true;
+    };
 
     if (hasKeyboardInput) {
       // Teclado cancela cualquier movimiento por doble clic
@@ -872,6 +1114,29 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       if (dx !== 0 && dy !== 0) {
         dx *= 0.707;
         dy *= 0.707;
+      }
+    } else if (hasJoystickInput && joystick) {
+      // Joystick mobile cancela moveTarget igual que teclado
+      if (moveTarget && onReachTarget) { autoMoveTimeRef.current = 0; onReachTarget(); }
+
+      const joySpeed = joystick.isRunning ? baseRunSpeed : (baseMoveSpeed * joystick.magnitude);
+      dx = joystick.dx * joySpeed * delta;
+      dy = joystick.dz * joySpeed * delta; // dz del joystick = forward/back (Y en mundo)
+
+      // Determinar dirección visual del avatar según ángulo del joystick
+      const absJx = Math.abs(joystick.dx);
+      const absJz = Math.abs(joystick.dz);
+      const joyRatio = Math.min(absJx, absJz) / Math.max(absJx, absJz || 0.001);
+      const joyDiag = joyRatio > 0.4;
+
+      if (joyDiag) {
+        const fb = joystick.dz > 0 ? 'up' : 'front';
+        const lr = joystick.dx > 0 ? 'right' : 'left';
+        newDirection = `${fb}-${lr}`;
+      } else if (absJx > absJz) {
+        newDirection = joystick.dx > 0 ? 'right' : 'left';
+      } else {
+        newDirection = joystick.dz > 0 ? 'up' : 'front';
       }
     } else if (moveTarget) {
       // Movimiento automático hacia el destino (doble clic estilo Gather)
@@ -888,22 +1153,21 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         autoMoveTimeRef.current = 0;
         if (onReachTarget) onReachTarget();
       } else {
-        // Transición walk → run: empieza caminando, después de 0.4s corre
+        // Transición walk -> run
         autoMoveTimeRef.current += delta;
         const isAutoRunning = autoMoveTimeRef.current > 0.4;
-        const autoSpeed = isAutoRunning ? RUN_SPEED : MOVE_SPEED;
+        const autoSpeed = isAutoRunning ? baseRunSpeed : baseMoveSpeed;
         const step = Math.min(autoSpeed * delta, dist);
 
-        // Aplicar movimiento directamente en X/Z (sin capa dy invertida)
+        // Aplicar movimiento directamente en X/Z
         positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, cx + (distX / dist) * step));
         positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, cz + (distZ / dist) * step));
 
-        // Determinar dirección visual del avatar (8 direcciones)
-        // En la escena: +Z = hacia la cámara (front), -Z = alejándose (up)
+        // Determinar dirección visual del avatar
         const absX = Math.abs(distX);
         const absZ = Math.abs(distZ);
         const ratio = Math.min(absX, absZ) / Math.max(absX, absZ);
-        const isDiagonal = ratio > 0.4; // Si ambos ejes tienen magnitud similar → diagonal
+        const isDiagonal = ratio > 0.4;
 
         if (isDiagonal) {
           const fb = distZ > 0 ? 'front' : 'up';
@@ -916,29 +1180,47 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
         }
 
         // Animación: walk al inicio, run después
-        if (animationState !== 'cheer' && animationState !== 'dance' && animationState !== 'sit') {
+        if (effectiveAnimState !== 'cheer' && effectiveAnimState !== 'dance' && effectiveAnimState !== 'sit' && effectiveAnimState !== 'wave') {
           setAnimationState(isAutoRunning ? 'run' : 'walk');
         }
       }
     }
 
-    // Movimiento por teclado (usa dx/dy)
-    const movingByKeyboard = dx !== 0 || dy !== 0;
-    
-    if (movingByKeyboard) {
-      // Actualizar posición
-      positionRef.current.x = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
-      positionRef.current.z = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
-      
-      // Actualizar animación según movimiento
-      if (animationState !== 'cheer' && animationState !== 'dance' && animationState !== 'sit') {
-        setAnimationState(hasKeyboardInput && isRunning ? 'run' : 'walk');
+    // Movimiento por teclado o joystick (ambos producen dx/dy)
+    const movingByDirectInput = dx !== 0 || dy !== 0;
+
+    if (movingByDirectInput) {
+      // Calcular nueva posición propuesta
+      const nextX = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.x + dx));
+      const nextZ = Math.max(0, Math.min(WORLD_SIZE, positionRef.current.z - dy));
+
+      // Verificar colisión con zonas prohibidas
+      // Intentar mover en ambos ejes
+      if (isPositionValid(nextX, nextZ)) {
+        positionRef.current.x = nextX;
+        positionRef.current.z = nextZ;
+      } else {
+        // Si falla, intentar deslizamiento (solo X)
+        if (isPositionValid(nextX, positionRef.current.z)) {
+          positionRef.current.x = nextX;
+        } 
+        // O solo Z
+        else if (isPositionValid(positionRef.current.x, nextZ)) {
+          positionRef.current.z = nextZ;
+        }
+        // Si ambos fallan, se bloquea (pared)
+      }
+
+      // Actualizar animación según movimiento (teclado: shift=run, joystick: magnitude>threshold=run)
+      if (effectiveAnimState !== 'cheer' && effectiveAnimState !== 'dance' && effectiveAnimState !== 'sit' && effectiveAnimState !== 'wave') {
+        const shouldRun = hasKeyboardInput ? isRunning : (hasJoystickInput && joystick?.isRunning);
+        setAnimationState(shouldRun ? 'run' : 'walk');
       }
     }
 
-    // Detectar si hay movimiento (teclado o automático)
-    const moving = movingByKeyboard || (moveTarget !== null && moveTarget !== undefined);
-    
+    // Detectar si hay movimiento (teclado, joystick o automático)
+    const moving = movingByDirectInput || (moveTarget !== null && moveTarget !== undefined);
+
     if (!moving && (animationState === 'walk' || animationState === 'run')) {
       setAnimationState('idle');
     }
@@ -951,31 +1233,67 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
       groupRef.current.position.z = positionRef.current.z;
     }
 
-    // Actualizar posición para CameraFollow (única fuente de verdad)
+    // Actualizar posición para CameraFollow
     (camera as any).userData.playerPosition = { x: positionRef.current.x, z: positionRef.current.z };
 
-    // Sincronizar posición con el store
+    if (onPositionUpdate) {
+      onPositionUpdate(positionRef.current.x, positionRef.current.z);
+    }
+
+        // Sincronizar posición con el store
     const now = state.clock.getElapsedTime();
     if (now - lastSyncTime.current > 0.1) {
       setPosition(
         positionRef.current.x * 16,
         positionRef.current.z * 16,
         newDirection,
-        animationState === 'sit',
+        effectiveAnimState === 'sit',
         moving
       );
-      
-      // Broadcast movement (WebRTC High Frequency) - solo cuando hay movimiento real
-      if (broadcastMovement && moving) {
-        broadcastMovement(
-          positionRef.current.x * 16, 
-          positionRef.current.z * 16, 
-          newDirection, 
-          moving
-        );
-      }
-      
       lastSyncTime.current = now;
+    }
+
+    if (broadcastMovement) {
+      // Usar ref para garantizar estado fresco en el loop
+      const currentAnim = animationStateRef.current;
+      
+      // Optimización: Solo enviar si hay cambios significativos
+      const payload = {
+        x: Number((positionRef.current.x * 16).toFixed(1)),
+        y: Number((positionRef.current.z * 16).toFixed(1)),
+        direction: newDirection,
+        isMoving: moving,
+        animState: currentAnim,
+      };
+      
+      const last = lastBroadcastRef.current;
+      const now = Date.now();
+      
+      // Detectar cambios reales
+      const changed =
+        !last ||
+        Math.abs(last.x - payload.x) > 0.5 ||
+        Math.abs(last.y - payload.y) > 0.5 ||
+        last.direction !== payload.direction ||
+        last.isMoving !== payload.isMoving ||
+        last.animState !== payload.animState;
+
+      const animChanged = !last || last.animState !== currentAnim;
+      // Si la animación cambió, enviar con fiabilidad (reliable) para evitar que se pierda el paquete de inicio
+      const isReliable = animChanged;
+
+      // Heartbeat para animaciones especiales (dance, cheer, etc.)
+      // Si estamos en una animación especial y no nos movemos, necesitamos reenviar 
+      // el estado periódicamente para que el otro cliente no haga timeout (y vuelva a idle)
+      const isSpecialAnim = !['idle', 'walk', 'run'].includes(currentAnim);
+      // Reducido a 200ms para mayor fluidez y evitar timeouts por jitter
+      const shouldHeartbeat = isSpecialAnim && (now - lastBroadcastTime.current > 200);
+
+      if (changed || shouldHeartbeat) {
+        broadcastMovement(payload.x, payload.y, payload.direction, payload.isMoving, payload.animState, isReliable);
+        lastBroadcastRef.current = payload;
+        lastBroadcastTime.current = now;
+      }
     }
   });
 
@@ -990,7 +1308,7 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
             name={currentUser.name}
             status={currentUser.status}
             isCurrentUser={true}
-            animationState={animationState}
+            animationState={effectiveAnimState}
             direction={direction}
             reaction={reactions.length > 0 ? reactions[reactions.length - 1].emoji : null}
             videoStream={stream}
@@ -1021,24 +1339,24 @@ const Player: React.FC<PlayerProps> = ({ currentUser, setPosition, stream, showV
   );
 };
 
-// ============== ESCENA PRINCIPAL ==============
 interface SceneProps {
   currentUser: User;
   onlineUsers: User[];
-  setPosition: (x: number, y: number, direction: string, isSitting: boolean, isMoving: boolean) => void;
+  setPosition: (x: number, y: number, direction?: string, isSitting?: boolean, isMoving?: boolean) => void;
   theme: string;
   orbitControlsRef: React.MutableRefObject<any>;
   stream: MediaStream | null;
   remoteStreams: Map<string, MediaStream>;
   showVideoBubbles?: boolean;
-  localMessage: string | null;
+  localMessage?: string;
   remoteMessages: Map<string, string>;
-  localReactions: Array<{ id: string; emoji: string }>;
-  remoteReaction: { emoji: string; from: string; fromName: string } | null;
+  localReactions?: Array<{ id: string; emoji: string }>;
+  remoteReaction?: { emoji: string; from: string; fromName: string } | null;
   onClickAvatar?: () => void;
   moveTarget?: { x: number; z: number } | null;
   onReachTarget?: () => void;
   onDoubleClickFloor?: (point: THREE.Vector3) => void;
+  onTapFloor?: (point: THREE.Vector3) => void;
   teleportTarget?: { x: number; z: number } | null;
   onTeleportDone?: () => void;
   showFloorGrid?: boolean;
@@ -1047,21 +1365,96 @@ interface SceneProps {
   invertYAxis?: boolean;
   cameraMode?: string;
   realtimePositionsRef?: React.MutableRefObject<Map<string, any>>;
-  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean) => void;
+  interpolacionWorkerRef?: React.MutableRefObject<Worker | null>;
+  posicionesInterpoladasRef?: React.MutableRefObject<Map<string, { x: number; z: number; direction?: DireccionAvatar; isMoving?: boolean }>>;
+  ecsStateRef?: React.MutableRefObject<EstadoEcsEspacio>;
+  broadcastMovement?: (x: number, y: number, direction: string, isMoving: boolean, animState?: string, reliable?: boolean) => void;
+  moveSpeed?: number;
+  runSpeed?: number;
+  zonasEmpresa?: ZonaEmpresa[];
+  onZoneCollision?: (zonaId: string | null) => void;
+  usersInCallIds?: Set<string>;
+  usersInAudioRangeIds?: Set<string>;
+  empresasAutorizadas?: string[];
+  mobileInputRef?: React.MutableRefObject<JoystickInput>;
+  enableDayNightCycle?: boolean;
 }
 
-const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true, cameraSensitivity = 5, invertYAxis = false, cameraMode = 'free', realtimePositionsRef, broadcastMovement }) => {
+const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, theme, orbitControlsRef, stream, remoteStreams, showVideoBubbles = true, localMessage, remoteMessages, localReactions, remoteReaction, onClickAvatar, moveTarget, onReachTarget, onDoubleClickFloor, onTapFloor, teleportTarget, onTeleportDone, showFloorGrid = true, showNamesAboveAvatars = true, cameraSensitivity = 5, invertYAxis = false, cameraMode = 'free', realtimePositionsRef, interpolacionWorkerRef, posicionesInterpoladasRef, ecsStateRef, broadcastMovement, moveSpeed, runSpeed, zonasEmpresa = [], onZoneCollision, usersInCallIds, usersInAudioRangeIds, empresasAutorizadas = [], mobileInputRef, enableDayNightCycle = false }) => {
   const gridColor = theme === 'arcade' ? '#00ff41' : '#6366f1';
+  const { camera } = useThree();
+  const frustumRef = useRef(new THREE.Frustum());
+  const projectionRef = useRef(new THREE.Matrix4());
+  const chairMeshRef = useRef<THREE.InstancedMesh>(null);
+  const chairDummy = useMemo(() => new THREE.Object3D(), []);
+  const playerColliderRef = useRef<any>(null);
+  const playerColliderPositionRef = useRef({ x: (currentUser.x || 400) / 16, z: (currentUser.y || 400) / 16 });
+  const zonaColisionRef = useRef<string | null>(null);
+  const chairPositions = useMemo(
+    () => [
+      [8, 0.35, 8],
+      [12, 0.35, 8],
+      [8, 0.35, 12],
+      [12, 0.35, 12],
+      [8, 0.35, 10],
+      [12, 0.35, 10],
+    ],
+    []
+  );
+
+  useFrame(() => {
+    projectionRef.current.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+    frustumRef.current.setFromProjectionMatrix(projectionRef.current);
+  });
+
+  useFrame(() => {
+    if (!playerColliderRef.current) return;
+    playerColliderRef.current.setNextKinematicTranslation({
+      x: playerColliderPositionRef.current.x,
+      y: 0,
+      z: playerColliderPositionRef.current.z,
+    });
+  });
+
+  const handlePlayerPositionUpdate = useCallback((x: number, z: number) => {
+    playerColliderPositionRef.current = { x, z };
+  }, []);
+
+  const handleZoneEnter = useCallback((payload: any) => {
+    const zonaId = payload?.other?.rigidBodyObject?.userData?.zonaId ?? payload?.other?.colliderObject?.userData?.zonaId;
+    if (!zonaId || zonaColisionRef.current === zonaId) return;
+    zonaColisionRef.current = zonaId;
+    onZoneCollision?.(zonaId);
+  }, [onZoneCollision]);
+
+  const handleZoneExit = useCallback((payload: any) => {
+    const zonaId = payload?.other?.rigidBodyObject?.userData?.zonaId ?? payload?.other?.colliderObject?.userData?.zonaId;
+    if (!zonaId || zonaColisionRef.current !== zonaId) return;
+    zonaColisionRef.current = null;
+    onZoneCollision?.(null);
+  }, [onZoneCollision]);
+
+  useEffect(() => {
+    if (!chairMeshRef.current) return;
+    chairPositions.forEach((pos, idx) => {
+      chairDummy.position.set(pos[0], pos[1], pos[2]);
+      chairDummy.updateMatrix();
+      chairMeshRef.current?.setMatrixAt(idx, chairDummy.matrix);
+    });
+    chairMeshRef.current.instanceMatrix.needsUpdate = true;
+  }, [chairPositions, chairDummy]);
 
   return (
     <>
-      {/* Iluminación */}
-      <ambientLight intensity={0.7} />
-      <directionalLight
-        position={[10, 20, 10]}
-        intensity={1.2}
-        castShadow
-      />
+      {/* Iluminación: DayNightCycle dinámico o luces estáticas */}
+      {enableDayNightCycle ? (
+        <DayNightCycle enabled={true} />
+      ) : (
+        <>
+          <ambientLight intensity={0.7} />
+          <directionalLight position={[10, 20, 10]} intensity={1.2} castShadow />
+        </>
+      )}
       
       {/* Cámara Perspectiva para rotación 3D */}
       <PerspectiveCamera
@@ -1089,9 +1482,6 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         reverseOrbit={invertYAxis}
       />
       
-      {/* Cámara que sigue al jugador */}
-      <CameraFollow orbitControlsRef={orbitControlsRef} />
-      
       {showFloorGrid && (
         <Grid
           args={[WORLD_SIZE * 2, WORLD_SIZE * 2]}
@@ -1113,12 +1503,74 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         <planeGeometry args={[WORLD_SIZE * 2, WORLD_SIZE * 2]} />
         <meshStandardMaterial color={themeColors[theme] || themeColors.dark} />
       </mesh>
+
+      {/* Zonas por empresa */}
+      {zonasEmpresa.filter((zona) => zona.estado === 'activa').map((zona) => {
+        const anchoZona = Math.max(1, Number(zona.ancho) / 16);
+        const altoZona = Math.max(1, Number(zona.alto) / 16);
+        const posicionX = Number(zona.posicion_x) / 16;
+        const posicionZ = Number(zona.posicion_y) / 16;
+        const colorZona = zona.color || '#64748b';
+        const esZonaComun = !!zona.es_comun;
+        const esZonaPropia = !!zona.empresa_id && zona.empresa_id === currentUser.empresa_id;
+        const variante = esZonaComun ? 'comun' : esZonaPropia ? 'propia' : 'ajena';
+        const nombreZona = zona.nombre_zona || (esZonaComun ? 'Zona común' : zona.empresa?.nombre) || undefined;
+        const opacidad = variante === 'propia' ? 0.45 : variante === 'comun' ? 0.2 : 0.28;
+
+        return (
+          <ZonaEmpresa3D
+            key={zona.id}
+            posicion={[posicionX, 0.01, posicionZ]}
+            ancho={anchoZona}
+            alto={altoZona}
+            color={colorZona}
+            nombre={nombreZona}
+            logoUrl={zona.empresa?.logo_url ?? null}
+            esZonaComun={esZonaComun}
+            variante={variante}
+            opacidad={opacidad}
+          />
+        );
+      })}
+
+      <Physics gravity={[0, 0, 0]}>
+        <RigidBody
+          ref={playerColliderRef}
+          type="kinematicPosition"
+          colliders={false}
+          onIntersectionEnter={handleZoneEnter}
+          onIntersectionExit={handleZoneExit}
+        >
+          <CuboidCollider args={[0.45, 1, 0.45]} />
+        </RigidBody>
+        {zonasEmpresa.filter((zona) => zona.estado === 'activa').map((zona) => {
+          const anchoZona = Math.max(1, Number(zona.ancho) / 16);
+          const altoZona = Math.max(1, Number(zona.alto) / 16);
+          const posicionX = Number(zona.posicion_x) / 16;
+          const posicionZ = Number(zona.posicion_y) / 16;
+          return (
+            <RigidBody key={`zona-collider-${zona.id}`} type="fixed" colliders={false} userData={{ zonaId: zona.id }}>
+              <CuboidCollider
+                args={[anchoZona / 2, 1, altoZona / 2]}
+                position={[posicionX, 0, posicionZ]}
+                sensor
+              />
+            </RigidBody>
+          );
+        })}
+      </Physics>
       
-      {/* Suelo base (para doble clic - movimiento estilo Gather) */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]} onDoubleClick={(e) => {
-        e.stopPropagation();
-        if (onDoubleClickFloor) onDoubleClickFloor(e.point);
-      }}>
+      {/* Suelo base: double-click (desktop) o single-tap (mobile) para mover */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.1, 0]}
+        onClick={(e) => {
+          e.stopPropagation();
+          if (onTapFloor) onTapFloor(e.point);
+        }}
+        onDoubleClick={(e) => {
+          e.stopPropagation();
+          if (onDoubleClickFloor) onDoubleClickFloor(e.point);
+        }}
+      >
         <planeGeometry args={[1000, 1000]} />
         <meshBasicMaterial visible={false} />
       </mesh>
@@ -1145,6 +1597,11 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
       <Text position={[10, 1.5, 10]} fontSize={0.5} color="white" anchorX="center" anchorY="middle">
         Mesa de Reunión
       </Text>
+
+      <instancedMesh ref={chairMeshRef} args={[undefined, undefined, chairPositions.length]} castShadow receiveShadow>
+        <boxGeometry args={[1, 0.6, 1]} />
+        <meshStandardMaterial color="#0f172a" />
+      </instancedMesh>
       
       <mesh position={[25, 0.02, 10]} rotation={[-Math.PI / 2, 0, 0]}>
         <planeGeometry args={[6, 6]} />
@@ -1159,7 +1616,7 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         currentUser={currentUser} 
         setPosition={setPosition} 
         stream={stream} 
-        showVideoBubble={showVideoBubbles} 
+        showVideoBubble={showVideoBubbles && !usersInCallIds?.size} // Bug 1 Fix: Ocultar bubble local si hay llamada activa (HUD visible)
         message={localMessage} 
         orbitControlsRef={orbitControlsRef}
         reactions={localReactions}
@@ -1169,12 +1626,85 @@ const Scene: React.FC<SceneProps> = ({ currentUser, onlineUsers, setPosition, th
         teleportTarget={teleportTarget}
         onTeleportDone={onTeleportDone}
         broadcastMovement={broadcastMovement}
+        moveSpeed={moveSpeed}
+        runSpeed={runSpeed}
+        ecsStateRef={ecsStateRef}
+        onPositionUpdate={handlePlayerPositionUpdate}
+        zonasEmpresa={zonasEmpresa}
+        empresasAutorizadas={empresasAutorizadas}
+        usersInCallIds={usersInCallIds}
+        mobileInputRef={mobileInputRef}
       />
       
+      {/* Cámara que sigue al jugador — DEBE montarse DESPUÉS de Player para que useFrame lea posición actualizada */}
+      <CameraFollow orbitControlsRef={orbitControlsRef} />
+      
       {/* Usuarios remotos */}
-      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} remoteMessages={remoteMessages} remoteReaction={remoteReaction} realtimePositionsRef={realtimePositionsRef} />
+      <RemoteUsers users={onlineUsers} remoteStreams={remoteStreams} showVideoBubble={showVideoBubbles} usersInCallIds={usersInCallIds} usersInAudioRangeIds={usersInAudioRangeIds} remoteMessages={remoteMessages} remoteReaction={remoteReaction} realtimePositionsRef={realtimePositionsRef} interpolacionWorkerRef={interpolacionWorkerRef} posicionesInterpoladasRef={posicionesInterpoladasRef} ecsStateRef={ecsStateRef} frustumRef={frustumRef} />
+
+      {/* Objetos interactivos del espacio (pizarra, café, reloj, planta) */}
+      <ObjetosInteractivos
+        playerPosition={playerColliderPositionRef.current}
+        onInteract={(tipo) => {
+          if (tipo === 'coffee') {
+            // +5 XP por tomar café
+            if (currentUser?.id) {
+              // Se maneja en el componente padre via callback
+            }
+          }
+        }}
+      />
+
+      {/* Partículas clima/temporada (auto-detecta por mes) */}
+      <ParticulasClima
+        centro={playerColliderPositionRef.current}
+      />
     </>
   );
+};
+
+// ============== ADAPTIVE FRAMELOOP ==============
+const AdaptiveFrameloop: React.FC = () => {
+  const { invalidate } = useThree();
+  const lastActivityRef = useRef(Date.now());
+  const IDLE_TIMEOUT = 3000;
+  const MIN_FPS_INTERVAL = 1000 / 30; // 30fps mínimo para animaciones fluidas
+
+  useEffect(() => {
+    const mark = () => { lastActivityRef.current = Date.now(); invalidate(); };
+    window.addEventListener('keydown', mark, { passive: true });
+    window.addEventListener('pointerdown', mark, { passive: true });
+    window.addEventListener('pointermove', mark, { passive: true });
+    window.addEventListener('wheel', mark, { passive: true });
+    return () => {
+      window.removeEventListener('keydown', mark);
+      window.removeEventListener('pointerdown', mark);
+      window.removeEventListener('pointermove', mark);
+      window.removeEventListener('wheel', mark);
+    };
+  }, [invalidate]);
+
+  // Render loop mínimo a 30fps para que animaciones idle (respirar, mirar) sean fluidas
+  useEffect(() => {
+    let animId: number;
+    let lastTime = 0;
+    const tick = (time: number) => {
+      if (time - lastTime >= MIN_FPS_INTERVAL) {
+        invalidate();
+        lastTime = time;
+      }
+      animId = requestAnimationFrame(tick);
+    };
+    animId = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(animId);
+  }, [invalidate]);
+
+  // Durante actividad del usuario → full fps (60fps) por 3 segundos
+  useFrame(() => {
+    if (Date.now() - lastActivityRef.current < IDLE_TIMEOUT) invalidate();
+  });
+
+  return null;
 };
 
 // ============== VIDEO HUD COMPONENT ==============
@@ -1460,6 +1990,9 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
           const isScreenSharing = remoteScreen && remoteScreen.getVideoTracks().length > 0;
           if (isScreenSharing) return null;
           
+          const hasRemoteStream = remoteStream && remoteStream.getVideoTracks().length > 0;
+          const shouldShowRemoteCam = u.isCameraOn || hasRemoteStream;
+
           return (
             <div key={u.id} className={`relative bg-zinc-900 rounded-[28px] overflow-hidden shadow-2xl group transition-all duration-300 ${
               useGridLayout ? 'w-[200px] h-[130px]' : 'w-52 h-36'
@@ -1481,7 +2014,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                 </div>
               )}
               {/* Prioridad: 1) Cámara OFF = foto, 2) Cámara ON + stream = video, 3) Cámara ON sin stream = conectando */}
-              {!u.isCameraOn ? (
+              {!shouldShowRemoteCam ? (
                 /* Usuario tiene cámara apagada - mostrar foto de perfil o inicial */
                 <div className="absolute inset-0 flex items-center justify-center bg-zinc-900">
                   <div className="w-14 h-14 rounded-full border border-indigo-500/30 flex items-center justify-center bg-black/50 overflow-hidden">
@@ -1492,7 +2025,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
                     )}
                   </div>
                 </div>
-              ) : remoteStream && remoteStream.getVideoTracks().length > 0 ? (
+              ) : hasRemoteStream ? (
                 /* Usuario tiene cámara ON y hay stream disponible */
                 <StableVideo 
                   stream={remoteStream} 
@@ -1647,7 +2180,7 @@ const ICE_SERVERS = [
 ];
 
 const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameHubOpen = false, isPlayingGame = false }) => {
-  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session, setActiveSubTab, activeSubTab } = useStore();
+  const { currentUser, onlineUsers, setPosition, activeWorkspace, toggleMic, toggleCamera, toggleScreenShare, togglePrivacy, setPrivacy, session, setActiveSubTab, setActiveChatGroupId, activeSubTab, empresasAutorizadas, setEmpresasAutorizadas } = useStore();
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [processedStream, setProcessedStream] = useState<MediaStream | null>(null); // Stream con efectos de fondo
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
@@ -1655,13 +2188,258 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const [moveTarget, setMoveTarget] = useState<{ x: number; z: number } | null>(null);
   const [teleportTarget, setTeleportTarget] = useState<{ x: number; z: number } | null>(null);
   const [showAvatarModal, setShowAvatarModal] = useState(false);
+  // === MOBILE GAME CONTROLS ===
+  const mobileInputRef = useRef<JoystickInput>({ dx: 0, dz: 0, magnitude: 0, isRunning: false, active: false });
+  const [showEmoteWheel, setShowEmoteWheel] = useState(false);
+  const [showGamificacion, setShowGamificacion] = useState(false);
+  const isMobile = useMemo(() => isTouchDevice(), []);
+  // Registrar Service Worker para PWA
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
+    }
+  }, []);
+  const [solicitudesEnviadas, setSolicitudesEnviadas] = useState<AutorizacionEmpresa[]>([]);
+  const [solicitandoAcceso, setSolicitandoAcceso] = useState(false);
+  const [notificacionAutorizacion, setNotificacionAutorizacion] = useState<{
+    id: string;
+    titulo: string;
+    mensaje?: string | null;
+    tipo: string;
+    datos_extra?: Record<string, any> | null;
+  } | null>(null);
+  const notificacionTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const chunkWorkerRef = useRef<Worker | null>(null);
+  const [chunkWorkerReady, setChunkWorkerReady] = useState(false);
+  const [chunkWorkerHasData, setChunkWorkerHasData] = useState(false);
+  const [chunkWorkerData, setChunkWorkerData] = useState<{ usuariosIds: string[]; chunksVecinos: string[] }>({
+    usuariosIds: [],
+    chunksVecinos: [],
+  });
+  const [chunkWorkerError, setChunkWorkerError] = useState<string | null>(null);
+  const interpolacionWorkerRef = useRef<Worker | null>(null);
+  const posicionesInterpoladasRef = useRef<Map<string, { x: number; z: number; direction?: DireccionAvatar; isMoving?: boolean }>>(new Map());
+  const [interpolacionWorkerError, setInterpolacionWorkerError] = useState<string | null>(null);
+  const ecsStateRef = useRef(crearEstadoEcsEspacio());
   
   // ========== Settings del usuario (leídos de localStorage/SettingsModal) ==========
   const [userSettingsVersion, setUserSettingsVersion] = useState(0);
   const space3dSettings = useMemo(() => getSettingsSection('space3d'), [userSettingsVersion]);
+  const enableDayNightCycle = space3dSettings.enableDayNightCycle ?? false;
   const meetingsSettings = useMemo(() => getSettingsSection('meetings'), [userSettingsVersion]);
   const notifSettings = useMemo(() => getSettingsSection('notifications'), [userSettingsVersion]);
   const performanceSettings = useMemo(() => getSettingsSection('performance'), [userSettingsVersion]);
+  const [gpuInfo, setGpuInfo] = useState<GpuInfo | null>(null);
+
+  useEffect(() => {
+    detectGpuCapabilities().then(setGpuInfo);
+  }, []);
+
+  const gpuRenderConfig = useMemo(() => {
+    if (!gpuInfo) return null;
+    return adaptiveConfigFromTier(
+      gpuInfo.tier,
+      performanceSettings.graphicsQuality === 'auto' ? undefined : performanceSettings.graphicsQuality,
+      performanceSettings.batterySaver,
+    );
+  }, [gpuInfo, performanceSettings.graphicsQuality, performanceSettings.batterySaver]);
+
+  const radioInteresChunks = useMemo(() => {
+    const radio = Number(space3dSettings.radioInteresChunks ?? 1);
+    if (!Number.isFinite(radio)) return 1;
+    return Math.max(1, Math.min(3, Math.round(radio)));
+  }, [space3dSettings.radioInteresChunks]);
+  const usuariosEcs = useMemo(() => {
+    const mapa = new Map<string, User>();
+    [currentUser, ...onlineUsers].forEach((usuario) => {
+      mapa.set(usuario.id, usuario);
+    });
+    return Array.from(mapa.values());
+  }, [currentUser, onlineUsers]);
+  const usuariosEcsSnapshot = useMemo(() => {
+    const ahora = Date.now();
+    const mapa = new Map<string, { x: number; y: number; direction?: User['direction']; isMoving?: boolean }>();
+    usuariosEcs.forEach((usuario) => {
+      const ecsData = obtenerEstadoUsuarioEcs(ecsStateRef.current, usuario.id);
+      if (ecsData && ahora - (ecsData.timestamp ?? 0) <= 2000) {
+        mapa.set(usuario.id, {
+          x: ecsData.x * 16,
+          y: ecsData.z * 16,
+          direction: ecsData.direction as User['direction'],
+          isMoving: ecsData.isMoving,
+        });
+      }
+    });
+    return mapa;
+  }, [usuariosEcs]);
+  const currentUserEcs = useMemo(() => {
+    const ecsData = usuariosEcsSnapshot.get(currentUser.id);
+    if (!ecsData) return currentUser;
+    return {
+      ...currentUser,
+      x: ecsData.x,
+      y: ecsData.y,
+      direction: ecsData.direction ?? currentUser.direction,
+      isMoving: ecsData.isMoving ?? currentUser.isMoving,
+    };
+  }, [currentUser, usuariosEcsSnapshot]);
+  const onlineUsersEcs = useMemo(() => {
+    return onlineUsers.map((usuario) => {
+      const ecsData = usuariosEcsSnapshot.get(usuario.id);
+      if (!ecsData) return usuario;
+      return {
+        ...usuario,
+        x: ecsData.x,
+        y: ecsData.y,
+        direction: ecsData.direction ?? usuario.direction,
+        isMoving: ecsData.isMoving ?? usuario.isMoving,
+      };
+    });
+  }, [onlineUsers, usuariosEcsSnapshot]);
+  const usuariosEnChunks = useMemo(() => {
+    let filtrados = onlineUsersEcs;
+    if (chunkWorkerReady && chunkWorkerHasData) {
+      const ids = new Set(chunkWorkerData.usuariosIds);
+      filtrados = onlineUsersEcs.filter((usuario) => ids.has(usuario.id));
+    } else {
+      filtrados = filtrarUsuariosPorChunks(onlineUsersEcs, currentUserEcs.x, currentUserEcs.y, radioInteresChunks);
+    }
+    // Siempre incluir usuarios de la misma empresa o empresas autorizadas (no desaparecen por distancia)
+    if (currentUserEcs.empresa_id) {
+      const filtradosIds = new Set(filtrados.map(u => u.id));
+      const faltantes = onlineUsersEcs.filter(u =>
+        !filtradosIds.has(u.id) && (
+          u.empresa_id === currentUserEcs.empresa_id ||
+          (u.empresa_id && empresasAutorizadas.includes(u.empresa_id))
+        )
+      );
+      if (faltantes.length > 0) filtrados = [...filtrados, ...faltantes];
+    }
+    return aplicarInteresEmpresa(filtrados, currentUserEcs.empresa_id, currentUserEcs.role, currentUserEcs.departamento_id, empresasAutorizadas);
+  }, [onlineUsersEcs, currentUserEcs.empresa_id, currentUserEcs.role, currentUserEcs.departamento_id, currentUserEcs.x, currentUserEcs.y, radioInteresChunks, empresasAutorizadas, chunkWorkerData.usuariosIds, chunkWorkerHasData, chunkWorkerReady]);
+  const usuariosParaConexion = useMemo(() => usuariosEnChunks.filter(u => !u.esFantasma), [usuariosEnChunks]);
+  const usuariosParaMinimapa = useMemo(() => usuariosEnChunks.filter(u => !u.esFantasma), [usuariosEnChunks]);
+  const chunkActual = useMemo(() => obtenerChunk(currentUserEcs.x, currentUserEcs.y), [currentUserEcs.x, currentUserEcs.y]);
+  const maxDpr = useMemo(() => {
+    if (gpuRenderConfig) return gpuRenderConfig.maxDpr;
+    if (performanceSettings.graphicsQuality === 'low') return 1;
+    if (performanceSettings.graphicsQuality === 'medium') return 1.5;
+    return window.devicePixelRatio;
+  }, [performanceSettings.graphicsQuality, gpuRenderConfig]);
+  const minDpr = useMemo(() => {
+    if (gpuRenderConfig) return gpuRenderConfig.minDpr;
+    return performanceSettings.graphicsQuality === 'low' ? 1 : 0.75;
+  }, [performanceSettings.graphicsQuality, gpuRenderConfig]);
+  const [adaptiveDpr, setAdaptiveDpr] = useState(maxDpr);
+
+  useEffect(() => {
+    setAdaptiveDpr(maxDpr);
+  }, [maxDpr]);
+
+  useEffect(() => {
+    if (chunkWorkerReady && chunkWorkerHasData && chunkWorkerData.chunksVecinos.length > 0) {
+      chunkVecinosRef.current = new Set(chunkWorkerData.chunksVecinos);
+      return;
+    }
+    const chunkActual = obtenerChunk(currentUserEcs.x, currentUserEcs.y);
+    chunkVecinosRef.current = new Set(obtenerChunksVecinos(chunkActual, radioInteresChunks));
+  }, [currentUserEcs.x, currentUserEcs.y, radioInteresChunks, chunkWorkerData.chunksVecinos, chunkWorkerHasData, chunkWorkerReady]);
+
+  useEffect(() => {
+    sincronizarUsuariosEcs(ecsStateRef.current, usuariosEcs);
+  }, [usuariosEcs]);
+
+  useEffect(() => {
+    return () => {
+      limpiarEstadoEcs(ecsStateRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    let worker: Worker | null = null;
+    try {
+      worker = new Worker(new URL('../workers/chunkWorker.ts', import.meta.url), { type: 'module' });
+      chunkWorkerRef.current = worker;
+      setChunkWorkerReady(true);
+      worker.onmessage = (event: MessageEvent) => {
+        const { type, payload } = event.data || {};
+        if (type === 'result') {
+          setChunkWorkerData({
+            usuariosIds: payload?.usuariosIds ?? [],
+            chunksVecinos: payload?.chunksVecinos ?? [],
+          });
+          setChunkWorkerHasData(true);
+        }
+        if (type === 'error') {
+          setChunkWorkerError(payload?.message || 'Error en worker de chunks');
+        }
+      };
+      worker.onerror = (error) => {
+        setChunkWorkerError(error.message || 'Error inicializando worker de chunks');
+      };
+    } catch (error) {
+      setChunkWorkerError('No se pudo iniciar el worker de chunks');
+    }
+
+    return () => {
+      if (worker) worker.terminate();
+      chunkWorkerRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    let worker: Worker | null = null;
+    try {
+      worker = new Worker(new URL('../workers/interpolacionWorker.ts', import.meta.url), { type: 'module' });
+      interpolacionWorkerRef.current = worker;
+      worker.onmessage = (event: MessageEvent) => {
+        const { type, payload } = event.data || {};
+        if (type === 'update') {
+          const positions = payload?.positions ?? [];
+          if (positions.length === 0) return;
+          const mapa = posicionesInterpoladasRef.current;
+          positions.forEach((pos: { id: string; x: number; z: number; direction?: DireccionAvatar; isMoving?: boolean }) => {
+            mapa.set(pos.id, { x: pos.x, z: pos.z, direction: pos.direction, isMoving: pos.isMoving });
+          });
+        }
+        if (type === 'error') {
+          setInterpolacionWorkerError(payload?.message || 'Error en worker de interpolación');
+        }
+      };
+      worker.onerror = (error) => {
+        setInterpolacionWorkerError(error.message || 'Error inicializando worker de interpolación');
+      };
+    } catch (error) {
+      setInterpolacionWorkerError('No se pudo iniciar el worker de interpolación');
+    }
+
+    return () => {
+      if (worker) worker.terminate();
+      interpolacionWorkerRef.current = null;
+      posicionesInterpoladasRef.current.clear();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!chunkWorkerRef.current || !chunkWorkerReady) return;
+    if (!Number.isFinite(currentUserEcs.x) || !Number.isFinite(currentUserEcs.y)) return;
+    chunkWorkerRef.current.postMessage({
+      type: 'compute',
+      payload: {
+        current: { x: currentUserEcs.x, y: currentUserEcs.y },
+        radio: radioInteresChunks,
+        users: onlineUsers.map((usuario) => ({
+          id: usuario.id,
+          x: usuariosEcsSnapshot.get(usuario.id)?.x ?? usuario.x,
+          y: usuariosEcsSnapshot.get(usuario.id)?.y ?? usuario.y,
+        })),
+      }
+    });
+  }, [onlineUsers, currentUserEcs.x, currentUserEcs.y, radioInteresChunks, chunkWorkerReady, usuariosEcsSnapshot]);
+
+  useEffect(() => {
+    usuariosVisiblesRef.current = new Set(usuariosParaConexion.map(usuario => usuario.id));
+  }, [USAR_LIVEKIT, usuariosParaConexion]);
   
   // Velocidades y radios basados en settings del usuario (factor sobre las constantes globales)
   const userMoveSpeed = useMemo(() => {
@@ -1673,6 +2451,30 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     const factor = space3dSettings.movementSpeed / 5;
     return RUN_SPEED * factor;
   }, [space3dSettings.movementSpeed]);
+
+  const normalizarDireccion = useCallback((direccion?: string): User['direction'] | undefined => {
+    if (!direccion) return undefined;
+    if (direccion === 'front' || direccion === 'back' || direccion === 'left' || direccion === 'right') {
+      return direccion as User['direction'];
+    }
+    if (direccion.startsWith('up')) return 'back';
+    if (direccion.startsWith('front') || direccion === 'down') return 'front';
+    return 'front';
+  }, []);
+
+  const setPositionEcs = useCallback((x: number, y: number, direction?: string, isSitting?: boolean, isMoving?: boolean) => {
+    setPosition(x, y, normalizarDireccion(direction), isSitting, isMoving);
+    if (currentUser?.id) {
+      actualizarEstadoUsuarioEcs(
+        ecsStateRef.current,
+        currentUser.id,
+        x / 16,
+        y / 16,
+        direction,
+        isMoving
+      );
+    }
+  }, [currentUser?.id, normalizarDireccion, setPosition]);
   
   const userProximityRadius = useMemo(() => {
     return space3dSettings.proximityRadius || PROXIMITY_RADIUS;
@@ -1710,8 +2512,19 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const wasIdleMutedRef = useRef(false);
   const micOnRef = useRef(currentUser.isMicOn);
   const camOnRef = useRef(currentUser.isCameraOn);
+  const hasActiveCallRef = useRef(false);
   micOnRef.current = currentUser.isMicOn;
   camOnRef.current = currentUser.isCameraOn;
+
+  // Función estable para verificar si hay llamada activa (doble check: ref de proximidad + LiveKit directo)
+  const isInActiveCall = useCallback(() => {
+    // Check 1: ref actualizada por usersInCall memo
+    if (hasActiveCallRef.current) return true;
+    // Check 2: verificación directa contra la API de LiveKit (siempre actual, no depende del render cycle)
+    const room = livekitRoomRef.current;
+    if (room && room.state === 'connected' && room.remoteParticipants.size > 0) return true;
+    return false;
+  }, []);
 
   useEffect(() => {
     const videoS = getSettingsSection('video');
@@ -1723,10 +2536,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
       wasIdleMutedRef.current = false;
       idleTimerRef.current = setTimeout(() => {
+        // No apagar mic/cam si el usuario está en conversación activa (best practice: Gather/Zoom/Meet)
+        // Doble check: hasActiveCallRef (proximidad) + LiveKit remoteParticipants (directo)
+        if (isInActiveCall()) {
+          console.log('[AutoIdleMute] Inactivo pero en conversación activa — no se apaga mic/cam');
+          return;
+        }
         if (micOnRef.current) { toggleMic(); wasIdleMutedRef.current = true; }
         if (camOnRef.current) { toggleCamera(); wasIdleMutedRef.current = true; }
         if (micOnRef.current || camOnRef.current) {
-          console.log('[AutoIdleMute] Usuario inactivo, mic/cam apagados');
+          console.log('[AutoIdleMute] Usuario inactivo y sin conversación, mic/cam apagados');
         }
       }, IDLE_TIMEOUT);
     };
@@ -1739,7 +2558,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       events.forEach(e => window.removeEventListener(e, resetIdleTimer));
       if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
     };
-  }, []); // Sin dependencias de mic/cam — usa refs para leer estado actual
+  }, [isInActiveCall]); // isInActiveCall es estable (useCallback sin deps)
   
   // Solicitar permiso de notificaciones desktop al montar
   useEffect(() => {
@@ -1753,9 +2572,75 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   
   // Estado de configuración de audio
   const [audioSettings, setAudioSettings] = useState<AudioSettings>(loadAudioSettings);
+  const audioProcesadoRef = useRef<{
+    context: AudioContext;
+    source: MediaStreamAudioSourceNode;
+    destination: MediaStreamAudioDestinationNode;
+    nodes: AudioNode[];
+    track: MediaStreamTrack;
+  } | null>(null);
+
+  const limpiarAudioProcesado = useCallback(() => {
+    const actual = audioProcesadoRef.current;
+    if (!actual) return;
+    actual.track.stop();
+    actual.nodes.forEach((node) => {
+      try {
+        node.disconnect();
+      } catch {
+        // noop
+      }
+    });
+    actual.source.disconnect();
+    actual.destination.disconnect();
+    actual.context.close().catch(() => undefined);
+    audioProcesadoRef.current = null;
+  }, []);
+
+  const crearAudioProcesado = useCallback(async (track: MediaStreamTrack, nivel: 'standard' | 'enhanced') => {
+    limpiarAudioProcesado();
+    const context = new AudioContext();
+    const stream = new MediaStream([track]);
+    const source = context.createMediaStreamSource(stream);
+
+    const highpass = context.createBiquadFilter();
+    highpass.type = 'highpass';
+    highpass.frequency.value = nivel === 'enhanced' ? 120 : 80;
+
+    const compressor = context.createDynamicsCompressor();
+    compressor.threshold.value = nivel === 'enhanced' ? -35 : -28;
+    compressor.knee.value = 30;
+    compressor.ratio.value = nivel === 'enhanced' ? 12 : 8;
+    compressor.attack.value = 0.003;
+    compressor.release.value = 0.25;
+
+    const gain = context.createGain();
+    gain.gain.value = nivel === 'enhanced' ? 1.1 : 1.0;
+
+    const destination = context.createMediaStreamDestination();
+    source.connect(highpass).connect(compressor).connect(gain).connect(destination);
+
+    const processedTrack = destination.stream.getAudioTracks()[0];
+    if (!processedTrack) {
+      context.close().catch(() => undefined);
+      return null;
+    }
+
+    audioProcesadoRef.current = {
+      context,
+      source,
+      destination,
+      nodes: [highpass, compressor, gain],
+      track: processedTrack,
+    };
+
+    return processedTrack;
+  }, [limpiarAudioProcesado]);
 
   // Stream efectivo para transmitir (procesado si hay efectos, original si no)
   const effectiveStream = (cameraSettings.backgroundEffect !== 'none' && processedStream) ? processedStream : stream;
+  const effectiveStreamRef = useRef<MediaStream | null>(null);
+  effectiveStreamRef.current = effectiveStream;
 
   // Cargar cargo del usuario desde miembros_espacio
   useEffect(() => {
@@ -1777,19 +2662,500 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     
     cargarCargo();
   }, [session?.user?.id, activeWorkspace?.id]);
+
+  useEffect(() => {
+    const cargarZonas = async () => {
+      if (!activeWorkspace?.id) {
+        setZonasEmpresa([]);
+        return;
+      }
+
+      const zonas = await cargarZonasEmpresa(activeWorkspace.id);
+      setZonasEmpresa(zonas);
+    };
+
+    cargarZonas();
+  }, [activeWorkspace?.id]);
+
+  const cargarAutorizaciones = useCallback(async () => {
+    if (!activeWorkspace?.id || !currentUser.empresa_id) {
+      setEmpresasAutorizadas([]);
+      return;
+    }
+
+    const autorizaciones = await cargarAutorizacionesActivas(activeWorkspace.id, currentUser.empresa_id);
+    const empresas = new Set<string>();
+
+    autorizaciones.forEach((autorizacion) => {
+      if (autorizacion.empresa_origen_id === currentUser.empresa_id) {
+        empresas.add(autorizacion.empresa_destino_id);
+      } else if (autorizacion.empresa_destino_id === currentUser.empresa_id) {
+        empresas.add(autorizacion.empresa_origen_id);
+      }
+    });
+
+    setEmpresasAutorizadas(Array.from(empresas));
+  }, [activeWorkspace?.id, currentUser.empresa_id, setEmpresasAutorizadas]);
+
+  const cargarSolicitudesPendientes = useCallback(async () => {
+    if (!activeWorkspace?.id || !currentUser.empresa_id) {
+      setSolicitudesEnviadas([]);
+      return;
+    }
+
+    const pendientes = await cargarSolicitudesEnviadas(activeWorkspace.id, currentUser.empresa_id);
+    setSolicitudesEnviadas(pendientes);
+  }, [activeWorkspace?.id, currentUser.empresa_id]);
+
+  useEffect(() => {
+    cargarAutorizaciones();
+  }, [cargarAutorizaciones]);
+
+  useEffect(() => {
+    cargarSolicitudesPendientes();
+  }, [cargarSolicitudesPendientes]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+    const channel = supabase
+      .channel(`notificaciones-${session.user.id}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'notificaciones',
+        filter: `usuario_id=eq.${session.user.id}`
+      }, (payload) => {
+        const nueva = payload.new as any;
+        if (activeWorkspace?.id && nueva?.espacio_id && nueva.espacio_id !== activeWorkspace.id) return;
+        setNotificacionAutorizacion({
+          id: nueva.id,
+          titulo: nueva.titulo || 'Notificación',
+          mensaje: nueva.mensaje,
+          tipo: nueva.tipo,
+          datos_extra: nueva.datos_extra,
+        });
+        if (String(nueva.tipo || '').includes('autorizacion_empresa')) {
+          cargarAutorizaciones();
+          cargarSolicitudesPendientes();
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [activeWorkspace?.id, cargarAutorizaciones, cargarSolicitudesPendientes, session?.user?.id]);
+
+  useEffect(() => {
+    if (!notificacionAutorizacion) return;
+    if (notificacionTimeoutRef.current) {
+      clearTimeout(notificacionTimeoutRef.current);
+    }
+    notificacionTimeoutRef.current = setTimeout(() => {
+      setNotificacionAutorizacion(null);
+    }, 6500);
+    return () => {
+      if (notificacionTimeoutRef.current) clearTimeout(notificacionTimeoutRef.current);
+    };
+  }, [notificacionAutorizacion]);
   const [remoteStreams, setRemoteStreams] = useState<Map<string, MediaStream>>(new Map());
   const [remoteScreenStreams, setRemoteScreenStreams] = useState<Map<string, MediaStream>>(new Map());
+  const [remoteAudioTracks, setRemoteAudioTracks] = useState<Map<string, MediaStreamTrack>>(new Map());
+  const livekitRoomRef = useRef<Room | null>(null);
+  const livekitRoomNameRef = useRef<string | null>(null);
+  const livekitConnectingRef = useRef(false);
+  const [livekitConnected, setLivekitConnected] = useState(false);
+  const livekitLocalTracksRef = useRef<Partial<Record<'audio' | 'video' | 'screen', LocalAudioTrack | LocalVideoTrack>>>({});
   const activeStreamRef = useRef<MediaStream | null>(null);
   const activeScreenRef = useRef<MediaStream | null>(null);
   const peerConnectionsRef = useRef<Map<string, RTCPeerConnection>>(new Map());
   const peerVideoTrackCountRef = useRef<Map<string, number>>(new Map()); // Rastrear video tracks por peer
   const webrtcChannelRef = useRef<any>(null);
+  const realtimeChunkManagerRef = useRef<RealtimeChunkManager | null>(null);
   const selectedCameraIdRef = useRef<string>(loadCameraSettings().selectedCameraId); // Cámara seleccionada por usuario
   const [localReactions, setLocalReactions] = useState<Array<{ id: string; emoji: string }>>([]);
   const [remoteReaction, setRemoteReaction] = useState<{ emoji: string; from: string; fromName: string } | null>(null);
   const orbitControlsRef = useRef<any>(null);
   const realtimePositionsRef = useRef<Map<string, any>>(new Map());
-  
+  const chunkVecinosRef = useRef<Set<string>>(new Set());
+  const usuariosVisiblesRef = useRef<Set<string>>(new Set());
+  const [zonasEmpresa, setZonasEmpresa] = useState<ZonaEmpresa[]>([]);
+  const [zonaColisionadaId, setZonaColisionadaId] = useState<string | null>(null);
+  const solicitudesPendientesPorEmpresa = useMemo(() => {
+    return new Set(solicitudesEnviadas.map((solicitud) => solicitud.empresa_destino_id));
+  }, [solicitudesEnviadas]);
+  const zonaAccesoProxima = useMemo(() => {
+    if (!currentUserEcs.empresa_id) return null;
+    if (!Number.isFinite(currentUserEcs.x) || !Number.isFinite(currentUserEcs.y)) return null;
+
+    const zonaColisionada = zonaColisionadaId
+      ? zonasEmpresa.find((zona) => zona.id === zonaColisionadaId)
+      : null;
+
+    if (zonaColisionada) {
+      if (
+        zonaColisionada.estado === 'activa' &&
+        !zonaColisionada.es_comun &&
+        zonaColisionada.empresa_id &&
+        zonaColisionada.empresa_id !== currentUserEcs.empresa_id &&
+        !empresasAutorizadas.includes(zonaColisionada.empresa_id)
+      ) {
+        const pendiente = solicitudesPendientesPorEmpresa.has(zonaColisionada.empresa_id);
+        return { zona: zonaColisionada, distancia: 0, pendiente };
+      }
+    }
+
+    let mejor: { zona: ZonaEmpresa; distancia: number; pendiente: boolean } | null = null;
+    zonasEmpresa.forEach((zona) => {
+      if (zona.estado !== 'activa') return;
+      if (zona.es_comun) return;
+      if (!zona.empresa_id || zona.empresa_id === currentUserEcs.empresa_id) return;
+      if (empresasAutorizadas.includes(zona.empresa_id)) return;
+
+      const halfAncho = Number(zona.ancho) / 2;
+      const halfAlto = Number(zona.alto) / 2;
+      const dx = Math.max(Math.abs(currentUserEcs.x - Number(zona.posicion_x)) - halfAncho, 0);
+      const dy = Math.max(Math.abs(currentUserEcs.y - Number(zona.posicion_y)) - halfAlto, 0);
+      const distancia = Math.sqrt(dx * dx + dy * dy);
+
+      if (distancia > ZONA_SOLICITUD_RADIO) return;
+
+      const pendiente = solicitudesPendientesPorEmpresa.has(zona.empresa_id);
+      if (!mejor || distancia < mejor.distancia) {
+        mejor = { zona, distancia, pendiente };
+      }
+    });
+
+    return mejor;
+  }, [currentUserEcs.empresa_id, currentUserEcs.x, currentUserEcs.y, empresasAutorizadas, solicitudesPendientesPorEmpresa, zonasEmpresa, zonaColisionadaId]);
+
+  const handleSolicitarAccesoZona = useCallback(async () => {
+    if (!zonaAccesoProxima?.zona || solicitandoAcceso) return;
+    if (!activeWorkspace?.id || !currentUser.empresa_id || !session?.user?.id) return;
+    if (zonaAccesoProxima.pendiente) return;
+
+    setSolicitandoAcceso(true);
+    const solicitudId = await solicitarAccesoEmpresa({
+      espacioId: activeWorkspace.id,
+      empresaOrigenId: currentUser.empresa_id,
+      empresaDestinoId: zonaAccesoProxima.zona.empresa_id,
+      usuarioId: session.user.id,
+    });
+    if (solicitudId) {
+      await cargarSolicitudesPendientes();
+      setNotificacionAutorizacion({
+        id: solicitudId,
+        titulo: 'Solicitud enviada',
+        mensaje: 'La empresa recibirá tu solicitud en instantes.',
+        tipo: 'solicitud_autorizacion_empresa',
+        datos_extra: { empresa_destino_id: zonaAccesoProxima.zona.empresa_id },
+      });
+    }
+    setSolicitandoAcceso(false);
+  }, [activeWorkspace?.id, cargarSolicitudesPendientes, currentUser.empresa_id, session?.user?.id, solicitandoAcceso, zonaAccesoProxima]);
+
+  const limpiarLivekit = useCallback(async () => {
+    const room = livekitRoomRef.current;
+    if (room) {
+      room.removeAllListeners();
+      await room.disconnect();
+    }
+    if (livekitLocalTracksRef.current.audio) {
+      livekitLocalTracksRef.current.audio.stop();
+    }
+    if (livekitLocalTracksRef.current.video) {
+      livekitLocalTracksRef.current.video.stop();
+    }
+    if (livekitLocalTracksRef.current.screen) {
+      livekitLocalTracksRef.current.screen.stop();
+    }
+    livekitRoomRef.current = null;
+    livekitRoomNameRef.current = null;
+    setLivekitConnected(false);
+    setRemoteStreams(new Map());
+    setRemoteScreenStreams(new Map());
+    setRemoteAudioTracks(new Map());
+    livekitLocalTracksRef.current = {};
+  }, []);
+
+  const obtenerEmpresaParticipante = useCallback((metadata?: string | null) => {
+    if (!metadata) return null;
+    try {
+      const data = JSON.parse(metadata);
+      return data?.empresa_id ?? null;
+    } catch (error) {
+      return null;
+    }
+  }, []);
+
+  const permitirMediaParticipante = useCallback((metadata?: string | null) => {
+    if (!currentUser.empresa_id) return true;
+    const empresaParticipante = obtenerEmpresaParticipante(metadata);
+    if (!empresaParticipante) return true;
+    if (empresaParticipante === currentUser.empresa_id) return true;
+    return empresasAutorizadas.includes(empresaParticipante);
+  }, [currentUser.empresa_id, obtenerEmpresaParticipante, empresasAutorizadas]);
+
+  const despublicarTrackLocal = useCallback(async (tipo: 'audio' | 'video' | 'screen') => {
+    const room = livekitRoomRef.current;
+    const existing = livekitLocalTracksRef.current[tipo];
+    if (!room || !existing) return;
+    try {
+      room.localParticipant.unpublishTrack(existing);
+    } catch (error) {
+      console.warn('Error despublicando track LiveKit:', error);
+    }
+    existing.stop();
+    livekitLocalTracksRef.current[tipo] = undefined;
+  }, []);
+
+  const publicarTrackLocal = useCallback(async (track: MediaStreamTrack, tipo: 'audio' | 'video' | 'screen') => {
+    const room = livekitRoomRef.current;
+    if (!room || room.state !== 'connected') return;
+    const existing = livekitLocalTracksRef.current[tipo];
+    if (existing?.mediaStreamTrack?.id === track.id) return;
+    // Si ya hay un track publicado del mismo tipo, usar replaceTrack (sin interrupción)
+    if (existing && existing.mediaStreamTrack) {
+      try {
+        await existing.replaceTrack(track);
+        console.log(`[LIVEKIT] Track ${tipo} reemplazado sin interrupción (replaceTrack)`);
+        return;
+      } catch (error) {
+        console.warn(`[LIVEKIT] replaceTrack falló para ${tipo}, re-publicando:`, error);
+        try { room.localParticipant.unpublishTrack(existing); } catch (_) {}
+        existing.stop();
+      }
+    }
+    // Primera publicación o fallback tras error de replaceTrack
+    const localTrack = tipo === 'audio' ? new LocalAudioTrack(track) : new LocalVideoTrack(track);
+    livekitLocalTracksRef.current[tipo] = localTrack;
+    await room.localParticipant.publishTrack(localTrack, {
+      source: tipo === 'screen' ? Track.Source.ScreenShare : tipo === 'video' ? Track.Source.Camera : Track.Source.Microphone,
+    });
+    console.log(`[LIVEKIT] Track ${tipo} publicado por primera vez`);
+  }, []);
+
+  const sincronizarTracksLocales = useCallback(async () => {
+    if (!USAR_LIVEKIT) return;
+    const room = livekitRoomRef.current;
+    if (!room || room.state !== 'connected') {
+      console.log('[LIVEKIT] sincronizarTracks skipped — room state:', room?.state);
+      return;
+    }
+
+    const streamActual = activeStreamRef.current;
+    const audioTrack = streamActual?.getAudioTracks()[0];
+    if (audioTrack) {
+      await publicarTrackLocal(audioTrack, 'audio');
+      audioTrack.enabled = !!currentUser.isMicOn;
+    } else {
+      await despublicarTrackLocal('audio');
+    }
+
+    if (currentUser.isCameraOn) {
+      // Buscar un video track VIVO (readyState === 'live'), preferir effectiveStream
+      let videoTrack = effectiveStreamRef.current?.getVideoTracks().find(t => t.readyState === 'live');
+      if (!videoTrack) {
+        videoTrack = streamActual?.getVideoTracks().find(t => t.readyState === 'live');
+      }
+      if (videoTrack) {
+        await publicarTrackLocal(videoTrack, 'video');
+      } else {
+        console.log('[LIVEKIT] No live video track available yet');
+        await despublicarTrackLocal('video');
+      }
+    } else {
+      await despublicarTrackLocal('video');
+    }
+
+    if (currentUser.isScreenSharing) {
+      const screenTrack = activeScreenRef.current?.getVideoTracks()[0];
+      if (screenTrack) {
+        await publicarTrackLocal(screenTrack, 'screen');
+      } else {
+        await despublicarTrackLocal('screen');
+      }
+    } else {
+      await despublicarTrackLocal('screen');
+    }
+  }, [USAR_LIVEKIT, currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, publicarTrackLocal, despublicarTrackLocal]);
+
+  const conectarLivekit = useCallback(async (roomName: string) => {
+    if (!USAR_LIVEKIT || !activeWorkspace?.id || !session?.access_token) return;
+    if (livekitRoomNameRef.current === roomName) return;
+    if (livekitConnectingRef.current) {
+      console.log('[LIVEKIT] Already connecting, skipping duplicate attempt');
+      return;
+    }
+
+    try {
+    livekitConnectingRef.current = true;
+    await limpiarLivekit();
+
+    const tokenData = await obtenerTokenLivekitEspacio({
+      roomName,
+      espacioId: activeWorkspace.id,
+      accessToken: session.access_token,
+      empresaId: currentUser.empresa_id,
+      departamentoId: currentUser.departamento_id,
+    });
+    console.log('[LIVEKIT] Connecting to:', tokenData.url, 'room:', roomName);
+
+    const room = new Room({
+      adaptiveStream: true,
+      dynacast: true,
+      reconnectPolicy: {
+        nextRetryDelayInMs: (context) => {
+          if (context.retryCount > 5) return null;
+          return Math.min(1000 * Math.pow(2, context.retryCount), 16000);
+        },
+      },
+      publishDefaults: {
+        simulcast: true,
+        videoSimulcastLayers: [VideoPresets.h90, VideoPresets.h216, VideoPresets.h540],
+        screenShareSimulcastLayers: [VideoPresets.h216, VideoPresets.h540],
+      },
+    });
+
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      console.log(`[LIVEKIT TrackSubscribed] from=${participant?.identity} kind=${track?.kind} source=${track?.source} allowed=${permitirMediaParticipante(participant?.metadata)}`);
+      if (!participant || !track || !permitirMediaParticipante(participant.metadata)) return;
+      if (track.kind === Track.Kind.Video) {
+        const stream = new MediaStream([track.mediaStreamTrack]);
+        if (track.source === Track.Source.ScreenShare) {
+          setRemoteScreenStreams(prev => new Map(prev).set(participant.identity, stream));
+        } else {
+          setRemoteStreams(prev => new Map(prev).set(participant.identity, stream));
+          console.log(`[LIVEKIT] Remote video stream set for ${participant.identity}, track.readyState=${track.mediaStreamTrack.readyState}`);
+        }
+      }
+      if (track.kind === Track.Kind.Audio) {
+        setRemoteAudioTracks(prev => new Map(prev).set(participant.identity, track.mediaStreamTrack));
+      }
+    });
+
+    room.on(RoomEvent.TrackPublished, (_publication, _participant) => {
+      // Suscripción controlada por proximidad — ver useEffect de suscripción selectiva
+    });
+
+    room.on(RoomEvent.ParticipantConnected, (_participant) => {
+      // Suscripción controlada por proximidad — ver useEffect de suscripción selectiva
+    });
+
+    room.on(RoomEvent.ParticipantMetadataChanged, (_metadata, _participant) => {
+      // Suscripción controlada por proximidad — ver useEffect de suscripción selectiva
+    });
+
+    room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      if (!participant || !track) return;
+      if (track.kind === Track.Kind.Video) {
+        if (track.source === Track.Source.ScreenShare) {
+          setRemoteScreenStreams(prev => {
+            const next = new Map(prev);
+            next.delete(participant.identity);
+            return next;
+          });
+        } else {
+          setRemoteStreams(prev => {
+            const next = new Map(prev);
+            next.delete(participant.identity);
+            return next;
+          });
+        }
+      }
+      if (track.kind === Track.Kind.Audio) {
+        setRemoteAudioTracks(prev => {
+          const next = new Map(prev);
+          next.delete(participant.identity);
+          return next;
+        });
+      }
+    });
+
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      setRemoteStreams(prev => {
+        const next = new Map(prev);
+        next.delete(participant.identity);
+        return next;
+      });
+      setRemoteScreenStreams(prev => {
+        const next = new Map(prev);
+        next.delete(participant.identity);
+        return next;
+      });
+      setRemoteAudioTracks(prev => {
+        const next = new Map(prev);
+        next.delete(participant.identity);
+        return next;
+      });
+    });
+
+    room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+      const active = new Set(speakers.map((p) => p.identity));
+      if (room.localParticipant.isSpeaking) {
+        active.add(room.localParticipant.identity);
+      }
+      setSpeakingUsers(active);
+    });
+
+    room.on(RoomEvent.Disconnected, () => {
+      console.log('[LIVEKIT] Disconnected — limpiando para permitir reconexión');
+      livekitRoomNameRef.current = null;
+      livekitRoomRef.current = null;
+      setLivekitConnected(false);
+    });
+
+    room.on(RoomEvent.Reconnecting, () => {
+      console.log('[LIVEKIT] Reconnecting...');
+    });
+    room.on(RoomEvent.Reconnected, () => {
+      console.log('[LIVEKIT] Reconnected successfully');
+    });
+
+    await room.connect(tokenData.url, tokenData.token, { autoSubscribe: false });
+    console.log('[LIVEKIT] Connected successfully to room:', roomName);
+    livekitRoomRef.current = room;
+    livekitRoomNameRef.current = roomName;
+    livekitConnectingRef.current = false;
+    setLivekitConnected(true);
+
+    } catch (err: any) {
+      console.error('[LIVEKIT] Connection failed:', err.message);
+      livekitRoomNameRef.current = null;
+      livekitRoomRef.current = null;
+      livekitConnectingRef.current = false;
+      setLivekitConnected(false);
+    }
+  }, [USAR_LIVEKIT, activeWorkspace?.id, session?.access_token, currentUser.empresa_id, currentUser.departamento_id, limpiarLivekit, permitirMediaParticipante]);
+
+  const hayOtrosUsuariosOnline = onlineUsers.length > 0;
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !activeWorkspace?.id) return;
+
+    if (hayOtrosUsuariosOnline) {
+      // Hay otros usuarios → conectar a LiveKit (si no estamos ya conectados)
+      const roomName = crearSalaLivekitPorEspacio(activeWorkspace.id);
+      conectarLivekit(roomName).catch((error) => {
+        console.error('Error conectando LiveKit:', error);
+      });
+    } else {
+      // Solo en el espacio → desconectar LiveKit (ahorra recursos)
+      if (livekitRoomRef.current) {
+        console.log('[LIVEKIT] Sin otros usuarios online — desconectando');
+        limpiarLivekit().catch(() => {});
+      }
+    }
+  }, [USAR_LIVEKIT, activeWorkspace?.id, hayOtrosUsuariosOnline, conectarLivekit, limpiarLivekit]);
+
+  useEffect(() => {
+    if (!USAR_LIVEKIT) return;
+    return () => {
+      limpiarLivekit().catch(() => {});
+    };
+  }, [USAR_LIVEKIT, limpiarLivekit]);
+
+  // NOTA: useEffect de sincronización de tracks movido después de hasActiveCall (línea ~2990)
+
   // Estado de grabación
   const [isRecording, setIsRecording] = useState(false);
   const [recordingDuration, setRecordingDuration] = useState(0);
@@ -1814,16 +3180,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const usersInCall = useMemo(() => {
     const nextConnectedUsers = new Set<string>();
     
-    const users = onlineUsers.filter(u => {
+    const users = usuariosEnChunks.filter(u => {
       // Excluir al usuario actual
       if (u.id === session?.user?.id) return false;
+      if (u.esFantasma) return false;
       
       // Validar coordenadas (ignorar 0,0 que suele ser inicialización)
-      if ((u.x === 0 && u.y === 0) || typeof u.x !== 'number' || typeof u.y !== 'number' || typeof currentUser.x !== 'number' || typeof currentUser.y !== 'number') {
+      if ((u.x === 0 && u.y === 0) || typeof u.x !== 'number' || typeof u.y !== 'number' || typeof currentUserEcs.x !== 'number' || typeof currentUserEcs.y !== 'number') {
         return false;
       }
 
-      const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
+      const dist = Math.sqrt(Math.pow(u.x - currentUserEcs.x, 2) + Math.pow(u.y - currentUserEcs.y, 2));
       
       const wasInCall = connectedUsersRef.current.has(u.id);
       
@@ -1858,23 +3225,292 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     
     connectedUsersRef.current = nextConnectedUsers;
     return users;
-  }, [onlineUsers, currentUser.x, currentUser.y, session?.user?.id, currentUser.isScreenSharing, userProximityRadius]);
+  }, [usuariosEnChunks, currentUserEcs.x, currentUserEcs.y, session?.user?.id, currentUser.isScreenSharing, userProximityRadius]);
 
   const hasActiveCall = usersInCall.length > 0;
-  
+  hasActiveCallRef.current = hasActiveCall;
+  // Set de IDs en proximidad — para controlar bubbles per-user (no bubble en proximidad, sí en rango espacial)
+  const usersInCallIds = useMemo(() => new Set(usersInCall.map(u => u.id)), [usersInCall]);
+
+  // Usuarios dentro del radio de audio espacial (más amplio que proximidad)
+  // Permite que el audio se escuche por el pasillo hasta distancia media (estilo Gather)
+  // NOTA: NO vaciar cuando spatialAudio está off — este array se usa para suscripciones LiveKit y routing de streams
+  const usersInAudioRange = useMemo(() => {
+    const audioRadius = userProximityRadius * AUDIO_SPATIAL_RADIUS_FACTOR;
+    const idsEnProximidad = new Set(usersInCall.map(u => u.id));
+    return usuariosEnChunks.filter(u => {
+      if (u.id === session?.user?.id) return false;
+      if (u.esFantasma) return false;
+      if (idsEnProximidad.has(u.id)) return false; // Ya están en usersInCall
+      if ((u.x === 0 && u.y === 0) || typeof u.x !== 'number' || typeof u.y !== 'number') return false;
+      const dist = Math.sqrt(Math.pow(u.x - currentUserEcs.x, 2) + Math.pow(u.y - currentUserEcs.y, 2));
+      return dist < audioRadius;
+    });
+  }, [usuariosEnChunks, currentUserEcs.x, currentUserEcs.y, session?.user?.id, userProximityRadius, usersInCall]);
+  // Set de IDs en rango de audio espacial — cam bubbles SOLO para estos usuarios
+  const usersInAudioRangeIds = useMemo(() => new Set(usersInAudioRange.map(u => u.id)), [usersInAudioRange]);
+
+  // Sincronizar tracks locales cuando cambian mic/cam/screen (solo si hay proximidad)
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected || !hasActiveCall) return;
+    sincronizarTracksLocales().catch((error) => {
+      console.warn('Error sincronizando tracks LiveKit:', error);
+    });
+  }, [USAR_LIVEKIT, livekitConnected, hasActiveCall, currentUser.isMicOn, currentUser.isCameraOn, currentUser.isScreenSharing, stream, screenStream, sincronizarTracksLocales]);
+
   // Calcular distancias de usuarios para audio espacial
   const userDistances = useMemo(() => {
     const distances = new Map<string, number>();
     usersInCall.forEach(u => {
-      const dist = Math.sqrt(Math.pow(u.x - currentUser.x, 2) + Math.pow(u.y - currentUser.y, 2));
+      const dist = Math.sqrt(Math.pow(u.x - currentUserEcs.x, 2) + Math.pow(u.y - currentUserEcs.y, 2));
       distances.set(u.id, dist);
     });
     return distances;
-  }, [usersInCall, currentUser.x, currentUser.y]);
-  
+  }, [usersInCall, currentUserEcs.x, currentUserEcs.y]);
+
+  const maxVideoStreams = useMemo(() => {
+    const limite = Number(performanceSettings.maxVideoStreams ?? 8);
+    return Number.isFinite(limite) ? Math.max(1, limite) : 8;
+  }, [performanceSettings.maxVideoStreams]);
+
+  const prioritizedVideoIds = useMemo(() => {
+    const inCallIds = usersInCall.map((u) => u.id);
+    const audioRangeIds = usersInAudioRange.map((u) => u.id);
+    const speakingFirst = inCallIds.filter((id) => speakingUsers.has(id));
+    const rest = inCallIds.filter((id) => !speakingUsers.has(id));
+
+    rest.sort((a, b) => {
+      const distA = userDistances.get(a) ?? Number.MAX_SAFE_INTEGER;
+      const distB = userDistances.get(b) ?? Number.MAX_SAFE_INTEGER;
+      return distA - distB;
+    });
+
+    // Incluir usuarios en rango espacial (cam bubble + audio a distancia media)
+    return Array.from(new Set([...speakingFirst, ...rest, ...audioRangeIds]));
+  }, [usersInCall, usersInAudioRange, speakingUsers, userDistances]);
+
+  const allowedVideoIds = useMemo(() => {
+    const screenIds = new Set<string>();
+    remoteScreenStreams.forEach((stream, id) => {
+      if (stream?.getVideoTracks().length) {
+        screenIds.add(id);
+      }
+    });
+
+    const allowed = new Set<string>(screenIds);
+    // Límite base + rango espacial (cam bubbles a distancia no cuentan contra el límite principal)
+    const limite = maxVideoStreams + screenIds.size + usersInAudioRange.length;
+    prioritizedVideoIds.forEach((id) => {
+      if (allowed.size >= limite) return;
+      allowed.add(id);
+    });
+    return allowed;
+  }, [maxVideoStreams, prioritizedVideoIds, remoteScreenStreams, usersInAudioRange.length]);
+
+  const remoteStreamsRouted = useMemo(() => {
+    const next = new Map<string, MediaStream>();
+    remoteStreams.forEach((stream, id) => {
+      if (allowedVideoIds.has(id)) {
+        next.set(id, stream);
+      }
+    });
+    return next;
+  }, [remoteStreams, allowedVideoIds]);
+
+  const remoteScreenStreamsRouted = useMemo(() => {
+    const next = new Map<string, MediaStream>();
+    remoteScreenStreams.forEach((stream, id) => {
+      if (allowedVideoIds.has(id)) {
+        next.set(id, stream);
+      }
+    });
+    return next;
+  }, [remoteScreenStreams, allowedVideoIds]);
+
+  // === SUSCRIPCIÓN SELECTIVA POR PROXIMIDAD + AUDIO ESPACIAL (patrón Gather/LiveKit HQ) ===
+  // Nivel 1: Proximidad (usersInCall) → subscribe ALL tracks (audio + video)
+  // Nivel 2: Audio range (usersInAudioRange) → subscribe AUDIO-ONLY tracks (audio espacial por el pasillo)
+  const livekitSubscribedIdsRef = useRef<Set<string>>(new Set());
+  const livekitAudioOnlyIdsRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected) return;
+    const room = livekitRoomRef.current;
+    if (!room) return;
+
+    const idsEnProximidad = new Set(usersInCall.map(u => u.id));
+    const idsEnAudioRange = new Set(usersInAudioRange.map(u => u.id));
+    const idsPreviosProximidad = livekitSubscribedIdsRef.current;
+    const idsPreviosAudio = livekitAudioOnlyIdsRef.current;
+
+    // === NIVEL 1: Proximidad completa (audio + video) ===
+    idsEnProximidad.forEach(userId => {
+      if (!idsPreviosProximidad.has(userId)) {
+        const participant = room.getParticipantByIdentity(userId);
+        if (participant) {
+          // Si estaba en audio-only, ya tiene audio suscrito → solo agregar video
+          const wasAudioOnly = idsPreviosAudio.has(userId);
+          let subsCount = 0;
+          participant.trackPublications.forEach(pub => {
+            if (pub instanceof RemoteTrackPublication && !pub.isSubscribed) {
+              pub.setSubscribed(true);
+              subsCount++;
+            }
+          });
+          console.log(`[LIVEKIT SUBSCRIBE] ${userId} — ${subsCount} tracks suscritos${wasAudioOnly ? ' (upgrade de audio-only)' : ''}`);
+        }
+      }
+    });
+
+    // === NIVEL 2: Rango espacial (audio + video para cam bubble a distancia media) ===
+    idsEnAudioRange.forEach(userId => {
+      // Bug 3 Fix: Evitar race condition. Si ya está en proximidad, NO suscribir como rango espacial (ya está en Nivel 1)
+      if (!idsPreviosAudio.has(userId) && !idsEnProximidad.has(userId) && !idsPreviosProximidad.has(userId)) {
+        const participant = room.getParticipantByIdentity(userId);
+        if (participant) {
+          let subsCount = 0;
+          participant.trackPublications.forEach(pub => {
+            if (pub instanceof RemoteTrackPublication && !pub.isSubscribed) {
+              pub.setSubscribed(true);
+              subsCount++;
+            }
+          });
+          if (subsCount > 0) console.log(`[LIVEKIT SPATIAL RANGE] ${userId} — ${subsCount} tracks suscritos (rango espacial, cam bubble + audio)`);
+        }
+      }
+    });
+
+    // === DESUSCRIBIR: un solo pase sobre TODOS los usuarios previos (evita race conditions) ===
+    const todosPrevios = new Set([...idsPreviosProximidad, ...idsPreviosAudio]);
+    todosPrevios.forEach(userId => {
+      // Si sigue en proximidad O en rango espacial → no tocar
+      if (idsEnProximidad.has(userId) || idsEnAudioRange.has(userId)) {
+        if (idsPreviosProximidad.has(userId) && !idsEnProximidad.has(userId) && idsEnAudioRange.has(userId)) {
+          console.log(`[LIVEKIT DOWNGRADE] ${userId} — tracks mantenidos (rango espacial, cam bubble visible)`);
+        }
+        return;
+      }
+      // Salió de TODOS los rangos → desuscribir todo
+      const participant = room.getParticipantByIdentity(userId);
+      if (participant) {
+        participant.trackPublications.forEach(pub => {
+          if (pub instanceof RemoteTrackPublication && pub.isSubscribed) {
+            pub.setSubscribed(false);
+          }
+        });
+        console.log(`[LIVEKIT UNSUBSCRIBE] ${userId} — tracks desuscritos (fuera de todos los rangos)`);
+      }
+    });
+
+    livekitSubscribedIdsRef.current = idsEnProximidad;
+    livekitAudioOnlyIdsRef.current = idsEnAudioRange;
+  }, [USAR_LIVEKIT, livekitConnected, usersInCall, usersInAudioRange]);
+
+  // Suscribir tracks nuevos de participantes ya en proximidad o rango de audio
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected) return;
+    const room = livekitRoomRef.current;
+    if (!room) return;
+
+    const handleTrackPublished = (publication: any, participant: any) => {
+      if (!participant) return;
+      const enProximidad = livekitSubscribedIdsRef.current.has(participant.identity);
+      const enAudioRange = livekitAudioOnlyIdsRef.current.has(participant.identity);
+      if (enProximidad && !publication.isSubscribed) {
+        publication.setSubscribed(true);
+        console.log(`[LIVEKIT SUBSCRIBE] Nuevo track de ${participant.identity} suscrito (ya en proximidad)`);
+      } else if (enAudioRange && !publication.isSubscribed) {
+        publication.setSubscribed(true);
+        console.log(`[LIVEKIT SPATIAL RANGE] Nuevo track de ${participant.identity} suscrito (rango espacial)`);
+      }
+    };
+
+    room.on(RoomEvent.TrackPublished, handleTrackPublished);
+    return () => {
+      room.off(RoomEvent.TrackPublished, handleTrackPublished);
+    };
+  }, [USAR_LIVEKIT, livekitConnected]);
+
+  // Despublicar tracks locales cuando no hay nadie en proximidad NI en rango de audio
+  const hasAnyoneNearby = hasActiveCall || usersInAudioRange.length > 0;
+  const prevHasAnyoneNearbyRef = useRef(false);
+  const prevHasActiveCallRef = useRef(false);
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected) return;
+    const room = livekitRoomRef.current;
+    if (!room) return;
+
+    if (!hasAnyoneNearby && prevHasAnyoneNearbyRef.current) {
+      // Salieron todos de proximidad Y rango de audio → despublicar todo
+      ['audio', 'video', 'screen'].forEach(tipo => {
+        despublicarTrackLocal(tipo as 'audio' | 'video' | 'screen').catch(() => {});
+      });
+      console.log('[LIVEKIT] Sin usuarios cercanos — tracks locales despublicados');
+    } else if (!hasActiveCall && prevHasActiveCallRef.current && usersInAudioRange.length > 0) {
+      // Salieron de proximidad pero quedan en rango audio → despublicar video, mantener audio
+      ['video', 'screen'].forEach(tipo => {
+        despublicarTrackLocal(tipo as 'audio' | 'video' | 'screen').catch(() => {});
+      });
+      console.log('[LIVEKIT] Sin proximidad pero con rango audio — video despublicado, audio mantenido');
+    } else if (hasActiveCall && !prevHasActiveCallRef.current) {
+      // Alguien entró en proximidad → publicar tracks locales con delay para estabilidad
+      const delay = setTimeout(() => {
+        if (livekitRoomRef.current?.state === 'connected') {
+          sincronizarTracksLocales().catch(() => {});
+          console.log('[LIVEKIT] Usuario en proximidad — sincronizando tracks locales (post-delay)');
+        } else {
+          console.log('[LIVEKIT] Room no está connected, esperando...');
+        }
+      }, 1500);
+      return () => clearTimeout(delay);
+    } else if (hasAnyoneNearby && !prevHasAnyoneNearbyRef.current && !hasActiveCall) {
+      // Alguien entró en rango espacial → publicar audio + video (cam bubble + audio espacial)
+      const delay = setTimeout(async () => {
+        if (livekitRoomRef.current?.state === 'connected') {
+          sincronizarTracksLocales().catch(() => {});
+          console.log('[LIVEKIT] Usuario en rango espacial — sincronizando tracks (cam bubble + audio espacial)');
+        }
+      }, 1000);
+      return () => clearTimeout(delay);
+    }
+
+    prevHasAnyoneNearbyRef.current = hasAnyoneNearby;
+    prevHasActiveCallRef.current = hasActiveCall;
+  }, [USAR_LIVEKIT, livekitConnected, hasActiveCall, hasAnyoneNearby, usersInAudioRange.length, despublicarTrackLocal, sincronizarTracksLocales, stream, publicarTrackLocal]);
+
+  // Re-publicar video cuando effectiveStream cambia (blur, fondo, etc.)
+  const prevEffectiveStreamRef = useRef<MediaStream | null>(null);
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected || !hasActiveCall || !currentUser.isCameraOn) return;
+    const room = livekitRoomRef.current;
+    if (!room || room.state !== 'connected') return;
+    // Evitar republicar si el stream no cambió realmente
+    if (effectiveStream === prevEffectiveStreamRef.current) return;
+    // Si hay efecto activo pero processedStream aún no está listo, esperar
+    if (cameraSettings.backgroundEffect !== 'none' && !processedStream) {
+      console.log('[LIVEKIT] Esperando processedStream para efecto:', cameraSettings.backgroundEffect);
+      return;
+    }
+
+    const debounce = setTimeout(async () => {
+      const videoTrack = effectiveStream?.getVideoTracks().find(t => t.readyState === 'live');
+      if (videoTrack) {
+        try {
+          await publicarTrackLocal(videoTrack, 'video');
+          prevEffectiveStreamRef.current = effectiveStream;
+          console.log('[LIVEKIT] Video track re-publicado tras cambio de efecto');
+        } catch (e) {
+          console.error('[LIVEKIT] Error re-publicando video track:', e);
+        }
+      } else {
+        console.log('[LIVEKIT] effectiveStream no tiene video track live, skipping');
+      }
+    }, 800);
+    return () => clearTimeout(debounce);
+  }, [USAR_LIVEKIT, livekitConnected, effectiveStream, processedStream, hasActiveCall, currentUser.isCameraOn, cameraSettings.backgroundEffect, publicarTrackLocal]);
+
   // Speaker detection - analizar nivel de audio
   useEffect(() => {
-    if (!stream) return;
+    if (USAR_LIVEKIT || !stream) return;
     
     // Crear AudioContext si no existe
     if (!audioContextRef.current) {
@@ -1916,6 +3552,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   
   // Audio espacial - ajustar volumen según distancia (solo si spatialAudio está activado)
   useEffect(() => {
+    if (USAR_LIVEKIT) return;
     remoteStreams.forEach((remoteStream, oderId) => {
       let volume = 1;
       if (space3dSettings.spatialAudio) {
@@ -1929,10 +3566,113 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         (el as HTMLVideoElement).volume = volume;
       });
     });
-  }, [remoteStreams, userDistances, userProximityRadius, space3dSettings.spatialAudio]);
+  }, [USAR_LIVEKIT, remoteStreams, userDistances, userProximityRadius, space3dSettings.spatialAudio]);
   
+  const enviarDataLivekit = useCallback((mensaje: { type: string; payload: Record<string, any> }, reliable = true) => {
+    if (!USAR_LIVEKIT) return false;
+    const room = livekitRoomRef.current;
+    if (!room) return false;
+    const encoder = new TextEncoder();
+    const data = encoder.encode(JSON.stringify(mensaje));
+    room.localParticipant.publishData(data, { reliable }).catch((error) => {
+      console.warn('Error enviando data LiveKit:', error);
+    });
+    return true;
+  }, [USAR_LIVEKIT]);
+
+  const manejarEventoInstantaneo = useCallback((mensaje: { type: string; payload: any }) => {
+    if (!mensaje?.type || !mensaje.payload || !session?.user?.id) return;
+
+    if (mensaje.type === 'reaction') {
+      if (mensaje.payload.from === session.user.id) return;
+      setRemoteReaction({ emoji: mensaje.payload.emoji, from: mensaje.payload.from, fromName: mensaje.payload.fromName });
+      setTimeout(() => setRemoteReaction(null), 3000);
+      return;
+    }
+
+    if (mensaje.type === 'wave') {
+      if (mensaje.payload.from === session.user.id) return;
+      if (mensaje.payload.to && mensaje.payload.to !== session.user.id) return;
+      setIncomingWave({ from: mensaje.payload.from, fromName: mensaje.payload.fromName });
+      return;
+    }
+
+    if (mensaje.type === 'chat') {
+      if (mensaje.payload.from === session.user.id) return;
+      setRemoteMessages(prev => {
+        const newMap = new Map(prev);
+        newMap.set(mensaje.payload.from, mensaje.payload.message);
+        return newMap;
+      });
+
+      const ns = getSettingsSection('notifications');
+      if (ns.newMessageSound) {
+        sendDesktopNotification(`💬 ${mensaje.payload.fromName}`, mensaje.payload.message);
+      }
+      if (ns.mentionNotifications && mensaje.payload.message?.includes(`@${currentUser.name}`)) {
+        sendDesktopNotification(`📢 Mención de ${mensaje.payload.fromName}`, mensaje.payload.message);
+      }
+
+      setTimeout(() => {
+        setRemoteMessages(prev => {
+          const newMap = new Map(prev);
+          newMap.delete(mensaje.payload.from);
+          return newMap;
+        });
+      }, 5000);
+      return;
+    }
+
+    if (mensaje.type === 'movement') {
+      if (mensaje.payload.id === session.user.id) return;
+      if (!usuariosVisiblesRef.current.has(mensaje.payload.id)) return;
+      // No filtrar por chunk — usuarios de misma empresa ya están en usuariosEnChunks
+      // El chunk filter aquí bloqueaba datos de movimiento de compañeros lejanos
+      realtimePositionsRef.current.set(mensaje.payload.id, {
+        x: mensaje.payload.x,
+        y: mensaje.payload.y,
+        direction: mensaje.payload.direction,
+        isMoving: mensaje.payload.isMoving,
+        animState: mensaje.payload.animState || (mensaje.payload.isMoving ? 'walk' : 'idle'),
+        timestamp: Date.now(), // Usar hora de recepción para evitar problemas de clock skew
+      });
+      actualizarEstadoUsuarioEcs(
+        ecsStateRef.current,
+        mensaje.payload.id,
+        mensaje.payload.x / 16,
+        mensaje.payload.y / 16,
+        mensaje.payload.direction,
+        mensaje.payload.isMoving
+      );
+    }
+  }, [session?.user?.id, currentUser.name]);
+
+  useEffect(() => {
+    if (!USAR_LIVEKIT || !livekitConnected) return;
+    const room = livekitRoomRef.current;
+    if (!room) return;
+
+    const manejarData = (payload: Uint8Array) => {
+      try {
+        const decoder = new TextDecoder();
+        const mensaje = JSON.parse(decoder.decode(payload));
+        manejarEventoInstantaneo(mensaje);
+      } catch (error) {
+        console.warn('Error parseando DataChannel LiveKit:', error);
+      }
+    };
+
+    room.on(RoomEvent.DataReceived, manejarData);
+    return () => {
+      room.off(RoomEvent.DataReceived, manejarData);
+    };
+  }, [USAR_LIVEKIT, livekitConnected, manejarEventoInstantaneo]);
+
   // Función para enviar wave a un usuario
   const handleWaveUser = useCallback((userId: string) => {
+    if (enviarDataLivekit({ type: 'wave', payload: { to: userId, from: session?.user?.id, fromName: currentUser.name } })) {
+      return;
+    }
     if (webrtcChannelRef.current && session?.user?.id) {
       webrtcChannelRef.current.send({
         type: 'broadcast',
@@ -1940,11 +3680,35 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         payload: { to: userId, from: session.user.id, fromName: currentUser.name }
       });
     }
-  }, [session?.user?.id, currentUser.name]);
+  }, [enviarDataLivekit, session?.user?.id, currentUser.name]);
 
   // Función para broadcast de movimiento (alta frecuencia)
   const webrtcChannelSubscribedRef = useRef(false);
-  const broadcastMovement = useCallback((x: number, y: number, direction: string, isMoving: boolean) => {
+  const lastMovementSentRef = useRef(0);
+  const broadcastMovement = useCallback((x: number, y: number, direction: string, isMoving: boolean, animState?: string, reliable: boolean = false) => {
+    const now = Date.now();
+    // Permitir broadcast inmediato si es reliable (cambio de estado importante), sino respetar throttle
+    if (!reliable && now - lastMovementSentRef.current < MOVEMENT_BROADCAST_MS) return;
+    
+    lastMovementSentRef.current = now;
+    if (session?.user?.id) {
+      actualizarEstadoUsuarioEcs(ecsStateRef.current, session.user.id, x / 16, y / 16, direction, isMoving);
+    }
+    if (enviarDataLivekit({
+      type: 'movement',
+      payload: {
+        id: session?.user?.id,
+        x,
+        y,
+        direction,
+        isMoving,
+        animState: animState || (isMoving ? 'walk' : 'idle'),
+        chunk: obtenerChunk(x, y).clave,
+        timestamp: Date.now(),
+      }
+    }, reliable)) {
+      return;
+    }
     if (webrtcChannelRef.current && session?.user?.id && webrtcChannelSubscribedRef.current) {
       webrtcChannelRef.current.send({
         type: 'broadcast',
@@ -1955,11 +3719,26 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           y, 
           direction, 
           isMoving,
+          animState: animState || (isMoving ? 'walk' : 'idle'),
+          chunk: obtenerChunk(x, y).clave,
           timestamp: Date.now()
         }
       });
     }
-  }, [session?.user?.id]);
+  }, [enviarDataLivekit, session?.user?.id]);
+
+  useEffect(() => {
+    if (!USAR_LIVEKIT) return;
+    if (realtimeChunkManagerRef.current) {
+      realtimeChunkManagerRef.current.destruir();
+      realtimeChunkManagerRef.current = null;
+    }
+    webrtcChannelRef.current = null;
+    webrtcChannelSubscribedRef.current = false;
+    peerConnectionsRef.current.forEach(pc => pc.close());
+    peerConnectionsRef.current.clear();
+    peerVideoTrackCountRef.current.clear();
+  }, [USAR_LIVEKIT]);
 
   // Activar mic/cam cuando hay usuarios cerca (respetando settings de reuniones)
   useEffect(() => {
@@ -2048,12 +3827,14 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     setTimeout(() => setLocalMessage(null), 5000);
     
     // 2. Broadcast a otros usuarios para burbuja
-    if (webrtcChannelRef.current) {
-      webrtcChannelRef.current.send({
-        type: 'broadcast',
-        event: 'chat',
-        payload: { message: content, from: session.user.id, fromName: currentUser.name }
-      });
+    if (!enviarDataLivekit({ type: 'chat', payload: { message: content, from: session.user.id, fromName: currentUser.name } })) {
+      if (webrtcChannelRef.current) {
+        webrtcChannelRef.current.send({
+          type: 'broadcast',
+          event: 'chat',
+          payload: { message: content, from: session.user.id, fromName: currentUser.name }
+        });
+      }
     }
     
     // 3. Persistir mensaje (solo a usuarios cercanos en llamada)
@@ -2064,7 +3845,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     
     setChatInput('');
     setShowChat(false);
-  }, [chatInput, session?.user?.id, currentUser.name, usersInCall, activeWorkspace?.id]);
+  }, [chatInput, session?.user?.id, currentUser.name, usersInCall, activeWorkspace?.id, enviarDataLivekit]);
 
   // Toggle grabación
   const handleToggleRecording = useCallback(async () => {
@@ -2089,14 +3870,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     }, 2000);
     
     // Enviar reacción a otros usuarios por el canal WebRTC
-    if (webrtcChannelRef.current && session?.user?.id) {
-      webrtcChannelRef.current.send({
-        type: 'broadcast',
-        event: 'reaction',
-        payload: { emoji, from: session.user.id, fromName: currentUser.name }
-      });
+    if (!enviarDataLivekit({ type: 'reaction', payload: { emoji, from: session.user.id, fromName: currentUser.name } })) {
+      if (webrtcChannelRef.current && session?.user?.id) {
+        webrtcChannelRef.current.send({
+          type: 'broadcast',
+          event: 'reaction',
+          payload: { emoji, from: session.user.id, fromName: currentUser.name }
+        });
+      }
     }
-  }, [session?.user?.id, currentUser.name]);
+  }, [session?.user?.id, currentUser.name, enviarDataLivekit]);
 
   // Atajos de teclado numérico 1-8 para emojis rápidos
   useEffect(() => {
@@ -2282,82 +4065,64 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
     }
   }, [createPeerConnection, session?.user?.id]);
 
-  // WebRTC Channel
+  // Broadcast por chunks (reemplaza canal global webrtc:workspaceId)
   useEffect(() => {
-    if (!activeWorkspace?.id || !session?.user?.id) return;
-    const webrtcChannel = supabase.channel(`webrtc:${activeWorkspace.id}`);
-    webrtcChannel
-      .on('broadcast', { event: 'offer' }, ({ payload }) => { if (payload.to === session.user.id) handleOffer(payload.offer, payload.from); })
-      .on('broadcast', { event: 'answer' }, ({ payload }) => { if (payload.to === session.user.id) handleAnswer(payload.answer, payload.from); })
-      .on('broadcast', { event: 'ice-candidate' }, ({ payload }) => { if (payload.to === session.user.id) handleIceCandidate(payload.candidate, payload.from); })
-      .on('broadcast', { event: 'reaction' }, ({ payload }) => {
-        // Recibir reacción de otro usuario
-        if (payload.from !== session.user.id) {
-          console.log('Received reaction from', payload.fromName, ':', payload.emoji);
-          setRemoteReaction({ emoji: payload.emoji, from: payload.from, fromName: payload.fromName });
-          setTimeout(() => setRemoteReaction(null), 3000);
-        }
-      })
-      .on('broadcast', { event: 'movement' }, ({ payload }) => {
-        // Recibir movimiento de alta frecuencia
-        if (payload.id !== session.user.id) {
-          realtimePositionsRef.current.set(payload.id, {
-            x: payload.x,
-            y: payload.y,
-            direction: payload.direction,
-            isMoving: payload.isMoving,
-            timestamp: payload.timestamp
-          });
-        }
-      })
-      .on('broadcast', { event: 'chat' }, ({ payload }) => {
-        // Recibir mensaje de chat
-        if (payload.from !== session.user.id) {
-          console.log('Received chat from', payload.fromName, ':', payload.message);
-          setRemoteMessages(prev => {
-            const newMap = new Map(prev);
-            newMap.set(payload.from, payload.message);
-            return newMap;
-          });
-          
-          // Notificación desktop para mensajes de chat
-          const ns = getSettingsSection('notifications');
-          if (ns.newMessageSound) {
-            sendDesktopNotification(`💬 ${payload.fromName}`, payload.message);
-          }
-          // Notificación de mención
-          if (ns.mentionNotifications && payload.message?.includes(`@${currentUser.name}`)) {
-            sendDesktopNotification(`📢 Mención de ${payload.fromName}`, payload.message);
-          }
-          
-          // Limpiar mensaje después de 5s
-          setTimeout(() => {
-            setRemoteMessages(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(payload.from);
-              return newMap;
-            });
-          }, 5000);
-        }
-      })
-      .subscribe((status) => {
-        webrtcChannelSubscribedRef.current = status === 'SUBSCRIBED';
-      });
-    webrtcChannelRef.current = webrtcChannel;
+    if (USAR_LIVEKIT || !activeWorkspace?.id || !session?.user?.id) return;
+
+    const manager = crearRealtimeChunkManager({
+      espacioId: activeWorkspace.id,
+      userId: session.user.id,
+      onMessage: (evento: EventoRealtime, payload: Record<string, unknown>) => {
+        const p = payload as any;
+        if (evento === 'offer' && p.to === session.user.id) { handleOffer(p.offer, p.from); return; }
+        if (evento === 'answer' && p.to === session.user.id) { handleAnswer(p.answer, p.from); return; }
+        if (evento === 'ice-candidate' && p.to === session.user.id) { handleIceCandidate(p.candidate, p.from); return; }
+        manejarEventoInstantaneo({ type: evento, payload: p });
+      },
+      onSubscriptionChange: (activos) => {
+        webrtcChannelSubscribedRef.current = activos > 0;
+      },
+    });
+
+    realtimeChunkManagerRef.current = manager;
+
+    // Proxy para compatibilidad con webrtcChannelRef.current.send()
+    webrtcChannelRef.current = {
+      send: ({ event, payload }: { type?: string; event: string; payload: any }) => {
+        manager.broadcast(event as EventoRealtime, payload);
+      },
+    };
+
+    // Suscripción inicial al chunk actual + vecinos
+    const chunk = obtenerChunk(currentUserEcs.x, currentUserEcs.y);
+    const vecinos = obtenerChunksVecinos(chunk, radioInteresChunks);
+    manager.actualizarChunk(chunk.clave, vecinos);
+
     return () => {
+      manager.destruir();
+      realtimeChunkManagerRef.current = null;
+      webrtcChannelRef.current = null;
       webrtcChannelSubscribedRef.current = false;
-      supabase.removeChannel(webrtcChannel);
       peerConnectionsRef.current.forEach(pc => pc.close());
       peerConnectionsRef.current.clear();
     };
-  }, [activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate]);
+  }, [USAR_LIVEKIT, activeWorkspace?.id, session?.user?.id, handleOffer, handleAnswer, handleIceCandidate, manejarEventoInstantaneo]);
+
+  // Sincronizar suscripciones de chunk cuando el usuario se mueve
+  useEffect(() => {
+    if (!realtimeChunkManagerRef.current) return;
+    const chunk = obtenerChunk(currentUserEcs.x, currentUserEcs.y);
+    const vecinos = obtenerChunksVecinos(chunk, radioInteresChunks);
+    realtimeChunkManagerRef.current.actualizarChunk(chunk.clave, vecinos);
+  }, [currentUserEcs.x, currentUserEcs.y, radioInteresChunks]);
 
   // Ref para tracking de usuarios que deben ser desconectados (con debounce)
   const pendingDisconnectsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Limpiar conexiones cuando usuarios SALEN del espacio (con debounce de 3s para evitar cierres prematuros)
   useEffect(() => {
-    const onlineUserIds = new Set(onlineUsers.map(u => u.id));
+    if (USAR_LIVEKIT) return;
+    const onlineUserIds = new Set(usuariosParaConexion.map(u => u.id));
     
     // Cancelar desconexiones pendientes para usuarios que volvieron a aparecer
     onlineUserIds.forEach(userId => {
@@ -2375,7 +4140,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         console.log('Scheduling disconnect for user (5s delay):', peerId);
         const timeout = setTimeout(() => {
           // Verificar de nuevo si el usuario sigue sin estar online
-          const stillMissing = !onlineUsers.some(u => u.id === peerId);
+          const stillMissing = !usuariosParaConexion.some(u => u.id === peerId);
           if (stillMissing && peerConnectionsRef.current.has(peerId)) {
             console.log('Closing connection with user who left space:', peerId);
             pc.close();
@@ -2389,13 +4154,13 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         pendingDisconnectsRef.current.set(peerId, timeout);
       }
     });
-  }, [onlineUsers]);
+  }, [usuariosParaConexion]);
 
   // Iniciar llamadas con TODOS los usuarios online (no solo proximidad) - estilo Gather
   useEffect(() => {
-    if (!session?.user?.id || !activeStreamRef.current || onlineUsers.length === 0) return;
+    if (USAR_LIVEKIT || !session?.user?.id || !activeStreamRef.current || usuariosParaConexion.length === 0) return;
     
-    onlineUsers.forEach(user => {
+    usuariosParaConexion.forEach(user => {
       if (user.id === session.user.id) return; // No conectar consigo mismo
       
       // Usar hash numérico para comparación consistente
@@ -2422,11 +4187,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         }
       }
     });
-  }, [onlineUsers, initiateCall, session?.user?.id, stream]);
+  }, [USAR_LIVEKIT, usuariosParaConexion, initiateCall, session?.user?.id, stream]);
 
   // Agregar screen share a conexiones existentes cuando se inicia
   useEffect(() => {
-    if (!screenStream || !hasActiveCall) return;
+    if (USAR_LIVEKIT || !screenStream || !hasActiveCall) return;
     
     console.log('Adding screen share to existing peer connections');
     
@@ -2458,7 +4223,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         }
       }
     });
-  }, [screenStream, hasActiveCall, session?.user?.id]);
+  }, [USAR_LIVEKIT, screenStream, hasActiveCall, session?.user?.id]);
 
   // NOTA: La renegociación automática cuando el stream cambia fue removida
   // porque causaba conflictos de SDP (m-lines order mismatch).
@@ -2470,10 +4235,10 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
   const pendingUpdateRef = useRef(false);
   // Ref para acceder al estado actual dentro de la función asíncrona
   const shouldHaveStreamRef = useRef(false);
-  // En mini mode (no space tab): solo activar stream si hay llamada activa (proximidad)
-  // En space tab: activar si hay llamada activa O el usuario tiene cam/mic/screen encendido
+  // En mini mode (no space tab): solo activar stream si hay llamada activa (proximidad) o rango audio
+  // En space tab: activar si hay llamada/audio-range O el usuario tiene cam/mic/screen encendido
   const isOnSpaceTab = activeSubTab === 'space';
-  shouldHaveStreamRef.current = hasActiveCall || (isOnSpaceTab && (currentUser.isScreenSharing || currentUser.isCameraOn || currentUser.isMicOn));
+  shouldHaveStreamRef.current = hasActiveCall || hasAnyoneNearby || (isOnSpaceTab && (currentUser.isScreenSharing || currentUser.isCameraOn || currentUser.isMicOn));
 
   // Manejar stream de video - encender/apagar según proximidad
   useEffect(() => {
@@ -2551,12 +4316,25 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
               return; // Terminará en finally y disparará pending update si es necesario
             }
 
-            activeStreamRef.current = newStream;
-            setStream(newStream);
+            let streamToUse = newStream;
+            const audioTrack = newStream.getAudioTracks()[0];
+            if (audioTrack && currentAudioSettings.noiseReduction) {
+              const nivel = currentAudioSettings.noiseReductionLevel === 'enhanced' ? 'enhanced' : 'standard';
+              const processedTrack = await crearAudioProcesado(audioTrack, nivel);
+              if (processedTrack) {
+                const mixed = new MediaStream([processedTrack, ...newStream.getVideoTracks()]);
+                streamToUse = mixed;
+              }
+            } else {
+              limpiarAudioProcesado();
+            }
+
+            activeStreamRef.current = streamToUse;
+            setStream(streamToUse);
             console.log('Camera/mic stream started');
             
             // IMPORTANTE: Agregar tracks a conexiones peer EXISTENTES y renegociar
-            if (peerConnectionsRef.current.size > 0) {
+            if (!USAR_LIVEKIT && peerConnectionsRef.current.size > 0) {
               console.log('Adding new stream tracks to', peerConnectionsRef.current.size, 'existing peer connections');
               peerConnectionsRef.current.forEach(async (pc, peerId) => {
                 // Verificar qué tracks ya tiene el peer
@@ -2605,13 +4383,15 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                 activeStreamRef.current?.removeTrack(track);
               });
               // Notificar a los peers que el video track se removió
-              peerConnectionsRef.current.forEach((pc) => {
-                pc.getSenders().forEach(sender => {
-                  if (sender.track?.kind === 'video') {
-                    try { pc.removeTrack(sender); } catch (e) { /* ignore */ }
-                  }
+              if (!USAR_LIVEKIT) {
+                peerConnectionsRef.current.forEach((pc) => {
+                  pc.getSenders().forEach(sender => {
+                    if (sender.track?.kind === 'video') {
+                      try { pc.removeTrack(sender); } catch (e) { /* ignore */ }
+                    }
+                  });
                 });
-              });
+              }
             } else if (currentUser.isCameraOn && videoTracks.length === 0 && activeStreamRef.current) {
               // Cámara ON pero no hay video track - obtener nuevo stream de video
               console.log('Camera ON - requesting new video track');
@@ -2621,25 +4401,27 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                 if (newVideoTrack && activeStreamRef.current) {
                   activeStreamRef.current.addTrack(newVideoTrack);
                   // Agregar a peers existentes y RENEGOCIAR
-                  peerConnectionsRef.current.forEach(async (pc, peerId) => {
-                    pc.addTrack(newVideoTrack, activeStreamRef.current!);
-                    
-                    // Renegociar para notificar el nuevo track
-                    try {
-                      const offer = await pc.createOffer();
-                      await pc.setLocalDescription(offer);
-                      if (webrtcChannelRef.current) {
-                        console.log('Sending renegotiation offer (video ON) to', peerId);
-                        webrtcChannelRef.current.send({
-                          type: 'broadcast',
-                          event: 'offer',
-                          payload: { offer, to: peerId, from: session?.user?.id }
-                        });
+                  if (!USAR_LIVEKIT) {
+                    peerConnectionsRef.current.forEach(async (pc, peerId) => {
+                      pc.addTrack(newVideoTrack, activeStreamRef.current!);
+                      
+                      // Renegociar para notificar el nuevo track
+                      try {
+                        const offer = await pc.createOffer();
+                        await pc.setLocalDescription(offer);
+                        if (webrtcChannelRef.current) {
+                          console.log('Sending renegotiation offer (video ON) to', peerId);
+                          webrtcChannelRef.current.send({
+                            type: 'broadcast',
+                            event: 'offer',
+                            payload: { offer, to: peerId, from: session?.user?.id }
+                          });
+                        }
+                      } catch (err) {
+                        console.error('Error renegotiating video ON with peer', peerId, err);
                       }
-                    } catch (err) {
-                      console.error('Error renegotiating video ON with peer', peerId, err);
-                    }
-                  });
+                    });
+                  }
                   setStream(new MediaStream(activeStreamRef.current.getTracks()));
                 }
               } catch (e) {
@@ -2655,17 +4437,19 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             const tracks = activeStreamRef.current.getTracks();
             
             // Remover tracks de conexiones activas
-            peerConnectionsRef.current.forEach((pc, peerId) => {
-              pc.getSenders().forEach(sender => {
-                if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
-                  try {
-                    pc.removeTrack(sender);
-                  } catch (e) {
-                    console.warn('Error removing track from PC:', e);
+            if (!USAR_LIVEKIT) {
+              peerConnectionsRef.current.forEach((pc, peerId) => {
+                pc.getSenders().forEach(sender => {
+                  if (sender.track && tracks.some(t => t.id === sender.track!.id)) {
+                    try {
+                      pc.removeTrack(sender);
+                    } catch (e) {
+                      console.warn('Error removing track from PC:', e);
+                    }
                   }
-                }
+                });
               });
-            });
+            }
 
             // Detener tracks
             tracks.forEach(track => {
@@ -2704,7 +4488,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
 
   // Actualizar conexiones WebRTC cuando cambie el stream procesado (efectos de fondo)
   useEffect(() => {
-    if (!processedStream || cameraSettings.backgroundEffect === 'none') return;
+    if (USAR_LIVEKIT || !processedStream || cameraSettings.backgroundEffect === 'none') return;
     
     const videoTrack = processedStream.getVideoTracks()[0];
     if (!videoTrack) return;
@@ -2722,10 +4506,17 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         }
       }
     });
-  }, [processedStream, cameraSettings.backgroundEffect]);
+  }, [USAR_LIVEKIT, processedStream, cameraSettings.backgroundEffect]);
 
-  // Limpiar processed stream cuando se desactiva el efecto
+  // Limpiar processed stream cuando se desactiva el efecto o la cámara se apaga
   useEffect(() => {
+    // Si no hay stream base (cámara apagada), limpiar processedStream
+    if (!stream && processedStream) {
+      console.log('[LIVEKIT] Limpiando processedStream — stream base es null (cámara apagada)');
+      setProcessedStream(null);
+      return;
+    }
+    if (USAR_LIVEKIT) return;
     if (cameraSettings.backgroundEffect === 'none' && processedStream) {
       setProcessedStream(null);
       
@@ -2746,11 +4537,12 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
         });
       }
     }
-  }, [cameraSettings.backgroundEffect, stream]);
+  }, [USAR_LIVEKIT, cameraSettings.backgroundEffect, stream, processedStream]);
 
   // ============== AUDIO/VIDEO ESTABILIDAD - Page Visibility API ==============
   // Mantiene el audio estable y cambia a video original cuando la página está oculta
   useEffect(() => {
+    if (USAR_LIVEKIT) return;
     let audioContext: AudioContext | null = null;
     let silentSource: AudioBufferSourceNode | null = null;
     let wasUsingProcessedStream = false;
@@ -2893,29 +4685,51 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
 
   return (
     <div className="w-full h-full relative bg-black" onClick={handleCanvasClick}>
+      {USAR_LIVEKIT && (
+        <SpatialAudio
+          tracks={remoteAudioTracks}
+          usuarios={[...usersInCall, ...usersInAudioRange]}
+          currentUser={currentUserEcs}
+          enabled={!!space3dSettings.spatialAudio}
+          silenciarAudio={currentUser.status !== PresenceStatus.AVAILABLE}
+        />
+      )}
       <Canvas
-        shadows={performanceSettings.graphicsQuality !== 'low'}
-        dpr={performanceSettings.graphicsQuality === 'low' ? 1 : performanceSettings.graphicsQuality === 'medium' ? 1.5 : window.devicePixelRatio}
+        frameloop="demand"
+        shadows={gpuRenderConfig ? gpuRenderConfig.shadows : performanceSettings.graphicsQuality !== 'low'}
+        dpr={adaptiveDpr}
         gl={{ 
-          antialias: performanceSettings.graphicsQuality !== 'low',
-          powerPreference: performanceSettings.batterySaver ? 'low-power' : 'default',
+          antialias: gpuRenderConfig ? gpuRenderConfig.antialias : performanceSettings.graphicsQuality !== 'low',
+          powerPreference: gpuRenderConfig ? gpuRenderConfig.powerPreference : (performanceSettings.batterySaver ? 'low-power' : 'default'),
           failIfMajorPerformanceCaveat: false
         }}
         onCreated={({ gl }) => {
-          console.log('Canvas created successfully');
+          console.log(`Canvas created | GPU Tier: ${gpuInfo?.tier ?? '?'} | API: ${gpuInfo?.api ?? '?'} | Renderer: ${gpuInfo?.renderer ?? '?'}`);
           gl.setClearColor(themeColors[theme] || '#000000');
+          if (gpuRenderConfig) {
+            gl.toneMappingExposure = gpuRenderConfig.toneMappingExposure;
+          }
         }}
       >
+        <AdaptiveFrameloop />
+        <PerformanceMonitor
+          onDecline={() => {
+            setAdaptiveDpr((prev) => Math.max(minDpr, prev - 0.25));
+          }}
+          onIncline={() => {
+            setAdaptiveDpr((prev) => Math.min(maxDpr, prev + 0.25));
+          }}
+        />
         <Suspense fallback={null}>
           <Scene
-            currentUser={currentUser}
-            onlineUsers={onlineUsers}
-            setPosition={setPosition}
+            currentUser={currentUserEcs}
+            onlineUsers={usuariosEnChunks}
+            setPosition={setPositionEcs}
             theme={theme}
             orbitControlsRef={orbitControlsRef}
             stream={stream}
-            remoteStreams={remoteStreams}
-            showVideoBubbles={!hasActiveCall}
+            remoteStreams={remoteStreamsRouted}
+            showVideoBubbles={true}
             localMessage={localMessage}
             remoteMessages={remoteMessages}
             localReactions={localReactions}
@@ -2931,11 +4745,39 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             invertYAxis={space3dSettings.invertYAxis}
             cameraMode={space3dSettings.cameraMode}
             realtimePositionsRef={realtimePositionsRef}
+            interpolacionWorkerRef={interpolacionWorkerRef}
+            posicionesInterpoladasRef={posicionesInterpoladasRef}
+            ecsStateRef={ecsStateRef}
             broadcastMovement={broadcastMovement}
+            moveSpeed={userMoveSpeed}
+            runSpeed={userRunSpeed}
+            zonasEmpresa={zonasEmpresa}
+            onZoneCollision={setZonaColisionadaId}
+            usersInCallIds={usersInCallIds}
+            usersInAudioRangeIds={usersInAudioRangeIds}
+            empresasAutorizadas={empresasAutorizadas}
+            mobileInputRef={mobileInputRef}
+            enableDayNightCycle={enableDayNightCycle}
+            onTapFloor={isMobile ? (point) => {
+              // Mobile: single tap = walk/teleport (misma lógica que double-click en desktop)
+              const playerX = (currentUserEcs.x || 400) / 16;
+              const playerZ = (currentUserEcs.y || 400) / 16;
+              const dx = point.x - playerX;
+              const dz = point.z - playerZ;
+              const dist = Math.sqrt(dx * dx + dz * dz);
+              if (dist > TELEPORT_DISTANCE) {
+                setMoveTarget(null);
+                setTeleportTarget({ x: point.x, z: point.z });
+              } else if (dist > 0.5) {
+                setTeleportTarget(null);
+                setMoveTarget({ x: point.x, z: point.z });
+              }
+              hapticFeedback('light');
+            } : undefined}
             onDoubleClickFloor={(point) => {
               // Calcular distancia desde posición actual del avatar
-              const playerX = (currentUser.x || 400) / 16;
-              const playerZ = (currentUser.y || 400) / 16;
+              const playerX = (currentUserEcs.x || 400) / 16;
+              const playerZ = (currentUserEcs.y || 400) / 16;
               const dx = point.x - playerX;
               const dz = point.z - playerZ;
               const dist = Math.sqrt(dx * dx + dz * dz);
@@ -2993,8 +4835,8 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           usersInCall={usersInCall}
           stream={stream}
           screenStream={screenStream}
-          remoteStreams={remoteStreams}
-          remoteScreenStreams={remoteScreenStreams}
+          remoteStreams={remoteStreamsRouted}
+          remoteScreenStreams={remoteScreenStreamsRouted}
           remoteReaction={remoteReaction}
           onWaveUser={handleWaveUser}
           currentReaction={localReactions.length > 0 ? localReactions[localReactions.length - 1].emoji : null}
@@ -3059,7 +4901,16 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                 activeStreamRef.current.addTrack(newAudioTrack);
                 oldAudioTrack.stop();
                 
-                // Reemplazar en todas las conexiones peer
+                // Reemplazar en LiveKit si está conectado
+                if (USAR_LIVEKIT && livekitRoomRef.current?.state === 'connected') {
+                  const finalTrack = newSettings.noiseReduction
+                    ? (await crearAudioProcesado(newAudioTrack, newSettings.noiseReductionLevel === 'enhanced' ? 'enhanced' : 'standard')) || newAudioTrack
+                    : newAudioTrack;
+                  await publicarTrackLocal(finalTrack, 'audio');
+                  finalTrack.enabled = currentUser.isMicOn;
+                  console.log('🎤 LiveKit audio track updated with new settings');
+                }
+                // Reemplazar en conexiones peer (path non-LiveKit)
                 peerConnectionsRef.current.forEach(async (pc, peerId) => {
                   const audioSender = pc.getSenders().find(s => s.track?.kind === 'audio');
                   if (audioSender) {
@@ -3068,7 +4919,19 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
                   }
                 });
                 
-                // Aplicar estado de mute actual
+                // Aplicar procesamiento de audio para stream local (path non-LiveKit)
+                if (!USAR_LIVEKIT) {
+                  const nivel = newSettings.noiseReductionLevel === 'enhanced' ? 'enhanced' : 'standard';
+                  if (newSettings.noiseReduction) {
+                    const processedTrack = await crearAudioProcesado(newAudioTrack, nivel);
+                    if (processedTrack) {
+                      activeStreamRef.current.removeTrack(newAudioTrack);
+                      activeStreamRef.current.addTrack(processedTrack);
+                    }
+                  } else {
+                    limpiarAudioProcesado();
+                  }
+                }
                 newAudioTrack.enabled = currentUser.isMicOn;
                 console.log('🎤 New microphone applied successfully');
               }
@@ -3112,7 +4975,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       )}
 
       {/* Minimapa */}
-      <Minimap currentUser={currentUser} users={onlineUsers} workspace={activeWorkspace} />
+      <Minimap currentUser={currentUserEcs} users={usuariosParaMinimapa} workspace={activeWorkspace} onTeleport={(x, z) => {
+        setMoveTarget(null);
+        setTeleportTarget({ x, z });
+        hapticFeedback('medium');
+      }} />
       
       {/* Notificación de Wave entrante */}
       {incomingWave && (
@@ -3132,14 +4999,150 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           </div>
         </div>
       )}
-      
-      {/* Controles de ayuda */}
-      <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-xs">
-        <div className="flex items-center gap-2">
-          <kbd className="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">WASD</kbd>
-          <span className="opacity-70">o flechas para mover</span>
+
+      {/* CTA: Solicitar acceso a zona privada */}
+      {zonaAccesoProxima && (
+        <div className="fixed bottom-32 right-4 z-[201] animate-slide-in">
+          <div className="bg-slate-950/80 border border-slate-700/50 backdrop-blur-xl px-4 py-3 rounded-xl shadow-2xl w-64">
+            <div className="text-xs text-slate-300">
+              Estás cerca de una zona privada
+            </div>
+            <div className="text-sm text-white font-semibold">
+              {zonaAccesoProxima.zona.nombre_zona || zonaAccesoProxima.zona.empresa?.nombre || 'Zona privada'}
+            </div>
+            <button
+              onClick={handleSolicitarAccesoZona}
+              disabled={zonaAccesoProxima.pendiente || solicitandoAcceso}
+              className="mt-2 w-full rounded-lg bg-emerald-500/90 text-white text-xs py-2 font-semibold disabled:opacity-50"
+            >
+              {zonaAccesoProxima.pendiente ? 'Solicitud pendiente' : solicitandoAcceso ? 'Enviando...' : 'Solicitar acceso'}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* Toast notificaciones de autorizaciones */}
+      {notificacionAutorizacion && (
+        <div className="fixed top-36 right-4 z-[202] animate-slide-in">
+          <div className="bg-slate-900/90 border border-slate-700/60 backdrop-blur-xl px-4 py-3 rounded-xl shadow-2xl w-72">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-white">{notificacionAutorizacion.titulo}</p>
+                {notificacionAutorizacion.mensaje && (
+                  <p className="text-xs text-slate-300 mt-1">{notificacionAutorizacion.mensaje}</p>
+                )}
+              </div>
+              <button
+                onClick={() => setNotificacionAutorizacion(null)}
+                className="text-slate-400 hover:text-white"
+              >
+                ✕
+              </button>
+            </div>
+            {notificacionAutorizacion.datos_extra?.canal_compartido_id && (
+              <button
+                onClick={() => {
+                  setActiveChatGroupId(notificacionAutorizacion.datos_extra?.canal_compartido_id || null);
+                  setActiveSubTab('chat');
+                }}
+                className="mt-2 w-full rounded-lg bg-sky-500/80 text-white text-xs py-2 font-semibold"
+              >
+                Abrir canal compartido
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+      
+      {/* Controles de ayuda — desktop: WASD, mobile: oculto (tiene joystick) */}
+      {!isMobile && (
+        <div className="absolute bottom-4 right-4 bg-black/50 backdrop-blur-sm px-3 py-2 rounded-lg text-white text-xs">
+          <div className="flex items-center gap-2">
+            <kbd className="px-1.5 py-0.5 bg-white/20 rounded text-[10px]">WASD</kbd>
+            <span className="opacity-70">o flechas para mover</span>
+          </div>
+        </div>
+      )}
+
+      {/* === MOBILE GAME HUD === */}
+      {isMobile && (
+        <>
+          {/* Joystick virtual — esquina inferior izquierda */}
+          <MobileJoystick inputRef={mobileInputRef} size={120} deadZone={0.15} runThreshold={0.7} />
+
+          {/* Botón de emotes — esquina inferior derecha */}
+          <button
+            className="absolute z-[150] select-none touch-none flex items-center justify-center rounded-full"
+            style={{
+              bottom: 140,
+              right: 24,
+              width: 52,
+              height: 52,
+              backgroundColor: 'rgba(15, 23, 42, 0.7)',
+              border: '2px solid rgba(99, 102, 241, 0.4)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={(e) => { e.stopPropagation(); setShowEmoteWheel(true); }}
+          >
+            <span className="text-xl">😄</span>
+          </button>
+
+          {/* Botón de chat — encima de emotes */}
+          <button
+            className="absolute z-[150] select-none touch-none flex items-center justify-center rounded-full"
+            style={{
+              bottom: 200,
+              right: 24,
+              width: 44,
+              height: 44,
+              backgroundColor: 'rgba(15, 23, 42, 0.7)',
+              border: '1px solid rgba(99, 102, 241, 0.3)',
+              backdropFilter: 'blur(4px)',
+            }}
+            onClick={(e) => { e.stopPropagation(); setShowChat(!showChat); setShowEmojis(false); }}
+          >
+            <span className="text-base">💬</span>
+          </button>
+        </>
+      )}
+
+      {/* Botón XP / Gamificación — esquina superior izquierda */}
+      <button
+        className="absolute top-4 left-4 z-[60] flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black/50 backdrop-blur-sm border border-indigo-500/30 hover:border-indigo-500/60 transition-colors cursor-pointer"
+        onClick={() => setShowGamificacion(true)}
+        title="Gamificación"
+      >
+        <span className="text-sm">⭐</span>
+        <span className="text-[10px] font-bold text-indigo-400">XP</span>
+      </button>
+
+      {/* Panel de Gamificación */}
+      <GamificacionPanel
+        usuarioId={session?.user?.id || ''}
+        espacioId={activeWorkspace?.id || ''}
+        visible={showGamificacion}
+        onClose={() => setShowGamificacion(false)}
+      />
+
+      {/* Emote Wheel overlay — funciona en mobile y desktop */}
+      <EmoteWheel
+        visible={showEmoteWheel}
+        onClose={() => setShowEmoteWheel(false)}
+        onSelect={(emoteId) => {
+          setShowEmoteWheel(false);
+          // Mapear emoteId a animación del avatar o emoji reaction
+          if (['wave', 'dance', 'cheer', 'victory', 'jump', 'sit'].includes(emoteId)) {
+            // Broadcast como emote trigger via moveTarget pattern
+            // El Player captará esto via su contextual animation system
+            if (broadcastMovement) {
+              const px = (currentUserEcs.x || 400);
+              const py = (currentUserEcs.y || 400);
+              broadcastMovement(px, py, currentUserEcs.direction || 'front', false, emoteId, true);
+            }
+          }
+          hapticFeedback('medium');
+        }}
+      />
       
       {/* Recording Manager V2 con análisis conductual avanzado */}
       {hasActiveCall && (

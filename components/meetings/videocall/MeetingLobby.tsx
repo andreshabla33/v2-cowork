@@ -43,52 +43,33 @@ export const MeetingLobby: React.FC<MeetingLobbyProps> = ({
         setLoading(true);
         
         if (tokenInvitacion) {
-          // Buscar por token de invitación (query simplificada sin relación usuarios)
-          const { data: invitacion, error: invError } = await supabase
-            .from('invitaciones_reunion')
-            .select(`
-              nombre,
-              email,
-              expira_en,
-              sala:salas_reunion(
-                nombre,
-                tipo,
-                configuracion,
-                creador_id
-              )
-            `)
-            .eq('token_unico', tokenInvitacion)
-            .single();
+          const { data, error: fnError } = await supabase.functions.invoke('validar-invitacion-reunion', {
+            body: { token: tokenInvitacion }
+          });
 
-          if (invError || !invitacion) {
-            console.error('Error buscando invitación:', invError);
+          if (fnError) {
+            console.error('Error validando invitación:', fnError);
+            throw new Error(fnError.message || 'Invitación no válida o expirada');
+          }
+
+          if (data?.error) {
+            throw new Error(data.error);
+          }
+
+          const invitacion = data?.invitacion;
+          const salaData = invitacion?.sala as any;
+
+          if (!salaData) {
             throw new Error('Invitación no válida o expirada');
           }
 
-          // Verificar expiración por fecha, no por campo "usado"
-          if (invitacion.expira_en && new Date(invitacion.expira_en) < new Date()) {
-            throw new Error('La invitación ha expirado');
-          }
+          setNombre(invitacion?.nombre || '');
+          setEmail(invitacion?.email || '');
 
-          setNombre(invitacion.nombre || '');
-          setEmail(invitacion.email || '');
-          const salaData = invitacion.sala as any;
-          
-          // Obtener nombre del creador por separado (evita problemas de RLS)
-          let organizadorNombre = 'Organizador';
-          if (salaData?.creador_id) {
-            const { data: creador } = await supabase
-              .from('usuarios')
-              .select('nombre')
-              .eq('id', salaData.creador_id)
-              .single();
-            organizadorNombre = creador?.nombre || 'Organizador';
-          }
-          
           setSalaInfo({
             nombre: salaData?.nombre || 'Reunión',
             tipo: salaData?.tipo || 'general',
-            organizador: organizadorNombre,
+            organizador: data?.organizador_nombre || 'Organizador',
             configuracion: salaData?.configuracion || { sala_espera: true },
           });
         } else if (codigoSala) {

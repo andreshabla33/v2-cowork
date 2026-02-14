@@ -148,28 +148,28 @@ export const BuildingChallengeGame: React.FC<BuildingChallengeGameProps> = ({ on
   if (gameState === 'lobby') {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center"><Building2 className="w-6 h-6 text-cyan-400" /></div>
-            <div><h2 className="text-2xl font-bold text-white">Desafío de Construcción</h2><p className="text-sm text-zinc-400">Construye, crea y colabora</p></div>
+        <div className="flex items-center justify-between p-6 lg:p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-4 lg:gap-3">
+            <div className="w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-lg bg-cyan-500/20 flex items-center justify-center"><Building2 className="w-6 h-6 lg:w-5 lg:h-5 text-cyan-400" /></div>
+            <div><h2 className="text-2xl lg:text-xl font-bold text-white">Desafío de Construcción</h2><p className="text-sm lg:text-xs text-zinc-400">Construye, crea y colabora</p></div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl"><X className="w-5 h-5 text-zinc-400" /></button>
         </div>
 
         <div className="flex-1 flex">
-          <div className="flex-1 p-8 space-y-6">
-            <div className="grid grid-cols-4 gap-4">
+          <div className="flex-1 p-8 lg:p-5 space-y-6 lg:space-y-4">
+            <div className="grid grid-cols-4 gap-4 lg:gap-3">
               {[{ icon: Clock, value: '35 min', label: 'Construcción' }, { icon: Users, value: '4', label: 'Equipos' }, { icon: Box, value: '∞', label: 'Bloques' }, { icon: Palette, value: '8', label: 'Colores' }].map((item, i) => (
-                <div key={i} className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                  <item.icon className="w-5 h-5 text-zinc-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">{item.value}</p>
-                  <p className="text-xs text-zinc-500">{item.label}</p>
+                <div key={i} className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                  <item.icon className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                  <p className="text-2xl lg:text-xl font-bold text-white">{item.value}</p>
+                  <p className="text-xs lg:text-[10px] text-zinc-500">{item.label}</p>
                 </div>
               ))}
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Desafíos Posibles</h3>
+              <h3 className="text-lg lg:text-base font-semibold text-white">Desafíos Posibles</h3>
               <div className="grid grid-cols-2 gap-3">
                 {CHALLENGES.map((challenge, idx) => (
                   <div key={idx} className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
@@ -181,7 +181,7 @@ export const BuildingChallengeGame: React.FC<BuildingChallengeGameProps> = ({ on
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Cómo jugar</h3>
+              <h3 className="text-lg lg:text-base font-semibold text-white">Cómo jugar</h3>
               <div className="space-y-3">
                 {['Recibe un desafío aleatorio al inicio', 'Usa bloques de diferentes formas y colores', 'Construye siguiendo el criterio del desafío', 'Vota por la mejor creación al final'].map((text, i) => (
                   <div key={i} className="flex items-start gap-3">
@@ -197,13 +197,13 @@ export const BuildingChallengeGame: React.FC<BuildingChallengeGameProps> = ({ on
             </button>
           </div>
 
-          <div className="w-80 p-6 border-l border-zinc-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Tipos de Bloques</h3>
+          <div className="w-80 lg:w-64 p-6 lg:p-4 border-l border-zinc-800">
+            <h3 className="text-lg lg:text-base font-semibold text-white mb-4 lg:mb-3">Tipos de Bloques</h3>
             <div className="grid grid-cols-2 gap-3">
               {BLOCK_TYPES.map((block) => (
                 <div key={block.type} className="p-3 bg-zinc-900 rounded-xl text-center">
-                  <span className="text-3xl">{block.icon}</span>
-                  <p className="text-sm text-zinc-400 mt-1">{block.name}</p>
+                  <span className="text-3xl lg:text-2xl">{block.icon}</span>
+                  <p className="text-sm lg:text-xs text-zinc-400 mt-1">{block.name}</p>
                 </div>
               ))}
             </div>
@@ -305,14 +305,14 @@ export const BuildingChallengeGame: React.FC<BuildingChallengeGameProps> = ({ on
       </div>
 
       <div className="flex-1 flex overflow-hidden">
-        <div className="w-72 border-r border-zinc-800 bg-zinc-950 p-4 overflow-auto">
+        <div className="w-72 lg:w-60 border-r border-zinc-800 bg-zinc-950 p-4 lg:p-3 overflow-auto">
           <div className="mb-6">
             <h3 className="text-sm font-semibold text-white mb-3 flex items-center gap-2"><Box className="w-4 h-4" />Tipo de Bloque</h3>
             <div className="grid grid-cols-2 gap-2">
               {BLOCK_TYPES.map((block) => (
-                <button key={block.type} onClick={() => setSelectedBlockType(block.type)} className={`p-3 rounded-xl border text-center transition-all ${selectedBlockType === block.type ? 'bg-cyan-500/20 border-cyan-500' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
-                  <span className="text-2xl">{block.icon}</span>
-                  <p className="text-xs text-zinc-400 mt-1">{block.name}</p>
+                <button key={block.type} onClick={() => setSelectedBlockType(block.type)} className={`p-3 lg:p-2 rounded-xl lg:rounded-lg border text-center transition-all ${selectedBlockType === block.type ? 'bg-cyan-500/20 border-cyan-500' : 'bg-zinc-900 border-zinc-800 hover:border-zinc-700'}`}>
+                  <span className="text-2xl lg:text-xl">{block.icon}</span>
+                  <p className="text-xs lg:text-[10px] text-zinc-400 mt-1">{block.name}</p>
                 </button>
               ))}
             </div>
@@ -332,7 +332,7 @@ export const BuildingChallengeGame: React.FC<BuildingChallengeGameProps> = ({ on
             <button onClick={handleClearAll} className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold flex items-center justify-center gap-2 transition-colors"><Trash2 className="w-4 h-4" />Limpiar Todo</button>
           </div>
 
-          <div className="mt-6 p-4 bg-zinc-900 rounded-xl"><p className="text-sm text-zinc-500 mb-1">Bloques usados</p><p className="text-2xl font-bold text-white">{blocks.length}</p></div>
+          <div className="mt-6 lg:mt-4 p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg"><p className="text-sm lg:text-xs text-zinc-500 mb-1">Bloques usados</p><p className="text-2xl lg:text-xl font-bold text-white">{blocks.length}</p></div>
         </div>
 
         <div className="flex-1 bg-gradient-to-b from-zinc-900 to-zinc-950 relative overflow-hidden">

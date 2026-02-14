@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
-import { useFrame, useGraph } from '@react-three/fiber';
+import { useFrame, useGraph, useLoader } from '@react-three/fiber';
 import { useGLTF, useAnimations } from '@react-three/drei';
 import * as THREE from 'three';
 import { SkeletonUtils } from 'three-stdlib';
@@ -16,7 +16,7 @@ interface AnimationConfig {
   orden: number;
 }
 
-interface Avatar3DConfig {
+export interface Avatar3DConfig {
   id: string;
   nombre: string;
   modelo_url: string;
@@ -41,22 +41,77 @@ const STORAGE_BASE = 'https://lcryrsdyrzotjqdxcwtp.supabase.co/storage/v1/object
 
 // URLs de animaciones desde Supabase Storage
 const ANIMATION_URLS: Record<AnimationState, string> = {
-  idle: `${STORAGE_BASE}/Meshy_AI_Animation_Short_Breathe_and_Look_Around_withSkin.glb`,
-  walk: `${STORAGE_BASE}/Meshy_AI_Animation_Walking_withSkin.glb`,
-  run: `${STORAGE_BASE}/Meshy_AI_Animation_Running_withSkin.glb`,
+  idle: `${STORAGE_BASE}/Monica_Idle.glb`,
+  walk: `${STORAGE_BASE}/Monica_Walk.glb`,
+  run: `${STORAGE_BASE}/Monica_Run.glb`,
   cheer: `${STORAGE_BASE}/Meshy_AI_Animation_Cheer_with_Both_Hands_withSkin.glb`,
-  dance: `${STORAGE_BASE}/Meshy_AI_Animation_Hip_Hop_Dance_2_withSkin.glb`,
-  sit: `${STORAGE_BASE}/Meshy_AI_Animation_Stand_to_Sit_Transition_M_withSkin.glb`,
-  wave: `${STORAGE_BASE}/Meshy_AI_Animation_Agree_Gesture_withSkin.glb`,
+  dance: `${STORAGE_BASE}/Monica_Dance.glb`,
+  sit: `${STORAGE_BASE}/Monica_Sit.glb`,
+  wave: `${STORAGE_BASE}/Monica_Wave.glb`,
   jump: `${STORAGE_BASE}/Meshy_AI_Animation_Happy_jump_f_withSkin.glb`,
   victory: `${STORAGE_BASE}/Meshy_AI_Animation_Victory_Cheer_withSkin.glb`,
 };
 
-// URL del modelo base (sin animación)
-const BASE_MODEL_URL = `${STORAGE_BASE}/Meshy_AI_Character_output.glb`;
+// URL del modelo base (GLB Mixamo con skeleton correcto)
+const BASE_MODEL_URL = ANIMATION_URLS.idle;
+
+// URL de la textura PNG del atlas de Monica
+const TEXTURE_PNG_URL = `${STORAGE_BASE}/texture_atlas_Monica_v2.png`;
 
 // Animaciones que hacen loop
 const LOOP_ANIMATIONS: AnimationState[] = ['idle', 'walk', 'run', 'dance'];
+
+// Remapeo de tracks: Mixamo → huesos del modelo (soporta Mixamo directo y Blender FBX)
+// stripRootMotion: elimina position tracks del Hips para evitar saltos al hacer loop (walk/run)
+function remapAnimationTracks(clip: THREE.AnimationClip, boneNames: Set<string>, stripRootMotion = false): THREE.AnimationClip {
+  const remapped = clip.clone();
+
+  remapped.tracks = remapped.tracks.map(track => {
+    const dotIdx = track.name.indexOf('.');
+    if (dotIdx === -1) return track;
+    const boneName = track.name.substring(0, dotIdx);
+    const property = track.name.substring(dotIdx);
+
+    // Ya coincide con un hueso del modelo
+    if (boneNames.has(boneName)) return track;
+
+    // Quitar prefijo mixamorig
+    let mapped = boneName;
+    if (boneName.startsWith('mixamorig')) {
+      mapped = boneName.replace('mixamorig', '');
+    }
+
+    // Match directo (sin prefijo)
+    if (boneNames.has(mapped)) {
+      track.name = mapped + property;
+      return track;
+    }
+
+    // Match case-insensitive
+    for (const bn of boneNames) {
+      if (bn.toLowerCase() === mapped.toLowerCase()) {
+        track.name = bn + property;
+        return track;
+      }
+    }
+
+    return track;
+  }).filter(track => {
+    const dotIdx = track.name.indexOf('.');
+    const boneName = dotIdx !== -1 ? track.name.substring(0, dotIdx) : track.name;
+    if (!boneNames.has(boneName)) return false;
+
+    // Strip root motion: eliminar position tracks del Hips (root bone)
+    // Esto evita que el avatar "salte atrás" al reiniciar el loop de walk/run
+    if (stripRootMotion) {
+      const property = track.name.substring(dotIdx);
+      const isHips = boneName.toLowerCase().includes('hips');
+      if (isHips && property === '.position') return false;
+    }
+    return true;
+  });
+  return remapped;
+}
 
 // ============== COMPONENTE PRINCIPAL AVATAR GLTF ==============
 export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({ 
@@ -76,6 +131,9 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
   // Cargar modelo principal
   const { scene, animations: baseAnimations } = useGLTF(modelUrl);
   
+  // Cargar textura PNG directamente
+  const monicaTexture = useLoader(THREE.TextureLoader, TEXTURE_PNG_URL);
+  
   // Clonar la escena correctamente para soportar SkinnedMesh
   const clone = useMemo(() => {
     const clonedScene = SkeletonUtils.clone(scene);
@@ -85,6 +143,92 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
   // Obtener nodos del grafo clonado (necesario para animated components si los hubiera)
   const { nodes } = useGraph(clone);
 
+  // Auto-corrección de escala y posición Y
+  const { modelScaleCorrection, modelYOffset } = useMemo(() => {
+    // Escala: detectar modelos microscópicos
+    const localBox = new THREE.Box3();
+    clone.traverse((child: any) => {
+      if ((child.isMesh || child.isSkinnedMesh) && child.geometry) {
+        child.geometry.computeBoundingBox();
+        if (child.geometry.boundingBox) {
+          localBox.union(child.geometry.boundingBox);
+        }
+      }
+    });
+    const localSize = localBox.getSize(new THREE.Vector3());
+    let scaleCorrection = 1;
+    if (localSize.y > 0 && localSize.y < 0.5) {
+      const TARGET_HEIGHT = 1.5;
+      scaleCorrection = TARGET_HEIGHT / localSize.y;
+    }
+
+    // Posición Y: detectar modelos flotantes (world BB min Y > 0.5)
+    const worldBox = new THREE.Box3().setFromObject(clone);
+    let yOffset = 0;
+    if (!worldBox.isEmpty() && worldBox.min.y > 0.5) {
+      yOffset = -worldBox.min.y;
+    }
+
+    return { modelScaleCorrection: scaleCorrection, modelYOffset: yOffset };
+  }, [clone]);
+
+  // Recopilar nombres de huesos y verificar meshes del modelo
+  const boneNames = useMemo(() => {
+    const names = new Set<string>();
+    clone.traverse((child: any) => {
+      if (child.isBone) names.add(child.name);
+    });
+    return names;
+  }, [clone]);
+
+  // Detectar si el modelo es compatible con animaciones Mixamo
+  // Mixamo usa huesos como mixamorig:Hips o Hips, LeftUpLeg, Spine, etc.
+  const isMixamoCompatible = useMemo(() => {
+    const mixamoBones = ['Hips', 'Spine', 'LeftUpLeg', 'RightUpLeg', 'LeftArm', 'RightArm'];
+    let matches = 0;
+    for (const mb of mixamoBones) {
+      for (const bn of boneNames) {
+        if (bn === mb || bn === `mixamorig:${mb}` || bn === `mixamorig${mb}`) {
+          matches++;
+          break;
+        }
+      }
+    }
+    return matches >= 3; // Al menos 3 de 6 huesos clave
+  }, [boneNames]);
+
+  // Aplicar textura PNG solo para modelos Mixamo (Monica), colores para otros
+  useEffect(() => {
+    clone.traverse((child: any) => {
+      if (child.isMesh || child.isSkinnedMesh) {
+        const mat = child.material as THREE.MeshStandardMaterial;
+        if (!mat) return;
+        if (isMixamoCompatible && monicaTexture) {
+          // Modelo Mixamo: aplicar textura atlas de Monica
+          monicaTexture.flipY = false;
+          monicaTexture.colorSpace = THREE.SRGBColorSpace;
+          mat.map = monicaTexture;
+          mat.metalness = 0;
+          mat.roughness = 0.9;
+          mat.side = THREE.DoubleSide;
+          mat.needsUpdate = true;
+        } else {
+          // Modelo no-Mixamo: aplicar colores si se proporcionan, respetar material original
+          if (skinColor && mat.name?.toLowerCase().includes('skin')) {
+            mat.color = new THREE.Color(skinColor);
+          }
+          if (clothingColor && mat.name?.toLowerCase().includes('cloth')) {
+            mat.color = new THREE.Color(clothingColor);
+          }
+          mat.metalness = Math.min(mat.metalness, 0.3);
+          mat.needsUpdate = true;
+        }
+      }
+    });
+  }, [clone, monicaTexture, isMixamoCompatible, skinColor, clothingColor]);
+
+  // Cargar idle (fallback si el modelo no tiene animaciones propias)
+  const idleGltf = useGLTF(ANIMATION_URLS.idle);
   // Cargar todas las animaciones
   const walkGltf = useGLTF(ANIMATION_URLS.walk);
   const runGltf = useGLTF(ANIMATION_URLS.run);
@@ -95,93 +239,80 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
   const jumpGltf = useGLTF(ANIMATION_URLS.jump);
   const victoryGltf = useGLTF(ANIMATION_URLS.victory);
   
-  // Combinar todas las animaciones con nombres únicos
+  // Combinar todas las animaciones con nombres únicos + remapear tracks
   const allAnimations = useMemo(() => {
+    if (boneNames.size === 0) return [];
+
+    const addAnim = (source: THREE.AnimationClip[], name: string, anims: THREE.AnimationClip[], stripRootMotion = false) => {
+      if (source.length > 0) {
+        const clip = remapAnimationTracks(source[0], boneNames, stripRootMotion);
+        clip.name = name;
+        anims.push(clip);
+      }
+    };
+
     const anims: THREE.AnimationClip[] = [];
-    
-    // Agregar animación base como idle (ahora viene con animación de respirar)
-    if (baseAnimations.length > 0) {
-      const idleAnim = baseAnimations[0].clone();
-      idleAnim.name = 'idle';
-      anims.push(idleAnim);
-    }
-    
-    // Agregar walk
-    if (walkGltf.animations.length > 0) {
-      const walkAnim = walkGltf.animations[0].clone();
-      walkAnim.name = 'walk';
-      anims.push(walkAnim);
-    }
-    
-    // Agregar run
-    if (runGltf.animations.length > 0) {
-      const runAnim = runGltf.animations[0].clone();
-      runAnim.name = 'run';
-      anims.push(runAnim);
-    }
-    
-    // Agregar cheer
-    if (cheerGltf.animations.length > 0) {
-      const cheerAnim = cheerGltf.animations[0].clone();
-      cheerAnim.name = 'cheer';
-      anims.push(cheerAnim);
-    }
-    
-    // Agregar dance
-    if (danceGltf.animations.length > 0) {
-      const danceAnim = danceGltf.animations[0].clone();
-      danceAnim.name = 'dance';
-      anims.push(danceAnim);
-    }
-    
-    // Agregar sit
-    if (sitGltf.animations.length > 0) {
-      const sitAnim = sitGltf.animations[0].clone();
-      sitAnim.name = 'sit';
-      anims.push(sitAnim);
-    }
-    
-    // Agregar wave
-    if (waveGltf.animations.length > 0) {
-      const waveAnim = waveGltf.animations[0].clone();
-      waveAnim.name = 'wave';
-      anims.push(waveAnim);
-    }
-    
-    // Agregar jump
-    if (jumpGltf.animations.length > 0) {
-      const jumpAnim = jumpGltf.animations[0].clone();
-      jumpAnim.name = 'jump';
-      anims.push(jumpAnim);
-    }
-    
-    // Agregar victory
-    if (victoryGltf.animations.length > 0) {
-      const victoryAnim = victoryGltf.animations[0].clone();
-      victoryAnim.name = 'victory';
-      anims.push(victoryAnim);
+
+    if (isMixamoCompatible) {
+      // Modelo Mixamo: usar animaciones externas de Monica
+      // Idle: preferir del modelo base, fallback a GLB separado
+      if (baseAnimations.length > 0) {
+        addAnim(baseAnimations, 'idle', anims);
+      } else {
+        addAnim(idleGltf.animations, 'idle', anims);
+      }
+      // Walk/Run: strip root motion para evitar salto al reiniciar loop
+      addAnim(walkGltf.animations, 'walk', anims, true);
+      addAnim(runGltf.animations, 'run', anims, true);
+      addAnim(cheerGltf.animations, 'cheer', anims);
+      addAnim(danceGltf.animations, 'dance', anims);
+      addAnim(sitGltf.animations, 'sit', anims);
+      addAnim(waveGltf.animations, 'wave', anims);
+      addAnim(jumpGltf.animations, 'jump', anims);
+      addAnim(victoryGltf.animations, 'victory', anims);
+    } else {
+      // Modelo NO Mixamo: usar solo animaciones propias del modelo
+      baseAnimations.forEach((clip, i) => {
+        const name = i === 0 ? 'idle' : clip.name || `anim_${i}`;
+        const remapped = remapAnimationTracks(clip, boneNames);
+        remapped.name = name;
+        anims.push(remapped);
+      });
     }
     
     return anims;
-  }, [baseAnimations, walkGltf.animations, runGltf.animations, cheerGltf.animations, danceGltf.animations, sitGltf.animations, waveGltf.animations, jumpGltf.animations, victoryGltf.animations]);
+  }, [boneNames, baseAnimations, isMixamoCompatible, idleGltf.animations, walkGltf.animations, runGltf.animations, cheerGltf.animations, danceGltf.animations, sitGltf.animations, waveGltf.animations, jumpGltf.animations, victoryGltf.animations]);
   
   // Configurar animaciones usando el ref del grupo raíz
   const { actions } = useAnimations(allAnimations, groupRef);
+  
+  // Cambiar animación según estado — con debounce para evitar cortes rápidos (estilo LOL/Roblox)
+  const pendingAnimRef = useRef<{ anim: AnimationState; timer: ReturnType<typeof setTimeout> } | null>(null);
+  const CROSSFADE_DURATION = 0.4; // Transición suave de 400ms
+  const ANIM_DEBOUNCE_MS = 150; // Evitar cambios walk→idle→walk en <150ms
 
-  // Cambiar animación según estado
   useEffect(() => {
     if (!actions || Object.keys(actions).length === 0) return;
     
     const targetAnim = animationState;
+    if (currentAnimation === targetAnim) {
+      // Cancelar pending si volvimos al estado actual
+      if (pendingAnimRef.current) {
+        clearTimeout(pendingAnimRef.current.timer);
+        pendingAnimRef.current = null;
+      }
+      return;
+    }
+
+    // Debounce: si es una transición entre loop animations (walk/idle/run), esperar un poco
+    const isLoopTransition = LOOP_ANIMATIONS.includes(targetAnim) && LOOP_ANIMATIONS.includes(currentAnimation);
     
-    if (currentAnimation !== targetAnim) {
-      // Fade out animación actual
+    const applyTransition = () => {
+      pendingAnimRef.current = null;
       const current = actions[currentAnimation];
       if (current) {
-        current.fadeOut(0.2);
+        current.fadeOut(CROSSFADE_DURATION);
       }
-      
-      // Fade in nueva animación
       const next = actions[targetAnim];
       if (next) {
         next.reset();
@@ -190,10 +321,34 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
           LOOP_ANIMATIONS.includes(targetAnim) ? Infinity : 1
         );
         next.clampWhenFinished = !LOOP_ANIMATIONS.includes(targetAnim);
-        next.fadeIn(0.2).play();
+        next.fadeIn(CROSSFADE_DURATION).play();
         setCurrentAnimation(targetAnim);
       }
+    };
+
+    // Cancelar pending anterior
+    if (pendingAnimRef.current) {
+      clearTimeout(pendingAnimRef.current.timer);
+      pendingAnimRef.current = null;
     }
+
+    if (isLoopTransition) {
+      // Debounce para evitar cortes rápidos en transiciones loop
+      pendingAnimRef.current = {
+        anim: targetAnim,
+        timer: setTimeout(applyTransition, ANIM_DEBOUNCE_MS),
+      };
+    } else {
+      // Acciones especiales (dance, cheer, etc.) → aplicar inmediatamente
+      applyTransition();
+    }
+
+    return () => {
+      if (pendingAnimRef.current) {
+        clearTimeout(pendingAnimRef.current.timer);
+        pendingAnimRef.current = null;
+      }
+    };
   }, [animationState, actions, currentAnimation]);
 
   // Iniciar animación idle por defecto
@@ -203,25 +358,37 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
     }
   }, [actions]);
 
-  // Aplicar colores personalizados
+  // Aplicar colores: fallback atractivo si no tiene textura, o colores personalizados
   useEffect(() => {
-    if (clone && (skinColor || clothingColor)) {
-      clone.traverse((child) => {
-        if (child instanceof THREE.Mesh && child.material) {
-          const material = child.material as THREE.MeshStandardMaterial;
-          if (clothingColor && child.name.toLowerCase().includes('body')) {
-            material.color = new THREE.Color(clothingColor);
-          }
-          if (skinColor && (child.name.toLowerCase().includes('skin') || child.name.toLowerCase().includes('head'))) {
-            material.color = new THREE.Color(skinColor);
-          }
+    if (!clone) return;
+    clone.traverse((child: any) => {
+      if ((child.isMesh || child.isSkinnedMesh) && child.material) {
+        const mat = child.material as THREE.MeshStandardMaterial;
+        
+        // Si no tiene textura, aplicar color por defecto atractivo
+        if (!mat.map) {
+          // Color base: violeta suave (tema de la app) o el color personalizado
+          mat.color = new THREE.Color(clothingColor || '#a78bfa');
+          mat.roughness = 0.6;
+          mat.metalness = 0.05;
+          mat.emissive = new THREE.Color('#1a1a2e');
+          mat.emissiveIntensity = 0.15;
         }
-      });
-    }
+        
+        // Colores personalizados por nombre de mesh
+        const meshName = child.name.toLowerCase();
+        if (skinColor && (meshName.includes('skin') || meshName.includes('head') || meshName.includes('face'))) {
+          mat.color = new THREE.Color(skinColor);
+        }
+        if (clothingColor && (meshName.includes('body') || meshName.includes('cloth') || meshName.includes('shirt'))) {
+          mat.color = new THREE.Color(clothingColor);
+        }
+      }
+    });
   }, [clone, skinColor, clothingColor]);
 
-  // Rotación según dirección
-  useFrame(() => {
+  // Rotación según dirección (delta-time based para fluidez independiente del framerate)
+  useFrame((_, delta) => {
     if (!groupRef.current) return;
     
     const rotations: Record<string, number> = {
@@ -238,18 +405,22 @@ export const GLTFAvatar: React.FC<GLTFAvatarProps> = ({
     };
     
     const targetRotation = rotations[direction] || 0;
+    // Factor independiente del framerate: misma velocidad a 30fps o 60fps
+    const lerpFactor = 1 - Math.pow(1 - 0.15, delta * 60);
     groupRef.current.rotation.y = THREE.MathUtils.lerp(
       groupRef.current.rotation.y,
       targetRotation,
-      0.15
+      lerpFactor
     );
   });
 
-  const avatarScale = (avatarConfig?.escala || 1) * scale;
+  const avatarScale = (avatarConfig?.escala || 1) * scale * modelScaleCorrection;
 
   return (
-    <group ref={groupRef} scale={[avatarScale, avatarScale, avatarScale]}>
-      <primitive object={clone} />
+    <group ref={groupRef}>
+      <group scale={[avatarScale, avatarScale, avatarScale]} position={[0, modelYOffset * avatarScale, 0]}>
+        <primitive object={clone} />
+      </group>
       <mesh position={[0, 0.01, 0]} rotation={[-Math.PI / 2, 0, 0]}>
         <circleGeometry args={[0.5, 32]} />
         <meshBasicMaterial color="#000000" transparent opacity={0.3} />
@@ -269,62 +440,91 @@ export const useAvatar3D = (userId?: string) => {
     const loadAvatar = async () => {
       try {
         setLoading(true);
-        
-        let avatarId: string | null = null;
-        
-        // Si hay userId, buscar el avatar asignado
-        if (userId) {
-          const { data: usuario } = await supabase
-            .from('usuarios')
-            .select('avatar_3d_id')
-            .eq('id', userId)
-            .single();
-          
-          avatarId = usuario?.avatar_3d_id || null;
+        setError(null);
+
+        // Obtener el usuario actual si no se proporcionó userId
+        let targetUserId = userId;
+        if (!targetUserId) {
+          const { data: { user } } = await supabase.auth.getUser();
+          targetUserId = user?.id;
         }
-        
-        // Si no hay avatar asignado, obtener el default
+
+        if (!targetUserId) {
+          setAvatarConfig(null);
+          setLoading(false);
+          return;
+        }
+
+        // Buscar avatar asignado al usuario
+        const { data: miembro } = await supabase
+          .from('miembros_espacio')
+          .select('avatar_3d_id')
+          .eq('usuario_id', targetUserId)
+          .maybeSingle();
+
+        const avatarId = miembro?.avatar_3d_id;
+
         if (!avatarId) {
-          const { data: defaultAvatar } = await supabase
-            .from('avatares_3d')
-            .select('id')
-            .eq('activo', true)
-            .order('orden', { ascending: true })
-            .limit(1)
-            .single();
-          
-          avatarId = defaultAvatar?.id || null;
+          // Sin avatar asignado, usar config por defecto
+          setAvatarConfig({
+            id: 'default',
+            nombre: 'Monica IA',
+            modelo_url: BASE_MODEL_URL,
+            escala: 1,
+          });
+          setLoading(false);
+          return;
         }
-        
-        if (avatarId) {
-          // Cargar avatar
-          const { data: avatar } = await supabase
-            .from('avatares_3d')
-            .select('*')
-            .eq('id', avatarId)
-            .single();
-          
-          // Cargar animaciones del avatar
-          const { data: anims } = await supabase
-            .from('avatar_animaciones')
-            .select('*')
-            .eq('avatar_id', avatarId)
-            .eq('activo', true)
-            .order('orden', { ascending: true });
-          
-          if (avatar) {
-            setAvatarConfig({
-              ...avatar,
-              animaciones: anims || []
-            } as Avatar3DConfig);
-          }
-          
-          if (anims) {
-            setAnimaciones(anims as AnimationConfig[]);
-          }
+
+        // Cargar config del avatar
+        const { data: avatar, error: avatarError } = await supabase
+          .from('avatares_3d')
+          .select('*')
+          .eq('id', avatarId)
+          .single();
+
+        if (avatarError) {
+          console.warn('⚠️ Error cargando avatar:', avatarError.message);
+          setAvatarConfig({
+            id: 'default',
+            nombre: 'Monica IA',
+            modelo_url: BASE_MODEL_URL,
+            escala: 1,
+          });
+        } else if (avatar) {
+          setAvatarConfig({
+            id: avatar.id,
+            nombre: avatar.nombre,
+            modelo_url: avatar.modelo_url || BASE_MODEL_URL,
+            escala: avatar.escala || 1,
+          });
         }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Error cargando avatar');
+
+        // Cargar animaciones personalizadas (si existen)
+        const { data: anims } = await supabase
+          .from('avatar_animaciones')
+          .select('*')
+          .eq('avatar_id', avatarId)
+          .order('orden', { ascending: true });
+
+        if (anims && anims.length > 0) {
+          setAnimaciones(anims.map((a: any) => ({
+            id: a.id,
+            nombre: a.nombre,
+            url: a.url,
+            loop: a.loop ?? false,
+            orden: a.orden ?? 0,
+          })));
+        }
+      } catch (err: any) {
+        console.error('❌ Error en useAvatar3D:', err);
+        setError(err.message || 'Error desconocido');
+        setAvatarConfig({
+          id: 'default',
+          nombre: 'Monica IA',
+          modelo_url: BASE_MODEL_URL,
+          escala: 1,
+        });
       } finally {
         setLoading(false);
       }
@@ -357,10 +557,9 @@ export const useAvatarControls = () => {
         setIsRunning(true);
       }
       
-      // Teclas de acción especiales
+      // Teclas de acción especiales (dance/cheer manuales, sit es contextual)
       if (e.code === 'KeyE') setAnimationState('cheer');
       if (e.code === 'KeyQ') setAnimationState('dance');
-      if (e.code === 'KeyC') setAnimationState('sit');
       
       // Flechas y WASD para movimiento
       if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) {
@@ -377,7 +576,7 @@ export const useAvatarControls = () => {
       }
       
       // Volver a idle cuando se sueltan teclas de acción
-      if (['KeyE', 'KeyQ', 'KeyC'].includes(e.code)) {
+      if (['KeyE', 'KeyQ'].includes(e.code)) {
         setAnimationState('idle');
       }
     };

@@ -108,8 +108,8 @@ export const SettingsMembers: React.FC<SettingsMembersProps> = ({
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
+      <div className="mb-8 lg:mb-6">
+        <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2 lg:mb-1">
           {currentLang === 'en' ? 'Manage Members' : currentLang === 'pt' ? 'Gerenciar Membros' : 'Gestionar Miembros'}
         </h2>
         <p className="text-sm text-zinc-400">

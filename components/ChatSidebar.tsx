@@ -4,7 +4,7 @@ import { useStore } from '../store/useStore';
 
 export const ChatSidebar: React.FC = () => {
   const [msg, setMsg] = useState('');
-  const { messages, addMessage, currentUser } = useStore();
+  const { messages, addMessage, currentUser, activeChatGroupId } = useStore();
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -15,10 +15,16 @@ export const ChatSidebar: React.FC = () => {
     if (!msg.trim()) return;
     addMessage({
       id: Math.random().toString(),
-      senderId: currentUser.id,
-      senderName: currentUser.name,
-      text: msg,
-      timestamp: Date.now()
+      grupo_id: activeChatGroupId || 'general',
+      usuario_id: currentUser.id,
+      contenido: msg,
+      tipo: 'texto',
+      creado_en: new Date().toISOString(),
+      usuario: {
+        id: currentUser.id,
+        nombre: currentUser.name,
+        avatar_url: currentUser.profilePhoto,
+      },
     });
     setMsg('');
   };
@@ -34,19 +40,19 @@ export const ChatSidebar: React.FC = () => {
       
       <div className="flex-1 overflow-y-auto p-6 space-y-6 custom-scrollbar">
         {messages.map(m => (
-          <div key={m.id} className={`flex flex-col gap-1.5 ${m.senderId === currentUser.id ? 'items-end' : 'items-start'}`}>
+          <div key={m.id} className={`flex flex-col gap-1.5 ${m.usuario_id === currentUser.id ? 'items-end' : 'items-start'}`}>
             <div className="flex items-center gap-2">
-              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{m.senderName}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-zinc-500">{m.usuario?.nombre || 'Invitado'}</span>
               <span className="text-[8px] text-zinc-700">
-                {new Date(m.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {new Date(m.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
             <p className={`text-xs p-3 rounded-2xl border ${
-              m.senderId === currentUser.id 
+              m.usuario_id === currentUser.id 
                 ? 'bg-indigo-600/10 border-indigo-500/20 text-indigo-100 rounded-tr-none' 
                 : 'bg-zinc-800/40 border-white/5 text-zinc-300 rounded-tl-none'
             }`}>
-              {m.text}
+              {m.contenido}
             </p>
           </div>
         ))}

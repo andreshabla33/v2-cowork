@@ -102,28 +102,28 @@ export const SpeedNetworkingGame: React.FC<SpeedNetworkingGameProps> = ({ onClos
   if (gameState === 'lobby') {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-pink-500/20 flex items-center justify-center"><MessageCircle className="w-6 h-6 text-pink-400" /></div>
-            <div><h2 className="text-2xl font-bold text-white">Speed Networking</h2><p className="text-sm text-zinc-400">Conecta con tus compañeros rápidamente</p></div>
+        <div className="flex items-center justify-between p-6 lg:p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-4 lg:gap-3">
+            <div className="w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-lg bg-pink-500/20 flex items-center justify-center"><MessageCircle className="w-6 h-6 lg:w-5 lg:h-5 text-pink-400" /></div>
+            <div><h2 className="text-2xl lg:text-xl font-bold text-white">Speed Networking</h2><p className="text-sm lg:text-xs text-zinc-400">Conecta con tus compañeros rápidamente</p></div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl"><X className="w-5 h-5 text-zinc-400" /></button>
         </div>
 
         <div className="flex-1 flex">
-          <div className="flex-1 p-8 space-y-6">
-            <div className="grid grid-cols-4 gap-4">
+          <div className="flex-1 p-8 lg:p-5 space-y-6 lg:space-y-4">
+            <div className="grid grid-cols-4 gap-4 lg:gap-3">
               {[{ icon: Clock, value: '3 min', label: 'Por conversación' }, { icon: Users, value: TOTAL_ROUNDS.toString(), label: 'Conexiones' }, { icon: Heart, value: '15+', label: 'Temas' }, { icon: Zap, value: '15 min', label: 'Total' }].map((item, i) => (
-                <div key={i} className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                  <item.icon className="w-5 h-5 text-zinc-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">{item.value}</p>
-                  <p className="text-xs text-zinc-500">{item.label}</p>
+                <div key={i} className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                  <item.icon className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                  <p className="text-2xl lg:text-xl font-bold text-white">{item.value}</p>
+                  <p className="text-xs lg:text-[10px] text-zinc-500">{item.label}</p>
                 </div>
               ))}
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Cómo funciona</h3>
+              <h3 className="text-lg lg:text-base font-semibold text-white">Cómo funciona</h3>
               <div className="space-y-3">
                 {['Se te emparejará aleatoriamente con un compañero', 'Tienes 3 minutos para conversar sobre el tema sugerido', 'Califica la conversación al final de cada ronda', '¡Conecta con quienes tengan intereses similares!'].map((text, i) => (
                   <div key={i} className="flex items-start gap-3">
@@ -139,15 +139,15 @@ export const SpeedNetworkingGame: React.FC<SpeedNetworkingGameProps> = ({ onClos
             </button>
           </div>
 
-          <div className="w-80 p-6 border-l border-zinc-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Participantes</h3>
+          <div className="w-80 lg:w-64 p-6 lg:p-4 border-l border-zinc-800">
+            <h3 className="text-lg lg:text-base font-semibold text-white mb-4 lg:mb-3">Participantes</h3>
             <div className="space-y-3">
               <div className="flex items-center gap-3 p-3 bg-pink-500/10 rounded-xl border border-pink-500/30">
-                <span className="text-2xl">👤</span><div><p className="font-medium text-white">Tú</p><p className="text-xs text-pink-400">Jugador</p></div>
+                <span className="text-2xl lg:text-xl">👤</span><div><p className="font-medium text-white">Tú</p><p className="text-xs text-pink-400">Jugador</p></div>
               </div>
               {MOCK_PARTICIPANTS.map((p) => (
                 <div key={p.id} className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl">
-                  <span className="text-2xl">{p.avatar}</span><div><p className="font-medium text-white">{p.name}</p><p className="text-xs text-zinc-500">{p.role}</p></div>
+                  <span className="text-2xl lg:text-xl">{p.avatar}</span><div><p className="font-medium text-white">{p.name}</p><p className="text-xs text-zinc-500">{p.role}</p></div>
                 </div>
               ))}
             </div>

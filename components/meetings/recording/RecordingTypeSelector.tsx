@@ -13,6 +13,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   TipoGrabacionDetallado, 
   CargoLaboral,
+  type ConfiguracionGrabacion,
   CONFIGURACIONES_GRABACION_DETALLADO,
   getTiposGrabacionDisponibles,
   puedeIniciarGrabacionConAnalisis,
@@ -106,7 +107,7 @@ export const RecordingTypeSelector: React.FC<RecordingTypeSelectorProps> = ({
 
   // Modal de disclaimer para RRHH
   if (showDisclaimer && selectedType) {
-    const config = CONFIGURACIONES_GRABACION[selectedType];
+    const config = CONFIGURACIONES_GRABACION_DETALLADO[selectedType];
     
     return (
       <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-[400] flex items-center justify-center p-4">
@@ -203,7 +204,7 @@ export const RecordingTypeSelector: React.FC<RecordingTypeSelectorProps> = ({
 
         {/* Opciones */}
         <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {Object.values(CONFIGURACIONES_GRABACION).map((config) => (
+          {(Object.values(CONFIGURACIONES_GRABACION_DETALLADO) as ConfiguracionGrabacion[]).map((config) => (
             <button
               key={config.tipo}
               onClick={() => handleTypeClick(config.tipo)}

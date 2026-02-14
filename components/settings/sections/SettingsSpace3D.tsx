@@ -14,6 +14,7 @@ interface Space3DSettings {
   showNamesAboveAvatars: boolean;
   spatialAudio: boolean;
   proximityRadius: number;
+  radioInteresChunks: number;
 }
 
 interface SettingsSpace3DProps {
@@ -56,8 +57,8 @@ export const SettingsSpace3D: React.FC<SettingsSpace3DProps> = ({
 
   return (
     <div>
-      <div className="mb-8">
-        <h2 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2">
+      <div className="mb-8 lg:mb-6">
+        <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white mb-2 lg:mb-1">
           {currentLang === 'en' ? '3D Space' : currentLang === 'pt' ? 'Espaço 3D' : 'Espacio 3D'}
         </h2>
         <p className="text-sm text-zinc-400">
@@ -112,6 +113,16 @@ export const SettingsSpace3D: React.FC<SettingsSpace3DProps> = ({
           description={currentLang === 'en' ? 'Show user names above their avatars' : currentLang === 'pt' ? 'Mostrar os nomes dos usuários sobre seus avatares' : 'Muestra el nombre de los usuarios sobre sus avatares'}
           checked={settings.showNamesAboveAvatars}
           onChange={(v) => updateSetting('showNamesAboveAvatars', v)}
+        />
+        <SettingSlider
+          label={currentLang === 'en' ? 'Chunk interest radius' : currentLang === 'pt' ? 'Raio de interesse por chunk' : 'Radio de interés por chunk'}
+          description={currentLang === 'en' ? 'How many chunks around you are actively rendered/connected' : currentLang === 'pt' ? 'Quantos chunks ao redor são renderizados/conectados' : 'Cuántos chunks alrededor se renderizan/conectan'}
+          value={settings.radioInteresChunks}
+          min={1}
+          max={3}
+          step={1}
+          unit="chunks"
+          onChange={(v) => updateSetting('radioInteresChunks', v)}
         />
       </SettingSection>
 

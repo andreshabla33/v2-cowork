@@ -6,7 +6,6 @@ import {
   Building2, 
   Users, 
   ArrowRight, 
-  ArrowLeft,
   Check,
   Sparkles,
   Mail,
@@ -14,6 +13,7 @@ import {
   Plus
 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useStore } from '@/store/useStore';
 import { CargoSelector } from './CargoSelector';
 import type { CargoLaboral, CargoDB } from './CargoSelector';
 
@@ -38,12 +38,12 @@ interface OnboardingCreadorProps {
   onComplete: () => void;
 }
 
-type Paso = 'bienvenida' | 'espacio' | 'empresa' | 'cargo' | 'invitar' | 'completado';
+type Paso = 'bienvenida' | 'empresa' | 'cargo' | 'invitar' | 'completado';
 
-interface EspacioData {
-  nombre: string;
-  descripcion: string;
-}
+const ESPACIO_GLOBAL = {
+  id: '91887e81-1f26-448c-9d6d-9839e7d83b5d',
+  nombre: 'kronos'
+};
 
 export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   userId,
@@ -54,13 +54,13 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   const { fetchWorkspaces } = useStore();
   const [paso, setPaso] = useState<Paso>('bienvenida');
   const [cargoSeleccionado, setCargoSeleccionado] = useState<CargoLaboral | null>(null);
-  const [espacioData, setEspacioData] = useState<EspacioData>({ nombre: '', descripcion: '' });
   const [invitaciones, setInvitaciones] = useState<string[]>(['']);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [espacioCreado, setEspacioCreado] = useState<{ id: string; nombre: string } | null>(null);
+  const [espacioCreado, setEspacioCreado] = useState<{ id: string; nombre: string } | null>(ESPACIO_GLOBAL);
   const [cargosDB, setCargosDB] = useState<CargoDB[]>([]);
   const [miembroId, setMiembroId] = useState<string | null>(null);
+  const [empresaId, setEmpresaId] = useState<string | null>(null);
   const [empresaData, setEmpresaData] = useState({
     nombre: '',
     industria: '',
@@ -89,98 +89,130 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     }
   };
 
-  const handleCrearEspacio = async () => {
-    if (!espacioData.nombre.trim()) {
-      setError('El nombre del espacio es requerido');
-      return;
+  const completarOnboarding = async () => {
+    if (!espacioCreado) {
+      throw new Error('Espacio global no disponible');
     }
 
-    setLoading(true);
-    setError(null);
+    let targetMiembroId = miembroId;
 
-    try {
-      // Crear el espacio de trabajo (trigger auto-crea cargos y departamentos)
-      const slug = `${espacioData.nombre.toLowerCase().replace(/\s+/g, '-')}-${Math.random().toString(36).substring(2, 8)}`;
-      
-      const { data: espacio, error: espacioError } = await supabase
-        .from('espacios_trabajo')
-        .insert({
-          nombre: espacioData.nombre,
-          descripcion: espacioData.descripcion || 'Espacio de trabajo colaborativo',
-          slug,
-          creado_por: userId
-        })
-        .select()
-        .single();
-
-      if (espacioError) throw espacioError;
-
-      // Crear membresía como super_admin (cargo se asigna en el siguiente paso)
+    if (!targetMiembroId) {
       const { data: miembroData, error: miembroError } = await supabase
         .from('miembros_espacio')
-        .insert({
-          espacio_id: espacio.id,
-          usuario_id: userId,
-          rol: 'super_admin',
-          aceptado: true,
-          onboarding_completado: false
-        })
         .select('id')
-        .single();
+        .eq('espacio_id', espacioCreado.id)
+        .eq('usuario_id', userId)
+        .maybeSingle();
 
       if (miembroError) throw miembroError;
-      setMiembroId(miembroData.id);
-
-      // Fetch cargos creados por el trigger
-      const { data: cargosData } = await supabase
-        .from('cargos')
-        .select('id, nombre, descripcion, categoria, icono, orden, activo, tiene_analisis_avanzado, analisis_disponibles, solo_admin')
-        .eq('espacio_id', espacio.id)
-        .eq('activo', true)
-        .order('orden');
-
-      await fetchWorkspaces();
-      setCargosDB((cargosData || []) as CargoDB[]);
-      setEspacioCreado({ id: espacio.id, nombre: espacio.nombre });
-      setEmpresaData(prev => ({ ...prev, nombre: espacioData.nombre }));
-      setPaso('empresa');
-    } catch (err: any) {
-      console.error('Error creando espacio:', err);
-      if (err.message?.includes('Failed to fetch') || err.message?.includes('NetworkError')) {
-        setError('Error de conexión. Verifica tu internet e intenta de nuevo.');
-      } else if (err.code === '23503') {
-        setError('Error de usuario. Cierra sesión, vuelve a entrar e intenta de nuevo.');
-      } else {
-        setError(err.message || 'Error al crear el espacio. Intenta de nuevo.');
+      if (miembroData?.id) {
+        targetMiembroId = miembroData.id;
+        setMiembroId(miembroData.id);
       }
-    } finally {
-      setLoading(false);
     }
+
+    if (!targetMiembroId) {
+      throw new Error('No se encontró la membresía');
+    }
+
+    const { error: updateError } = await supabase
+      .from('miembros_espacio')
+      .update({ onboarding_completado: true })
+      .eq('id', targetMiembroId);
+
+    if (updateError) throw updateError;
+  };
+
+  const finalizarOnboarding = async () => {
+    await completarOnboarding();
+    setPaso('completado');
+    setTimeout(onComplete, 2000);
   };
 
   const handleGuardarEmpresa = async () => {
     setLoading(true);
     setError(null);
     try {
+      if (!espacioCreado) {
+        throw new Error('Espacio global no disponible');
+      }
       if (empresaData.nombre.trim()) {
-        const { data: nuevaEmpresa, error: createError } = await supabase
-          .from('empresas')
-          .insert({
-            nombre: empresaData.nombre.trim(),
-            industria: empresaData.industria || null,
-            tamano: empresaData.tamano,
-            sitio_web: empresaData.sitio_web.trim() || null,
-            creado_por: userId,
-          })
-          .select()
-          .single();
-        if (createError) throw createError;
+        const payload = {
+          nombre: empresaData.nombre.trim(),
+          industria: empresaData.industria || null,
+          tamano: empresaData.tamano,
+          sitio_web: empresaData.sitio_web.trim() || null,
+          actualizado_en: new Date().toISOString(),
+          espacio_id: espacioCreado.id,
+        };
 
-        // Vincular empresa al espacio
-        await supabase
-          .from('espacios_trabajo')
-          .update({ empresa_id: nuevaEmpresa.id })
-          .eq('id', espacioCreado!.id);
+        let empresaActualId = empresaId;
+
+        if (empresaId) {
+          const { error: updateError } = await supabase
+            .from('empresas')
+            .update(payload)
+            .eq('id', empresaId);
+          if (updateError) throw updateError;
+        } else {
+          const { data: nuevaEmpresa, error: createError } = await supabase
+            .from('empresas')
+            .insert({
+              ...payload,
+              creado_por: userId,
+            })
+            .select()
+            .single();
+          if (createError) throw createError;
+          empresaActualId = nuevaEmpresa.id;
+          setEmpresaId(nuevaEmpresa.id);
+        }
+
+        const { data: miembroExistente, error: miembroExistenteError } = await supabase
+          .from('miembros_espacio')
+          .select('id, empresa_id')
+          .eq('espacio_id', espacioCreado.id)
+          .eq('usuario_id', userId)
+          .maybeSingle();
+
+        if (miembroExistenteError) throw miembroExistenteError;
+
+        if (miembroExistente) {
+          setMiembroId(miembroExistente.id);
+          if (empresaActualId && miembroExistente.empresa_id !== empresaActualId) {
+            const { error: updateMiembroError } = await supabase
+              .from('miembros_espacio')
+              .update({ empresa_id: empresaActualId })
+              .eq('id', miembroExistente.id);
+            if (updateMiembroError) throw updateMiembroError;
+          }
+        } else if (empresaActualId) {
+          const { data: miembroData, error: miembroError } = await supabase
+            .from('miembros_espacio')
+            .insert({
+              espacio_id: espacioCreado.id,
+              usuario_id: userId,
+              rol: 'super_admin',
+              aceptado: true,
+              onboarding_completado: false,
+              empresa_id: empresaActualId,
+            })
+            .select('id')
+            .single();
+
+          if (miembroError) throw miembroError;
+          setMiembroId(miembroData.id);
+        }
+
+        const { data: cargosData } = await supabase
+          .from('cargos')
+          .select('id, nombre, descripcion, categoria, icono, orden, activo, tiene_analisis_avanzado, analisis_disponibles, solo_admin')
+          .eq('espacio_id', espacioCreado.id)
+          .eq('activo', true)
+          .order('orden');
+
+        await fetchWorkspaces();
+        setCargosDB((cargosData || []) as CargoDB[]);
       }
       setPaso('cargo');
     } catch (err: any) {
@@ -189,10 +221,6 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleSkipEmpresa = () => {
-    setPaso('cargo');
   };
 
   const handleAddEmail = () => {
@@ -213,9 +241,16 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     const emailsValidos = invitaciones.filter(e => e.trim() && e.includes('@'));
     
     if (emailsValidos.length === 0) {
-      // Si no hay emails, simplemente completar
-      setPaso('completado');
-      setTimeout(onComplete, 2000);
+      setLoading(true);
+      setError(null);
+      try {
+        await finalizarOnboarding();
+      } catch (err: any) {
+        console.error('Error completando onboarding:', err);
+        setError(err.message || 'Error al completar el onboarding');
+      } finally {
+        setLoading(false);
+      }
       return;
     }
 
@@ -225,7 +260,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
     try {
       // Enviar invitaciones usando la Edge Function
       for (const email of emailsValidos) {
-        await supabase.functions.invoke('enviar-invitacion', {
+        const { data, error: fnError } = await supabase.functions.invoke('enviar-invitacion', {
           body: {
             email,
             espacio_id: espacioCreado!.id,
@@ -233,10 +268,12 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             invitador_id: userId
           }
         });
+
+        if (fnError) throw new Error(fnError.message || 'Error al enviar la invitación');
+        if (data?.error) throw new Error(data.error);
       }
 
-      setPaso('completado');
-      setTimeout(onComplete, 2000);
+      await finalizarOnboarding();
     } catch (err: any) {
       console.error('Error enviando invitaciones:', err);
       setError('Error al enviar algunas invitaciones');
@@ -246,8 +283,16 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
   };
 
   const handleSkipInvitaciones = () => {
-    setPaso('completado');
-    setTimeout(onComplete, 2000);
+    setLoading(true);
+    setError(null);
+    finalizarOnboarding()
+      .catch((err: any) => {
+        console.error('Error completando onboarding:', err);
+        setError(err.message || 'Error al completar el onboarding');
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   return (
@@ -282,7 +327,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 ¡Bienvenido, {userName.split(' ')[0]}!
               </h1>
               <p className="text-sm lg:text-xs text-zinc-400">
-                Vamos a configurar tu espacio de trabajo en menos de 2 minutos
+                Vamos a configurar tu empresa en el espacio global kronos
               </p>
             </div>
 
@@ -291,30 +336,24 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">1</span>
                 </div>
-                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Crea tu espacio de trabajo</span>
+                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Datos de tu empresa</span>
               </div>
               <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
                   <span className="text-violet-400 font-black text-sm lg:text-xs">2</span>
                 </div>
-                <span className="text-zinc-300 font-medium text-sm lg:text-xs">Datos de tu empresa</span>
-              </div>
-              <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
-                <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
-                  <span className="text-violet-400 font-black text-sm lg:text-xs">3</span>
-                </div>
                 <span className="text-zinc-300 font-medium text-sm lg:text-xs">Selecciona tu cargo</span>
               </div>
               <div className="flex items-center gap-3 lg:gap-2 p-3 lg:p-2.5 backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-xl lg:rounded-lg group hover:border-violet-500/30 transition-all">
                 <div className="w-8 h-8 lg:w-7 lg:h-7 bg-gradient-to-br from-violet-600/20 to-fuchsia-600/20 rounded-lg flex items-center justify-center border border-violet-500/20">
-                  <span className="text-violet-400 font-black text-sm lg:text-xs">4</span>
+                  <span className="text-violet-400 font-black text-sm lg:text-xs">3</span>
                 </div>
                 <span className="text-zinc-300 font-medium text-sm lg:text-xs">Invita a tu equipo</span>
               </div>
             </div>
 
             <button
-              onClick={() => setPaso('espacio')}
+              onClick={() => setPaso('empresa')}
               className="relative w-full group overflow-hidden bg-gradient-to-r from-violet-600 via-fuchsia-600 to-cyan-500 text-white py-3 lg:py-2.5 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-wider transition-all shadow-2xl shadow-violet-600/30 active:scale-[0.98]"
             >
               <span className="absolute inset-0 bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
@@ -326,97 +365,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
           </motion.div>
         )}
 
-        {/* PASO: Crear Espacio */}
-        {paso === 'espacio' && (
-          <motion.div
-            key="espacio"
-            initial={{ opacity: 0, x: 100 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -100 }}
-            className="w-full max-w-md lg:max-w-sm relative z-10"
-          >
-            <div className="absolute -inset-1 bg-gradient-to-r from-emerald-600/20 via-cyan-600/20 to-violet-500/20 rounded-[40px] lg:rounded-[32px] blur-xl opacity-60" />
-            <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
-              <button
-                onClick={() => setPaso('bienvenida')}
-                className="mb-4 lg:mb-3 text-zinc-500 hover:text-violet-400 flex items-center gap-2 text-xs transition-colors"
-              >
-                <ArrowLeft className="w-3.5 h-3.5" />
-                Volver
-              </button>
-
-              <div className="text-center mb-6 lg:mb-5">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
-                  Paso 1 de 4
-                </div>
-                <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
-                  <div className="absolute -inset-2 bg-gradient-to-r from-emerald-500 to-cyan-500 rounded-xl blur-lg opacity-40" />
-                  <div className="relative w-12 h-12 lg:w-10 lg:h-10 bg-gradient-to-br from-emerald-500 to-cyan-500 rounded-xl flex items-center justify-center">
-                    <Building2 className="w-6 h-6 lg:w-5 lg:h-5 text-white" />
-                  </div>
-                </div>
-                <h2 className="text-2xl lg:text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-emerald-200 to-white mb-1">Crea tu espacio</h2>
-                <p className="text-zinc-500 text-xs lg:text-[10px]">Dale un nombre a tu espacio de trabajo</p>
-              </div>
-
-              <div className="space-y-3 lg:space-y-2.5 mb-5 lg:mb-4">
-                <div>
-                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">
-                    Nombre del espacio *
-                  </label>
-                  <input
-                    type="text"
-                    value={espacioData.nombre}
-                    onChange={(e) => setEspacioData({ ...espacioData, nombre: e.target.value })}
-                    placeholder="Ej: Mi Empresa, Equipo Marketing..."
-                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs lg:text-[10px] font-medium text-zinc-400 mb-1.5">
-                    Descripción (opcional)
-                  </label>
-                  <textarea
-                    value={espacioData.descripcion}
-                    onChange={(e) => setEspacioData({ ...espacioData, descripcion: e.target.value })}
-                    placeholder="¿De qué trata este espacio?"
-                    rows={2}
-                    className="w-full px-4 py-3.5 lg:py-3 bg-black/40 border border-white/5 rounded-xl text-sm lg:text-xs text-white placeholder-zinc-700 focus:border-violet-500/50 focus:ring-2 focus:ring-violet-500/20 outline-none transition-all resize-none"
-                  />
-                </div>
-              </div>
-
-              {error && (
-                <div className="mb-3 p-2.5 bg-red-500/10 border border-red-500/30 rounded-xl text-red-400 text-[10px] font-bold">
-                  {error}
-                </div>
-              )}
-
-              <button
-                onClick={handleCrearEspacio}
-                disabled={loading || !espacioData.nombre.trim()}
-                className="relative w-full group overflow-hidden bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white py-3.5 lg:py-3 rounded-xl font-black text-xs lg:text-[10px] uppercase tracking-[0.15em] transition-all shadow-2xl shadow-emerald-600/30 active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <span className="absolute inset-0 bg-gradient-to-r from-emerald-400 via-teal-400 to-cyan-400 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
-                <span className="relative flex items-center justify-center gap-2">
-                  {loading ? (
-                    <>
-                      <div className="w-4 h-4 lg:w-3.5 lg:h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                      Creando...
-                    </>
-                  ) : (
-                    <>
-                      Crear espacio
-                      <ArrowRight className="w-4 h-4 lg:w-3.5 lg:h-3.5" />
-                    </>
-                  )}
-                </span>
-              </button>
-            </div>
-          </motion.div>
-        )}
-
-        {/* PASO: Datos de Empresa (opcional) */}
+        {/* PASO: Datos de Empresa */}
         {paso === 'empresa' && (
           <motion.div
             key="empresa"
@@ -429,7 +378,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
               <div className="text-center mb-6 lg:mb-5">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
-                  Paso 2 de 4
+                  Paso 1 de 3
                 </div>
                 <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
                   <div className="absolute -inset-2 bg-gradient-to-r from-fuchsia-500 to-violet-500 rounded-xl blur-lg opacity-40" />
@@ -520,13 +469,6 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
                     )}
                   </span>
                 </button>
-                <button
-                  onClick={handleSkipEmpresa}
-                  disabled={loading}
-                  className="w-full py-2 text-zinc-500 hover:text-violet-400 transition-colors text-[10px] lg:text-[9px] font-bold uppercase tracking-widest"
-                >
-                  Omitir por ahora
-                </button>
               </div>
             </div>
           </motion.div>
@@ -543,7 +485,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
           >
             <CargoSelector
               onSelect={handleSelectCargo}
-              espacioNombre={espacioCreado?.nombre || 'tu espacio'}
+              espacioNombre={espacioCreado?.nombre || 'kronos'}
               isLoading={loading}
               rolUsuario="super_admin"
               cargosDB={cargosDB}
@@ -564,7 +506,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
             <div className="relative backdrop-blur-xl bg-white/[0.03] border border-white/[0.08] rounded-[36px] lg:rounded-[28px] p-6 lg:p-5">
               <div className="text-center mb-6 lg:mb-5">
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-gradient-to-r from-violet-600/20 to-fuchsia-600/20 border border-violet-500/30 rounded-full text-violet-400 text-[9px] lg:text-[8px] font-bold uppercase tracking-wider mb-3">
-                  Paso 4 de 4
+                  Paso 3 de 3
                 </div>
                 <div className="relative group mx-auto w-12 h-12 lg:w-10 lg:h-10 mb-3">
                   <div className="absolute -inset-2 bg-gradient-to-r from-violet-600 to-fuchsia-600 rounded-xl blur-lg opacity-40" />
@@ -670,7 +612,7 @@ export const OnboardingCreador: React.FC<OnboardingCreadorProps> = ({
               Tu espacio <span className="text-emerald-400 font-medium">{espacioCreado?.nombre}</span> está listo
             </p>
             <p className="text-zinc-600 text-[10px]">Redirigiendo...</p>
-            
+
             <div className="mt-6">
               <div className="w-6 h-6 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto" />
             </div>

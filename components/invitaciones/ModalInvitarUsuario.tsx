@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Mail, User, Shield, Users, Crown, X, Send, CheckCircle, AlertTriangle } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { supabase, SUPABASE_URL, SUPABASE_ANON_KEY } from '../../lib/supabase';
 import { Modal } from '../ui/Modal';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
@@ -46,17 +46,38 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
     setEnviando(true);
 
     try {
-      const { data, error: fnError } = await supabase.functions.invoke('enviar-invitacion', {
-        body: {
+      // Obtener token fresco directamente del cliente Supabase
+      const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+      const accessToken = sessionData?.session?.access_token;
+      if (sessionError || !accessToken) {
+        throw new Error('No hay sesión activa. Por favor, inicia sesión nuevamente.');
+      }
+
+      const response = await fetch(`${SUPABASE_URL}/functions/v1/enviar-invitacion`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+          'apikey': SUPABASE_ANON_KEY,
+        },
+        body: JSON.stringify({
           email: email.trim().toLowerCase(),
           espacio_id: espacioId,
           rol,
           nombre_invitado: nombre.trim() || undefined,
-        },
+        }),
       });
 
-      if (fnError) throw new Error(fnError.message || 'Error al enviar la invitación');
-      if (data?.error) throw new Error(data.error);
+      const data = await response.json();
+
+      if (!response.ok) {
+        const msg = [data.error, data.detail].filter(Boolean).join(' — ');
+        throw new Error(msg || `Error ${response.status}`);
+      }
+      if (data?.error) {
+        const msg = [data.error, data.detail].filter(Boolean).join(' — ');
+        throw new Error(msg);
+      }
 
       setExito(true);
       setEmail('');
@@ -90,7 +111,7 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
       title="Invitar al equipo"
       subtitle={espacioNombre}
     >
-      <form onSubmit={handleEnviar} className="p-6 space-y-5">
+      <form onSubmit={handleEnviar} className="p-6 lg:p-5 space-y-5 lg:space-y-4">
         {/* Email */}
         <Input
           label="Correo electrónico *"
@@ -114,10 +135,10 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
 
         {/* Rol de acceso */}
         <div>
-          <label className="block text-[10px] lg:text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3">
+          <label className="block text-[10px] lg:text-[9px] font-black uppercase tracking-widest text-zinc-500 mb-3 lg:mb-2">
             Rol de acceso
           </label>
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 gap-2 lg:gap-1.5">
             {ROLES.map(r => {
               const Icon = r.icon;
               const isSelected = rol === r.id;
@@ -133,13 +154,13 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
                   key={r.id}
                   type="button"
                   onClick={() => setRol(r.id)}
-                  className={`relative flex flex-col items-center gap-2 p-4 rounded-xl border transition-all duration-200 ${
+                  className={`relative flex flex-col items-center gap-2 lg:gap-1.5 p-4 lg:p-3 rounded-xl lg:rounded-lg border transition-all duration-200 ${
                     isSelected
                       ? `${c.bg} ${c.border} shadow-lg ${c.glow}`
                       : 'border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.04] hover:border-white/[0.1]'
                   }`}
                 >
-                  <div className={`p-2.5 rounded-xl transition-colors ${
+                  <div className={`p-2.5 lg:p-2 rounded-xl lg:rounded-lg transition-colors ${
                     isSelected ? c.bg : 'bg-white/[0.03]'
                   }`}>
                     <Icon className={`w-5 h-5 transition-colors ${
@@ -147,12 +168,12 @@ export const ModalInvitarUsuario: React.FC<Props> = ({
                     }`} />
                   </div>
                   <div className="text-center">
-                    <p className={`text-[10px] font-black uppercase tracking-wider transition-colors ${
+                    <p className={`text-[10px] lg:text-[9px] font-black uppercase tracking-wider transition-colors ${
                       isSelected ? 'text-white' : 'text-zinc-400'
                     }`}>
                       {r.label}
                     </p>
-                    <p className="text-[8px] text-zinc-600 mt-0.5 leading-tight">
+                    <p className="text-[8px] lg:text-[7px] text-zinc-600 mt-0.5 leading-tight">
                       {r.desc}
                     </p>
                   </div>

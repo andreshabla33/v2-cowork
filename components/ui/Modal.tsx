@@ -34,17 +34,17 @@ const sizeClasses: Record<ModalSize, string> = {
   '5xl': 'max-w-5xl',
 };
 
-// Responsive adjustments (desktop-first)
+// Responsive adjustments (mobile-first: base=compact, lg=desktop)
 const responsiveSizes: Record<ModalSize, string> = {
   xs: 'max-w-xs',
-  sm: 'max-w-sm lg:max-w-xs',
-  md: 'max-w-md lg:max-w-sm',
-  lg: 'max-w-lg lg:max-w-md md:max-w-sm',
-  xl: 'max-w-xl lg:max-w-lg md:max-w-md',
-  '2xl': 'max-w-2xl lg:max-w-xl md:max-w-lg',
-  '3xl': 'max-w-3xl lg:max-w-2xl md:max-w-xl',
-  '4xl': 'max-w-4xl lg:max-w-3xl md:max-w-2xl',
-  '5xl': 'max-w-5xl lg:max-w-4xl md:max-w-3xl',
+  sm: 'max-w-xs sm:max-w-sm',
+  md: 'max-w-sm sm:max-w-md',
+  lg: 'max-w-sm sm:max-w-md lg:max-w-lg',
+  xl: 'max-w-md sm:max-w-lg lg:max-w-xl',
+  '2xl': 'max-w-lg sm:max-w-xl lg:max-w-2xl',
+  '3xl': 'max-w-xl sm:max-w-2xl lg:max-w-3xl',
+  '4xl': 'max-w-2xl sm:max-w-3xl lg:max-w-4xl',
+  '5xl': 'max-w-3xl sm:max-w-4xl lg:max-w-5xl',
 };
 
 export const Modal: React.FC<ModalProps> = ({

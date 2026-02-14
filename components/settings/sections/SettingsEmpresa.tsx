@@ -67,18 +67,27 @@ export const SettingsEmpresa: React.FC<SettingsEmpresaProps> = ({ workspaceId, i
   const fetchEmpresa = useCallback(async () => {
     setLoading(true);
     try {
-      // Buscar empresa vinculada al espacio
-      const { data: espacio } = await supabase
-        .from('espacios_trabajo')
-        .select('empresa_id')
-        .eq('id', workspaceId)
-        .single();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const userId = sessionData.session?.user.id;
+      if (!userId) {
+        setEmpresa(null);
+        setLoading(false);
+        return;
+      }
 
-      if (espacio?.empresa_id) {
+      const { data: miembroData } = await supabase
+        .from('miembros_espacio')
+        .select('empresa_id')
+        .eq('espacio_id', workspaceId)
+        .eq('usuario_id', userId)
+        .maybeSingle();
+
+      if (miembroData?.empresa_id) {
         const { data: empresaData } = await supabase
           .from('empresas')
           .select('*')
-          .eq('id', espacio.empresa_id)
+          .eq('id', miembroData.empresa_id)
+          .eq('espacio_id', workspaceId)
           .single();
 
         if (empresaData) {
@@ -153,20 +162,14 @@ export const SettingsEmpresa: React.FC<SettingsEmpresaProps> = ({ workspaceId, i
           .insert({
             ...empresaPayload,
             creado_por: session.session?.user.id,
+            espacio_id: workspaceId,
           })
           .select()
           .single();
         if (createError) throw createError;
 
-        // Vincular al espacio
-        const { error: linkError } = await supabase
-          .from('espacios_trabajo')
-          .update({ empresa_id: nuevaEmpresa.id })
-          .eq('id', workspaceId);
-        if (linkError) throw linkError;
-
         setEmpresa(nuevaEmpresa);
-        showMessage('Empresa creada y vinculada al espacio', 'success');
+        showMessage('Empresa creada correctamente', 'success');
       }
       setHasChanges(false);
     } catch (err: any) {

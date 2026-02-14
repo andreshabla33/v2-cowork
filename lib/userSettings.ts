@@ -78,6 +78,8 @@ export interface UserSettings {
     showNamesAboveAvatars: boolean;
     spatialAudio: boolean;
     proximityRadius: number;
+    radioInteresChunks: number;
+    enableDayNightCycle: boolean;
   };
   calendar: {
     googleConnected: boolean;
@@ -195,7 +197,9 @@ const defaultSettings: UserSettings = {
     showFloorGrid: true,
     showNamesAboveAvatars: true,
     spatialAudio: true,
-    proximityRadius: 150
+    proximityRadius: 150,
+    radioInteresChunks: 1,
+    enableDayNightCycle: false
   },
   calendar: {
     googleConnected: false,

@@ -9,6 +9,7 @@ export interface AudioSettings {
   selectedMicrophoneId: string;
   selectedSpeakerId: string;
   noiseReduction: boolean;
+  noiseReductionLevel: string;
   echoCancellation: boolean;
   autoGainControl: boolean;
 }
@@ -19,6 +20,7 @@ const defaultAudioSettings: AudioSettings = {
   selectedMicrophoneId: '',
   selectedSpeakerId: '',
   noiseReduction: true,
+  noiseReductionLevel: 'standard',
   echoCancellation: true,
   autoGainControl: true,
 };
@@ -330,23 +332,23 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
           {/* Menú de configuración de audio estilo Gather */}
           {showAudioMenu && (
-            <div className="absolute bottom-full left-0 mb-2 w-80 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="absolute bottom-full left-0 mb-2 w-72 lg:w-64 bg-zinc-900/95 backdrop-blur-xl rounded-xl lg:rounded-lg border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
               <div className="p-3 space-y-3">
                 {/* Selección de micrófono */}
                 <div>
-                  <div className="text-xs font-medium text-white/50 px-1 mb-2">Seleccionar micrófono</div>
+                  <div className="text-xs lg:text-[11px] font-medium text-white/50 px-1 mb-2">Seleccionar micrófono</div>
                   {microphones.map((mic) => (
                     <button
                       key={mic.deviceId}
                       onClick={() => updateAudioSettings({ selectedMicrophoneId: mic.deviceId })}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`w-full flex items-center gap-3 px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors ${
                         audioSettings.selectedMicrophoneId === mic.deviceId 
-                          ? 'bg-indigo-500/20 text-white' 
+                          ? 'bg-violet-500/20 text-white' 
                           : 'text-white/70 hover:bg-white/5'
                       }`}
                     >
                       {audioSettings.selectedMicrophoneId === mic.deviceId && (
-                        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -361,19 +363,19 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
                 {/* Selección de altavoz */}
                 <div>
-                  <div className="text-xs font-medium text-white/50 px-1 mb-2">Seleccionar altavoz</div>
+                  <div className="text-xs lg:text-[11px] font-medium text-white/50 px-1 mb-2">Seleccionar altavoz</div>
                   {speakers.length > 0 ? speakers.map((speaker) => (
                     <button
                       key={speaker.deviceId}
                       onClick={() => updateAudioSettings({ selectedSpeakerId: speaker.deviceId })}
-                      className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
+                      className={`w-full flex items-center gap-3 px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors ${
                         audioSettings.selectedSpeakerId === speaker.deviceId 
-                          ? 'bg-indigo-500/20 text-white' 
+                          ? 'bg-violet-500/20 text-white' 
                           : 'text-white/70 hover:bg-white/5'
                       }`}
                     >
                       {audioSettings.selectedSpeakerId === speaker.deviceId && (
-                        <svg className="w-4 h-4 text-indigo-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                           <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                         </svg>
                       )}
@@ -393,7 +395,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 {/* Reducción de ruido */}
                 <button
                   onClick={() => updateAudioSettings({ noiseReduction: !audioSettings.noiseReduction })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs text-white/80 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -401,7 +403,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     </svg>
                     <span>Reducción de ruido</span>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.noiseReduction ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.noiseReduction ? 'bg-violet-500' : 'bg-zinc-600'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.noiseReduction ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
@@ -409,7 +411,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 {/* Echo Cancellation */}
                 <button
                   onClick={() => updateAudioSettings({ echoCancellation: !audioSettings.echoCancellation })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs text-white/80 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -417,7 +419,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     </svg>
                     <span>Cancelación de eco</span>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.echoCancellation ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.echoCancellation ? 'bg-violet-500' : 'bg-zinc-600'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.echoCancellation ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
@@ -425,7 +427,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 {/* Auto Gain Control */}
                 <button
                   onClick={() => updateAudioSettings({ autoGainControl: !audioSettings.autoGainControl })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs text-white/80 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -433,7 +435,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     </svg>
                     <span>Control automático de ganancia</span>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.autoGainControl ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${audioSettings.autoGainControl ? 'bg-violet-500' : 'bg-zinc-600'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${audioSettings.autoGainControl ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
@@ -481,22 +483,22 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
 
           {/* Menú de configuración de cámara estilo Gather */}
           {showCameraMenu && (
-            <div className="absolute bottom-full left-0 mb-2 w-64 bg-zinc-900/95 backdrop-blur-xl rounded-xl border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
+            <div className="absolute bottom-full left-0 mb-2 w-64 lg:w-56 bg-zinc-900/95 backdrop-blur-xl rounded-xl lg:rounded-lg border border-white/10 shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200">
               {/* Selector de cámara */}
               <div className="p-3 border-b border-white/5">
-                <div className="text-xs font-medium text-white/50 mb-2">Seleccionar cámara</div>
+                <div className="text-xs lg:text-[11px] font-medium text-white/50 mb-2">Seleccionar cámara</div>
                 {cameras.map((camera) => (
                   <button
                     key={camera.deviceId}
                     onClick={() => updateCameraSettings({ selectedCameraId: camera.deviceId })}
-                    className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors flex items-center gap-2 ${
+                    className={`w-full text-left px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors flex items-center gap-2 ${
                       cameraSettings.selectedCameraId === camera.deviceId
-                        ? 'bg-indigo-500/20 text-white'
+                        ? 'bg-violet-500/20 text-white'
                         : 'text-white/70 hover:bg-white/5 hover:text-white'
                     }`}
                   >
                     {cameraSettings.selectedCameraId === camera.deviceId && (
-                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -512,7 +514,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 {/* Hide self view */}
                 <button
                   onClick={() => updateCameraSettings({ hideSelfView: !cameraSettings.hideSelfView })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs text-white/80 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -520,24 +522,24 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     </svg>
                     <span>Ocultar mi vista</span>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.hideSelfView ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.hideSelfView ? 'bg-violet-500' : 'bg-zinc-600'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cameraSettings.hideSelfView ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </button>
 
                 {/* Background effects - Opciones separadas */}
                 <div className="space-y-1">
-                  <div className="text-xs font-medium text-white/50 px-3 pt-2">Efectos de fondo</div>
+                  <div className="text-xs lg:text-[11px] font-medium text-white/50 px-3 pt-2">Efectos de fondo</div>
                   
                   {/* Ninguno */}
                   <button
                     onClick={() => updateCameraSettings({ backgroundEffect: 'none' })}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      cameraSettings.backgroundEffect === 'none' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    className={`w-full flex items-center gap-3 px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors ${
+                      cameraSettings.backgroundEffect === 'none' ? 'bg-violet-500/20 text-white' : 'text-white/70 hover:bg-white/5'
                     }`}
                   >
                     {cameraSettings.backgroundEffect === 'none' && (
-                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -547,12 +549,12 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   {/* Blur */}
                   <button
                     onClick={() => updateCameraSettings({ backgroundEffect: 'blur' })}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      cameraSettings.backgroundEffect === 'blur' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    className={`w-full flex items-center gap-3 px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors ${
+                      cameraSettings.backgroundEffect === 'blur' ? 'bg-violet-500/20 text-white' : 'text-white/70 hover:bg-white/5'
                     }`}
                   >
                     {cameraSettings.backgroundEffect === 'blur' && (
-                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -562,12 +564,12 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                   {/* Imagen */}
                   <button
                     onClick={() => fileInputRef.current?.click()}
-                    className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                      cameraSettings.backgroundEffect === 'image' ? 'bg-indigo-500/20 text-white' : 'text-white/70 hover:bg-white/5'
+                    className={`w-full flex items-center gap-3 px-3 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs transition-colors ${
+                      cameraSettings.backgroundEffect === 'image' ? 'bg-violet-500/20 text-white' : 'text-white/70 hover:bg-white/5'
                     }`}
                   >
                     {cameraSettings.backgroundEffect === 'image' && (
-                      <svg className="w-4 h-4 text-indigo-400" fill="currentColor" viewBox="0 0 20 20">
+                      <svg className="w-4 h-4 text-violet-400" fill="currentColor" viewBox="0 0 20 20">
                         <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                       </svg>
                     )}
@@ -580,7 +582,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                 {/* Mirror video */}
                 <button
                   onClick={() => updateCameraSettings({ mirrorVideo: !cameraSettings.mirrorVideo })}
-                  className="w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-sm text-white/80 hover:bg-white/5 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-2.5 lg:py-2 rounded-lg text-sm lg:text-xs text-white/80 hover:bg-white/5 transition-colors"
                 >
                   <div className="flex items-center gap-3">
                     <svg className="w-4 h-4 text-white/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -588,7 +590,7 @@ export const BottomControlBar: React.FC<BottomControlBarProps> = ({
                     </svg>
                     <span>Espejo de video</span>
                   </div>
-                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.mirrorVideo ? 'bg-indigo-500' : 'bg-zinc-600'}`}>
+                  <div className={`w-9 h-5 rounded-full transition-colors relative ${cameraSettings.mirrorVideo ? 'bg-violet-500' : 'bg-zinc-600'}`}>
                     <div className={`absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform ${cameraSettings.mirrorVideo ? 'translate-x-4' : 'translate-x-0.5'}`} />
                   </div>
                 </button>

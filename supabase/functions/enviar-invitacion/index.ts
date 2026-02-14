@@ -53,6 +53,21 @@ serve(async (req) => {
       });
     }
 
+    const { data: miembroInvitador, error: miembroError } = await supabaseClient
+      .from('miembros_espacio')
+      .select('empresa_id')
+      .eq('espacio_id', espacio_id)
+      .eq('usuario_id', user.id)
+      .maybeSingle();
+
+    if (miembroError || !miembroInvitador?.empresa_id) {
+      return new Response(JSON.stringify({ error: 'No se encontró empresa del invitador' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    const empresaId = miembroInvitador.empresa_id;
+
     // SHA-256 Token Hashing
     const invitationToken = crypto.randomUUID();
     const tokenBytes = new TextEncoder().encode(invitationToken);
@@ -64,6 +79,7 @@ serve(async (req) => {
       .insert({
         email: email.toLowerCase().trim(),
         espacio_id,
+        empresa_id: empresaId,
         rol,
         token: invitationToken,
         token_hash: tokenHash,
@@ -80,6 +96,20 @@ serve(async (req) => {
 
     const invitationLink = `https://mvp-cowork.vercel.app/invitation?token=${invitationToken}`;
     const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+
+    try {
+      await supabaseClient.from('actividades_log').insert({
+        usuario_id: user.id,
+        empresa_id: empresaId,
+        espacio_id,
+        accion: 'crear_invitacion',
+        entidad: 'invitaciones_pendientes',
+        descripcion: 'Invitacion enviada por edge function',
+        datos_extra: { email: email.toLowerCase().trim(), rol }
+      });
+    } catch (_logError) {
+      // No bloquear el flujo si falla el log
+    }
     
     if (!RESEND_API_KEY) {
         return new Response(JSON.stringify({ error: 'Configuration Error: RESEND_API_KEY missing' }), {

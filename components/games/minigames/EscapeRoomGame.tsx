@@ -181,14 +181,14 @@ export const EscapeRoomGame: React.FC<EscapeRoomGameProps> = ({ onClose }) => {
   if (gameState === 'lobby') {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-violet-500/20 flex items-center justify-center">
-              <Lock className="w-6 h-6 text-violet-400" />
+        <div className="flex items-center justify-between p-6 lg:p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-4 lg:gap-3">
+            <div className="w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-lg bg-violet-500/20 flex items-center justify-center">
+              <Lock className="w-6 h-6 lg:w-5 lg:h-5 text-violet-400" />
             </div>
             <div>
-              <h2 className="text-2xl font-bold text-white">Escape Room Virtual</h2>
-              <p className="text-sm text-zinc-400">Resuelve puzzles y escapa a tiempo</p>
+              <h2 className="text-2xl lg:text-xl font-bold text-white">Escape Room Virtual</h2>
+              <p className="text-sm lg:text-xs text-zinc-400">Resuelve puzzles y escapa a tiempo</p>
             </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl">
@@ -197,27 +197,27 @@ export const EscapeRoomGame: React.FC<EscapeRoomGameProps> = ({ onClose }) => {
         </div>
 
         <div className="flex-1 flex">
-          <div className="flex-1 p-8 space-y-6">
-            <div className="grid grid-cols-3 gap-4">
-              <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                <Clock className="w-5 h-5 text-zinc-400 mb-2" />
-                <p className="text-2xl font-bold text-white">30 min</p>
-                <p className="text-xs text-zinc-500">Límite de tiempo</p>
+          <div className="flex-1 p-8 lg:p-5 space-y-6 lg:space-y-4">
+            <div className="grid grid-cols-3 gap-4 lg:gap-3">
+              <div className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                <Clock className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                <p className="text-2xl lg:text-xl font-bold text-white">30 min</p>
+                <p className="text-xs lg:text-[10px] text-zinc-500">Límite de tiempo</p>
               </div>
-              <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                <Users className="w-5 h-5 text-zinc-400 mb-2" />
-                <p className="text-2xl font-bold text-white">2-6</p>
-                <p className="text-xs text-zinc-500">Jugadores</p>
+              <div className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                <Users className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                <p className="text-2xl lg:text-xl font-bold text-white">2-6</p>
+                <p className="text-xs lg:text-[10px] text-zinc-500">Jugadores</p>
               </div>
-              <div className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                <Lightbulb className="w-5 h-5 text-zinc-400 mb-2" />
-                <p className="text-2xl font-bold text-white">{PUZZLES.length}</p>
-                <p className="text-xs text-zinc-500">Puzzles</p>
+              <div className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                <Lightbulb className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                <p className="text-2xl lg:text-xl font-bold text-white">{PUZZLES.length}</p>
+                <p className="text-xs lg:text-[10px] text-zinc-500">Puzzles</p>
               </div>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Cómo jugar</h3>
+              <h3 className="text-lg lg:text-base font-semibold text-white">Cómo jugar</h3>
               <div className="space-y-3">
                 {['Trabaja en equipo para resolver cada puzzle', 'Usa el chat para comunicarte con tus compañeros', 'Tienes 3 pistas disponibles durante el juego', '¡Escapa antes de que se acabe el tiempo!'].map((text, i) => (
                   <div key={i} className="flex items-start gap-3">
@@ -234,12 +234,12 @@ export const EscapeRoomGame: React.FC<EscapeRoomGameProps> = ({ onClose }) => {
             </button>
           </div>
 
-          <div className="w-80 p-6 border-l border-zinc-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Jugadores</h3>
+          <div className="w-80 lg:w-64 p-6 lg:p-4 border-l border-zinc-800">
+            <h3 className="text-lg lg:text-base font-semibold text-white mb-4 lg:mb-3">Jugadores</h3>
             <div className="space-y-3">
               {players.map((player) => (
                 <div key={player.id} className="flex items-center gap-3 p-3 bg-zinc-900 rounded-xl">
-                  <span className="text-2xl">{player.avatar}</span>
+                  <span className="text-2xl lg:text-xl">{player.avatar}</span>
                   <div className="flex-1">
                     <p className="font-medium text-white">{player.name}</p>
                     <p className="text-xs text-green-400">● Listo</p>

@@ -24,15 +24,15 @@ export const SettingSlider: React.FC<SettingSliderProps> = ({
   disabled = false
 }) => {
   return (
-    <div className="py-4 border-b border-white/[0.05] last:border-b-0">
-      <div className="flex items-center justify-between mb-3">
+    <div className="py-4 lg:py-3 border-b border-white/[0.05] last:border-b-0">
+      <div className="flex items-center justify-between mb-3 lg:mb-2">
         <div>
-          <p className="text-sm font-medium text-white">{label}</p>
+          <p className="text-sm lg:text-xs font-medium text-white">{label}</p>
           {description && (
-            <p className="text-xs text-zinc-400 mt-0.5">{description}</p>
+            <p className="text-xs lg:text-[11px] text-zinc-400 mt-0.5">{description}</p>
           )}
         </div>
-        <span className="px-3 py-1 rounded-lg bg-violet-600/20 border border-violet-500/40 text-sm font-bold text-violet-300">
+        <span className="px-3 lg:px-2 py-1 rounded-lg bg-violet-600/20 border border-violet-500/40 text-sm lg:text-xs font-bold text-violet-300">
           {value}{unit}
         </span>
       </div>

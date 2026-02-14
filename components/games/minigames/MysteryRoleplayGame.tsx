@@ -117,33 +117,33 @@ export const MysteryRoleplayGame: React.FC<MysteryRoleplayGameProps> = ({ onClos
   if (gameState === 'lobby') {
     return (
       <div className="h-full flex flex-col">
-        <div className="flex items-center justify-between p-6 border-b border-zinc-800">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-indigo-500/20 flex items-center justify-center"><Star className="w-6 h-6 text-indigo-400" /></div>
-            <div><h2 className="text-2xl font-bold text-white">Mystery Role Play</h2><p className="text-sm text-zinc-400">Resuelve el misterio en equipo</p></div>
+        <div className="flex items-center justify-between p-6 lg:p-4 border-b border-zinc-800">
+          <div className="flex items-center gap-4 lg:gap-3">
+            <div className="w-12 h-12 lg:w-10 lg:h-10 rounded-xl lg:rounded-lg bg-indigo-500/20 flex items-center justify-center"><Star className="w-6 h-6 lg:w-5 lg:h-5 text-indigo-400" /></div>
+            <div><h2 className="text-2xl lg:text-xl font-bold text-white">Mystery Role Play</h2><p className="text-sm lg:text-xs text-zinc-400">Resuelve el misterio en equipo</p></div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-zinc-800 rounded-xl"><X className="w-5 h-5 text-zinc-400" /></button>
         </div>
 
         <div className="flex-1 flex">
-          <div className="flex-1 p-8 space-y-6">
-            <div className="grid grid-cols-4 gap-4">
+          <div className="flex-1 p-8 lg:p-5 space-y-6 lg:space-y-4">
+            <div className="grid grid-cols-4 gap-4 lg:gap-3">
               {[{ icon: Clock, value: '40 min', label: 'Investigación' }, { icon: Users, value: '4-8', label: 'Jugadores' }, { icon: Fingerprint, value: '5', label: 'Pistas' }, { icon: AlertTriangle, value: '1', label: 'Culpable' }].map((item, i) => (
-                <div key={i} className="p-4 bg-zinc-900 rounded-xl border border-zinc-800">
-                  <item.icon className="w-5 h-5 text-zinc-400 mb-2" />
-                  <p className="text-2xl font-bold text-white">{item.value}</p>
-                  <p className="text-xs text-zinc-500">{item.label}</p>
+                <div key={i} className="p-4 lg:p-3 bg-zinc-900 rounded-xl lg:rounded-lg border border-zinc-800">
+                  <item.icon className="w-5 h-5 lg:w-4 lg:h-4 text-zinc-400 mb-2 lg:mb-1.5" />
+                  <p className="text-2xl lg:text-xl font-bold text-white">{item.value}</p>
+                  <p className="text-xs lg:text-[10px] text-zinc-500">{item.label}</p>
                 </div>
               ))}
             </div>
 
-            <div className="p-6 bg-red-500/10 border border-red-500/30 rounded-2xl">
-              <h3 className="text-lg font-semibold text-red-400 mb-2 flex items-center gap-2"><AlertTriangle className="w-5 h-5" />El Caso</h3>
+            <div className="p-6 lg:p-4 bg-red-500/10 border border-red-500/30 rounded-2xl lg:rounded-xl">
+              <h3 className="text-lg lg:text-base font-semibold text-red-400 mb-2 flex items-center gap-2"><AlertTriangle className="w-5 h-5" />El Caso</h3>
               <p className="text-zinc-300 leading-relaxed">Un importante documento ha desaparecido de la oficina principal. La seguridad fue desactivada brevemente anoche entre las 10 PM y la medianoche. Hay 4 sospechosos, cada uno con su propia historia y secretos. Como equipo, deben investigar, interrogar y descubrir quién es el responsable antes de que sea demasiado tarde.</p>
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-white">Cómo jugar</h3>
+              <h3 className="text-lg lg:text-base font-semibold text-white">Cómo jugar</h3>
               <div className="space-y-3">
                 {['Cada jugador recibe un rol secreto con información exclusiva', 'Investiga revelando pistas y interrogando a sospechosos', 'Discute con tu equipo para analizar la evidencia', 'Vota por el culpable al final del tiempo'].map((text, i) => (
                   <div key={i} className="flex items-start gap-3">
@@ -159,13 +159,13 @@ export const MysteryRoleplayGame: React.FC<MysteryRoleplayGameProps> = ({ onClos
             </button>
           </div>
 
-          <div className="w-80 p-6 border-l border-zinc-800">
-            <h3 className="text-lg font-semibold text-white mb-4">Roles Disponibles</h3>
+          <div className="w-80 lg:w-64 p-6 lg:p-4 border-l border-zinc-800">
+            <h3 className="text-lg lg:text-base font-semibold text-white mb-4 lg:mb-3">Roles Disponibles</h3>
             <div className="space-y-3">
               {ROLES.map((role) => (
                 <div key={role.id} className="p-3 bg-zinc-900 rounded-xl">
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{role.avatar}</span>
+                    <span className="text-2xl lg:text-xl">{role.avatar}</span>
                     <div><p className="font-medium text-white">{role.name}</p><p className="text-xs text-zinc-500">{role.isSuspect ? 'Sospechoso' : 'Investigador'}</p></div>
                   </div>
                 </div>

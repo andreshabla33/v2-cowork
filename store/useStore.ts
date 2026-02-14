@@ -1,6 +1,7 @@
 
 import { create } from 'zustand';
 import { User, Role, Task, TaskStatus, ChatMessage, ThemeType, Workspace, SpaceItem, AvatarConfig, Departamento, PresenceStatus } from '../types';
+import type { Avatar3DConfig } from '../components/Avatar3DGLTF';
 import { supabase } from '../lib/supabase';
 import { getSettingsSection } from '../lib/userSettings';
 
@@ -30,10 +31,12 @@ interface AppState {
   notifications: Notification[];
   unreadChatCount: number;
   activeChatGroupId: string | null;
+  empresasAutorizadas: string[];
   setOnlineUsers: (users: User[]) => void;
   incrementUnreadChat: () => void;
   clearUnreadChat: () => void;
   setActiveChatGroupId: (id: string | null) => void;
+  setEmpresasAutorizadas: (empresas: string[]) => void;
   
   setSession: (session: any) => void;
   setTheme: (theme: ThemeType) => void;
@@ -45,6 +48,8 @@ interface AppState {
   setAuthFeedback: (feedback: { type: 'success' | 'error', message: string } | null) => void;
   
   setPosition: (x: number, y: number, direction?: User['direction'], isSitting?: boolean, isMoving?: boolean) => void;
+  setEmpresaId: (empresaId: string | null) => void;
+  setDepartamentoId: (departamentoId: string | null) => void;
   updateAvatar: (config: AvatarConfig) => Promise<void>;
   updateStatus: (status: PresenceStatus, statusText?: string) => Promise<void>;
   toggleMic: () => void;
@@ -65,6 +70,8 @@ interface AppState {
   addMessage: (msg: ChatMessage) => void;
   addNotification: (message: string, type?: Notification['type']) => void;
   clearNotifications: () => void;
+  avatar3DConfig: Avatar3DConfig | null;
+  setAvatar3DConfig: (config: Avatar3DConfig | null) => void;
   isMiniMode: boolean;
   setMiniMode: (val: boolean) => void;
   toggleMiniMode: () => void;
@@ -93,6 +100,7 @@ export const useStore = create<AppState>((set, get) => ({
   isMiniMode: false,
   isInitializing: false,
   notifications: [],
+  avatar3DConfig: null,
   currentUser: {
     id: 'guest',
     name: 'Invitado',
@@ -116,11 +124,13 @@ export const useStore = create<AppState>((set, get) => ({
   messages: [],
   unreadChatCount: 0,
   activeChatGroupId: null,
+  empresasAutorizadas: [],
   
   setOnlineUsers: (users) => set({ onlineUsers: users }),
   incrementUnreadChat: () => set((state) => ({ unreadChatCount: state.unreadChatCount + 1 })),
   clearUnreadChat: () => set({ unreadChatCount: 0 }),
   setActiveChatGroupId: (id) => set({ activeChatGroupId: id }),
+  setEmpresasAutorizadas: (empresas) => set({ empresasAutorizadas: empresas }),
 
   initialize: async () => {
     if (get().isInitializing) {
@@ -171,6 +181,44 @@ export const useStore = create<AppState>((set, get) => ({
           console.warn("initialize: Could not load avatar config", e);
         }
 
+        // Cargar avatar 3D seleccionado
+        let avatar3DConfig: Avatar3DConfig | null = null;
+        try {
+          const { data: usuarioAvatar } = await supabase
+            .from('usuarios')
+            .select('avatar_3d_id')
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          let avatarId = usuarioAvatar?.avatar_3d_id || null;
+          
+          // Si no tiene avatar asignado, obtener el primero activo
+          if (!avatarId) {
+            const { data: defaultAvatar } = await supabase
+              .from('avatares_3d')
+              .select('id')
+              .eq('activo', true)
+              .order('orden', { ascending: true })
+              .limit(1)
+              .maybeSingle();
+            avatarId = defaultAvatar?.id || null;
+          }
+          
+          if (avatarId) {
+            const { data: avatar3D } = await supabase
+              .from('avatares_3d')
+              .select('id, nombre, modelo_url, escala')
+              .eq('id', avatarId)
+              .maybeSingle();
+            
+            if (avatar3D) {
+              avatar3DConfig = avatar3D as Avatar3DConfig;
+            }
+          }
+        } catch (e) {
+          console.warn("initialize: Could not load avatar 3D config", e);
+        }
+
         let profilePhoto = '';
         try {
           const { data: usuarioData } = await supabase
@@ -195,7 +243,8 @@ export const useStore = create<AppState>((set, get) => ({
             profilePhoto,
             status: statusData.estado_disponibilidad || PresenceStatus.AVAILABLE,
             statusText: statusData.estado_personalizado || ''
-          }
+          },
+          avatar3DConfig
         });
 
         const workspaces = await get().fetchWorkspaces();
@@ -348,6 +397,19 @@ export const useStore = create<AppState>((set, get) => ({
     } 
   })),
 
+  setEmpresaId: (empresaId) => set((state) => ({
+    currentUser: {
+      ...state.currentUser,
+      empresa_id: empresaId ?? undefined
+    }
+  })),
+  setDepartamentoId: (departamentoId) => set((state) => ({
+    currentUser: {
+      ...state.currentUser,
+      departamento_id: departamentoId ?? undefined
+    }
+  })),
+
   updateAvatar: async (config) => {
     const { session } = get();
     if (session?.user?.id) {
@@ -428,6 +490,7 @@ export const useStore = create<AppState>((set, get) => ({
     notifications: [{ id: Math.random().toString(), message, type, timestamp: Date.now() }, ...state.notifications].slice(0, 5)
   })),
   clearNotifications: () => set({ notifications: [] }),
+  setAvatar3DConfig: (config) => set({ avatar3DConfig: config }),
   setMiniMode: (val) => set({ isMiniMode: val }),
   toggleMiniMode: () => set((state) => ({ isMiniMode: !state.isMiniMode })),
 }));

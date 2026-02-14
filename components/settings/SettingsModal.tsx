@@ -20,8 +20,9 @@ import { SettingsSecurity } from './sections/SettingsSecurity';
 import { SettingsCargos } from './sections/SettingsCargos';
 import { SettingsDepartamentos } from './sections/SettingsDepartamentos';
 import { SettingsEmpresa } from './sections/SettingsEmpresa';
+import { SettingsZona } from './sections/SettingsZona';
 
-type SettingsTab = 'general' | 'calendar' | 'minimode' | 'audio' | 'video' | 'meetings' | 'notifications' | 'privacy' | 'performance' | 'space3d' | 'members' | 'guests' | 'security' | 'cargos' | 'departamentos' | 'empresa';
+type SettingsTab = 'general' | 'calendar' | 'minimode' | 'audio' | 'video' | 'meetings' | 'notifications' | 'privacy' | 'performance' | 'space3d' | 'members' | 'guests' | 'security' | 'cargos' | 'departamentos' | 'empresa' | 'zonas';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -108,7 +109,8 @@ const defaultSettings = {
     showFloorGrid: true,
     showNamesAboveAvatars: true,
     spatialAudio: true,
-    proximityRadius: 150
+    proximityRadius: 150,
+    radioInteresChunks: 1
   },
   guests: {
     guestCheckInEnabled: false,
@@ -173,6 +175,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
         selectedMicrophoneId: newSettings.audio.selectedMicrophoneId,
         selectedSpeakerId: newSettings.audio.selectedSpeakerId,
         noiseReduction: newSettings.audio.noiseReduction,
+        noiseReductionLevel: newSettings.audio.noiseReductionLevel,
         echoCancellation: newSettings.audio.echoCancellation,
         autoGainControl: newSettings.audio.autoGainControl,
       };
@@ -227,6 +230,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     { id: 'guests', label: t('settings.guests.title', currentLang), Icon: UserPlus, category: t('settings.category.workspace', currentLang), adminOnly: true },
     { id: 'security', label: t('settings.security.title', currentLang), Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
     { id: 'empresa', label: 'Empresa', Icon: Settings, category: t('settings.category.workspace', currentLang), adminOnly: true },
+    { id: 'zonas', label: 'Zonas y Accesos', Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
     { id: 'cargos', label: 'Cargos', Icon: ShieldCheck, category: t('settings.category.workspace', currentLang), adminOnly: true },
     { id: 'departamentos', label: 'Departamentos', Icon: Users2, category: t('settings.category.workspace', currentLang), adminOnly: true },
   ];
@@ -243,22 +247,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
       />
       
       {/* Modal */}
-      <div className="relative w-full max-w-4xl h-[85vh] max-h-[700px] backdrop-blur-xl bg-zinc-900/95 border border-white/[0.1] rounded-3xl shadow-2xl overflow-hidden flex animate-in fade-in zoom-in-95 duration-200">
+      <div className="relative w-full max-w-4xl lg:max-w-3xl md:max-w-2xl h-[85vh] max-h-[700px] lg:max-h-[600px] backdrop-blur-xl bg-zinc-900/95 border border-white/[0.1] rounded-3xl lg:rounded-2xl shadow-2xl overflow-hidden flex animate-in fade-in zoom-in-95 duration-200">
         
         {/* Sidebar */}
-        <div className="w-56 bg-black/40 border-r border-white/[0.05] flex flex-col">
+        <div className="w-56 lg:w-48 bg-black/40 border-r border-white/[0.05] flex flex-col">
           {/* Header */}
-          <div className="p-5 border-b border-white/[0.05]">
-            <h2 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white">
+          <div className="p-5 lg:p-4 border-b border-white/[0.05]">
+            <h2 className="text-lg lg:text-base font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-violet-200 to-white">
               {t('settings.title', currentLang)}
             </h2>
           </div>
           
           {/* Navigation */}
-          <nav className="flex-1 px-2 py-3 overflow-y-auto">
+          <nav className="flex-1 px-2 lg:px-1.5 py-3 lg:py-2 overflow-y-auto">
             {categories.map(category => (
               <div key={category} className="mb-4">
-                <p className="text-[9px] font-black uppercase tracking-widest text-zinc-600 px-2 mb-2">
+                <p className="text-[9px] lg:text-[8px] font-black uppercase tracking-widest text-zinc-600 px-2 mb-2">
                   {category}
                 </p>
                 {filteredTabs
@@ -267,14 +271,14 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     <button
                       key={tab.id}
                       onClick={() => setActiveTab(tab.id as SettingsTab)}
-                      className={`group w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${
+                      className={`group w-full flex items-center gap-2.5 lg:gap-2 px-2.5 lg:px-2 py-2 lg:py-1.5 rounded-lg text-sm lg:text-xs font-medium transition-all duration-200 ${
                         activeTab === tab.id
                           ? 'bg-violet-600/20 text-white'
                           : 'text-zinc-400 hover:text-white hover:bg-white/[0.05]'
                       }`}
                     >
                       <tab.Icon 
-                        className={`w-[18px] h-[18px] stroke-[1.5] transition-all duration-200 ${
+                        className={`w-[18px] h-[18px] lg:w-4 lg:h-4 stroke-[1.5] transition-all duration-200 ${
                           activeTab === tab.id 
                             ? 'text-violet-400' 
                             : 'text-zinc-500 group-hover:text-zinc-300'
@@ -303,7 +307,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           </div>
           
           {/* Content area */}
-          <div className="flex-1 overflow-y-auto p-8">
+          <div className="flex-1 overflow-y-auto p-8 lg:p-6 md:p-4">
             {activeTab === 'general' && (
               <SettingsGeneral
                 settings={settings.general}
@@ -388,6 +392,12 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             )}
             {activeTab === 'empresa' && isAdmin && (
               <SettingsEmpresa
+                workspaceId={workspaceId}
+                isAdmin={isAdmin}
+              />
+            )}
+            {activeTab === 'zonas' && isAdmin && (
+              <SettingsZona
                 workspaceId={workspaceId}
                 isAdmin={isAdmin}
               />

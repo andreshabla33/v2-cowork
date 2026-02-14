@@ -226,23 +226,25 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
       try {
         // Si es invitado, obtener tipo desde la invitación
         if (tokenInvitacion) {
-          const { data: invitacion } = await supabase
-            .from('invitaciones_reunion')
-            .select('sala:salas_reunion(tipo, configuracion)')
-            .eq('token_unico', tokenInvitacion)
-            .single();
-          
-          if (invitacion?.sala) {
-            const salaData = invitacion.sala as any;
+          const { data, error: fnError } = await supabase.functions.invoke('validar-invitacion-reunion', {
+            body: { token: tokenInvitacion }
+          });
+
+          if (fnError || data?.error) {
+            throw new Error(fnError?.message || data?.error || 'Invitación no válida');
+          }
+
+          const salaData = data?.invitacion?.sala as any;
+          if (salaData) {
             const config = salaData.configuracion;
-            
+
             // Usar tipo_reunion de configuración si existe (nuevo sistema unificado)
             if (config?.tipo_reunion) {
               setTipoReunion(tipoMapUnificado[config.tipo_reunion as TipoReunionUnificado] || 'equipo');
             } else {
               setTipoReunion(tipoMapBD[salaData.tipo] || 'equipo');
             }
-            
+
             if (config?.reunion_id) {
               setReunionId(config.reunion_id);
             }
@@ -251,7 +253,7 @@ export const MeetingRoom: React.FC<MeetingRoomProps> = ({
               setInvitadoExterno(config.invitados_externos[0]);
             }
           }
-        } 
+        }
         // Si es usuario autenticado con salaId
         else if (salaId) {
           const { data: sala } = await supabase

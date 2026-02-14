@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { useStore } from '../store/useStore';
 import VirtualSpace3D from './VirtualSpace3D';
 import { TaskBoard } from './TaskBoard';
@@ -19,17 +19,21 @@ import { supabase } from '../lib/supabase';
 import { Language, getCurrentLanguage, subscribeToLanguageChange, t } from '../lib/i18n';
 import { getSettingsSection } from '../lib/userSettings';
 import { cargarMetricasEspacio } from '../lib/metricasAnalisis';
+import { obtenerChunk, obtenerChunksVecinos } from '../lib/chunkSystem';
 import { MiniModeOverlay } from './MiniModeOverlay';
 import { ProductTour } from './onboarding/ProductTour';
 
 export const WorkspaceLayout: React.FC = () => {
-  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace, setMiniMode, isMiniMode } = useStore();
+  const { activeWorkspace, activeSubTab, setActiveSubTab, setActiveWorkspace, currentUser, theme, setTheme, setView, session, setOnlineUsers, addNotification, unreadChatCount, clearUnreadChat, userRoleInActiveWorkspace, setMiniMode, isMiniMode, setEmpresaId, setDepartamentoId, setEmpresasAutorizadas } = useStore();
   const [showViben, setShowViben] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [showGameHub, setShowGameHub] = useState(false);
   const [isPlayingGame, setIsPlayingGame] = useState(false);
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
-  const presenceChannelRef = useRef<any>(null);
+  const presenceChannelsRef = useRef<Map<string, any>>(new Map());
+  const prevOnlineUsersRef = useRef<Set<string>>(new Set());
+  const lastNotificationRef = useRef<Map<string, number>>(new Map());
+  const currentUserRef = useRef(currentUser);
   const [currentLang, setCurrentLang] = useState<Language>(getCurrentLanguage());
 
   // Mini Mode: auto-show al salir del espacio virtual, auto-hide al volver
@@ -60,6 +64,148 @@ export const WorkspaceLayout: React.FC = () => {
   const onVibenToggle = () => setShowViben(prev => !prev);
   const isAdmin = userRoleInActiveWorkspace === 'super_admin' || userRoleInActiveWorkspace === 'admin';
 
+  useEffect(() => {
+    currentUserRef.current = currentUser;
+  }, [currentUser]);
+
+  const recalcularUsuarios = useCallback(() => {
+    const usuariosMap = new Map<string, User>();
+    const detalleMap = new Map<string, 'empresa' | 'publico'>();
+    presenceChannelsRef.current.forEach((channel) => {
+      const state = channel.presenceState();
+      Object.keys(state).forEach(key => {
+        const presences = state[key] as any[];
+        presences.forEach(presence => {
+          if (presence.user_id !== session?.user?.id) {
+            const nivelDetalle: 'empresa' | 'publico' = presence.nivel_detalle === 'publico' ? 'publico' : 'empresa';
+            const nivelPrevio = detalleMap.get(presence.user_id);
+            if (nivelPrevio === 'empresa' && nivelDetalle === 'publico') return;
+
+            detalleMap.set(presence.user_id, nivelDetalle);
+            usuariosMap.set(presence.user_id, {
+              id: presence.user_id,
+              name: presence.name || (nivelDetalle === 'publico' ? 'Miembro de otra empresa' : 'Usuario'),
+              role: presence.role || Role.MIEMBRO,
+              avatar: presence.profilePhoto || '',
+              profilePhoto: presence.profilePhoto || '',
+              avatarConfig: presence.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20', accessory: 'none' },
+              empresa_id: presence.empresa_id || undefined,
+              departamento_id: presence.departamento_id || undefined,
+              x: presence.x || 500,
+              y: presence.y || 500,
+              direction: presence.direction || 'front',
+              isOnline: true,
+              isMicOn: presence.isMicOn || false,
+              isCameraOn: presence.isCameraOn || false,
+              isScreenSharing: false,
+              isPrivate: presence.isPrivate ?? nivelDetalle === 'publico',
+              status: presence.status || PresenceStatus.AVAILABLE,
+            });
+          }
+        });
+      });
+    });
+
+    const nextIds = new Set(usuariosMap.keys());
+    const now = Date.now();
+    nextIds.forEach((userId) => {
+      if (!prevOnlineUsersRef.current.has(userId)) {
+        const lastTime = lastNotificationRef.current.get(userId) ?? 0;
+        if (now - lastTime > 30000) {
+          addNotification(`${usuariosMap.get(userId)?.name || 'Usuario'} se conectó`, 'entry');
+          lastNotificationRef.current.set(userId, now);
+        }
+      }
+    });
+
+    prevOnlineUsersRef.current = nextIds;
+    setOnlineUsers(Array.from(usuariosMap.values()));
+  }, [addNotification, session?.user?.id, setOnlineUsers]);
+
+  const trackPresenceEnCanal = useCallback(async (channel: any, nivelDetalle: 'publico' | 'empresa') => {
+    if (!session?.user?.id) return;
+    const privacy = getSettingsSection('privacy');
+    const usuarioActual = currentUserRef.current;
+    const statusPrivado = !privacy.showOnlineStatus
+      ? PresenceStatus.AWAY
+      : !privacy.showActivityStatus
+      ? PresenceStatus.AVAILABLE
+      : usuarioActual.status;
+    const payloadBase = {
+      user_id: session.user.id,
+      empresa_id: usuarioActual.empresa_id ?? null,
+      departamento_id: usuarioActual.departamento_id ?? null,
+      nivel_detalle: nivelDetalle,
+      x: privacy.showLocationInSpace ? usuarioActual.x : 0,
+      y: privacy.showLocationInSpace ? usuarioActual.y : 0,
+      direction: usuarioActual.direction,
+      status: statusPrivado,
+    };
+    const payloadEmpresa = {
+      ...payloadBase,
+      name: usuarioActual.name,
+      role: usuarioActual.role,
+      avatarConfig: usuarioActual.avatarConfig,
+      profilePhoto: usuarioActual.profilePhoto,
+      isMicOn: usuarioActual.isMicOn,
+      isCameraOn: usuarioActual.isCameraOn,
+    };
+    const payloadPublico = {
+      ...payloadBase,
+      name: 'Miembro de otra empresa',
+      role: Role.MIEMBRO,
+      avatarConfig: undefined,
+      profilePhoto: '',
+      isMicOn: false,
+      isCameraOn: false,
+      isPrivate: true,
+      status: PresenceStatus.AWAY,
+    };
+    await channel.track(nivelDetalle === 'empresa' ? payloadEmpresa : payloadPublico);
+  }, [session?.user?.id]);
+
+  const sincronizarCanalesPorChunk = useCallback(() => {
+    if (!activeWorkspace?.id || !session?.user?.id) return;
+    const usuarioActual = currentUserRef.current;
+    const chunkActual = obtenerChunk(usuarioActual.x, usuarioActual.y);
+    const claves = obtenerChunksVecinos(chunkActual, 2);
+    const canalesDeseados = new Map<string, 'publico' | 'empresa'>();
+    const empresaId = usuarioActual.empresa_id ?? null;
+
+    claves.forEach((clave) => {
+      canalesDeseados.set(`workspace:${activeWorkspace.id}:${clave}:publico`, 'publico');
+      if (empresaId) {
+        canalesDeseados.set(`workspace:${activeWorkspace.id}:${clave}:empresa:${empresaId}`, 'empresa');
+      }
+    });
+
+    canalesDeseados.forEach((nivelDetalle, canalNombre) => {
+      if (presenceChannelsRef.current.has(canalNombre)) return;
+      const channel = supabase.channel(canalNombre, {
+        config: { presence: { key: session.user.id } }
+      });
+
+      channel
+        .on('presence', { event: 'sync' }, () => {
+          recalcularUsuarios();
+        })
+        .subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await trackPresenceEnCanal(channel, nivelDetalle);
+          }
+        });
+
+      presenceChannelsRef.current.set(canalNombre, channel);
+    });
+
+    presenceChannelsRef.current.forEach((channel, canalNombre) => {
+      if (!canalesDeseados.has(canalNombre)) {
+        supabase.removeChannel(channel);
+        presenceChannelsRef.current.delete(canalNombre);
+      }
+    });
+  }, [activeWorkspace?.id, session?.user?.id, recalcularUsuarios, trackPresenceEnCanal]);
+
   // Aplicar reducedMotion globalmente al body
   useEffect(() => {
     const perf = getSettingsSection('performance');
@@ -81,74 +227,94 @@ export const WorkspaceLayout: React.FC = () => {
     }
   }, [activeWorkspace?.id]);
 
-  // Realtime Presence CENTRALIZADO - único lugar que maneja presencia
   useEffect(() => {
     if (!activeWorkspace?.id || !session?.user?.id) return;
+    let cancelado = false;
+    const cargarEmpresa = async () => {
+      try {
+        const { data } = await supabase
+          .from('miembros_espacio')
+          .select('empresa_id, departamento_id')
+          .eq('espacio_id', activeWorkspace.id)
+          .eq('usuario_id', session.user.id)
+          .maybeSingle();
 
-    const roomName = `workspace:${activeWorkspace.id}`;
-    const channel = supabase.channel(roomName, {
-      config: { presence: { key: session.user.id } }
-    });
+        if (!cancelado) {
+          setEmpresaId(data?.empresa_id ?? null);
+          setDepartamentoId(data?.departamento_id ?? null);
+        }
+      } catch (error) {
+        if (!cancelado) {
+          setEmpresaId(null);
+          setDepartamentoId(null);
+        }
+      }
+    };
 
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const users: User[] = [];
-        Object.keys(state).forEach(key => {
-          const presences = state[key] as any[];
-          presences.forEach(presence => {
-            if (presence.user_id !== session.user.id) {
-              users.push({
-                id: presence.user_id,
-                name: presence.name || 'Usuario',
-                role: presence.role || Role.MIEMBRO,
-                avatar: presence.profilePhoto || '',
-                profilePhoto: presence.profilePhoto || '',
-                avatarConfig: presence.avatarConfig || { skinColor: '#fcd34d', clothingColor: '#6366f1', hairColor: '#4b2c20', accessory: 'none' },
-                x: presence.x || 500,
-                y: presence.y || 500,
-                direction: presence.direction || 'front',
-                isOnline: true,
-                isMicOn: presence.isMicOn || false,
-                isCameraOn: presence.isCameraOn || false,
-                isScreenSharing: false,
-                isPrivate: false,
-                status: presence.status || PresenceStatus.AVAILABLE,
-              });
-            }
-          });
+    cargarEmpresa();
+    return () => {
+      cancelado = true;
+    };
+  }, [activeWorkspace?.id, session?.user?.id, setEmpresaId, setDepartamentoId]);
+
+  useEffect(() => {
+    if (!activeWorkspace?.id || !currentUser.empresa_id) {
+      setEmpresasAutorizadas([]);
+      return;
+    }
+
+    let cancelado = false;
+    const cargarAutorizaciones = async () => {
+      try {
+        const { data } = await supabase
+          .from('autorizaciones_empresa')
+          .select('empresa_origen_id, empresa_destino_id, estado')
+          .eq('espacio_id', activeWorkspace.id)
+          .eq('estado', 'aprobada');
+
+        if (cancelado) return;
+        const autorizadas = new Set<string>();
+        (data || []).forEach((row: any) => {
+          if (row.empresa_origen_id === currentUser.empresa_id && row.empresa_destino_id) {
+            autorizadas.add(row.empresa_destino_id);
+          }
+          if (row.empresa_destino_id === currentUser.empresa_id && row.empresa_origen_id) {
+            autorizadas.add(row.empresa_origen_id);
+          }
         });
-        setOnlineUsers(users);
-      })
-      .on('presence', { event: 'join' }, ({ newPresences }) => {
-        if (newPresences[0]?.name) {
-          addNotification(`${newPresences[0].name} se conectó`, 'entry');
-        }
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          const privacy = getSettingsSection('privacy');
-          // Siempre hacer track de presencia básica para aparecer en el espacio
-          // La ubicación exacta depende de showLocationInSpace
-          await channel.track({
-            user_id: session.user.id,
-            name: currentUser.name,
-            role: currentUser.role,
-            avatarConfig: currentUser.avatarConfig,
-            profilePhoto: currentUser.profilePhoto,
-            x: privacy.showLocationInSpace ? currentUser.x : 0,
-            y: privacy.showLocationInSpace ? currentUser.y : 0,
-            direction: currentUser.direction,
-            isMicOn: currentUser.isMicOn,
-            isCameraOn: currentUser.isCameraOn,
-            status: !privacy.showOnlineStatus ? PresenceStatus.AWAY : !privacy.showActivityStatus ? PresenceStatus.AVAILABLE : currentUser.status,
-          });
-        }
+        setEmpresasAutorizadas(Array.from(autorizadas));
+      } catch (error) {
+        if (!cancelado) setEmpresasAutorizadas([]);
+      }
+    };
+
+    cargarAutorizaciones();
+    return () => {
+      cancelado = true;
+    };
+  }, [activeWorkspace?.id, currentUser.empresa_id, setEmpresasAutorizadas]);
+
+  // Realtime Presence por chunk (interest management)
+  useEffect(() => {
+    if (!activeWorkspace?.id || !session?.user?.id) return;
+    sincronizarCanalesPorChunk();
+    return () => {
+      presenceChannelsRef.current.forEach((channel) => {
+        supabase.removeChannel(channel);
       });
+      presenceChannelsRef.current.clear();
+      prevOnlineUsersRef.current = new Set();
+    };
+  }, [activeWorkspace?.id, session?.user?.id, currentUser.empresa_id, sincronizarCanalesPorChunk]);
 
-    presenceChannelRef.current = channel;
+  useEffect(() => {
+    if (!activeWorkspace?.id || !session?.user?.id) return;
+    sincronizarCanalesPorChunk();
+  }, [activeWorkspace?.id, session?.user?.id, currentUser.x, currentUser.y, currentUser.empresa_id, sincronizarCanalesPorChunk]);
 
-    // Registrar conexión al espacio para tracking de tiempo (solo si activityHistory está habilitado)
+  // Registrar conexión al espacio para tracking de tiempo (solo si activityHistory está habilitado)
+  useEffect(() => {
+    if (!activeWorkspace?.id || !session?.user?.id) return;
     let conexionId: string | null = null;
     const privacyForConn = getSettingsSection('privacy');
     if (privacyForConn.activityHistoryEnabled !== false) {
@@ -156,10 +322,21 @@ export const WorkspaceLayout: React.FC = () => {
         try {
           const { data } = await supabase
             .from('registro_conexiones')
-            .insert({ usuario_id: session.user.id, espacio_id: activeWorkspace.id })
+            .insert({ usuario_id: session.user.id, espacio_id: activeWorkspace.id, empresa_id: currentUserRef.current.empresa_id ?? null })
             .select('id')
             .single();
           if (data) conexionId = data.id;
+
+          await supabase.from('actividades_log').insert({
+            usuario_id: session.user.id,
+            empresa_id: currentUserRef.current.empresa_id ?? null,
+            espacio_id: activeWorkspace.id,
+            accion: 'conexion_espacio',
+            entidad: 'espacio',
+            entidad_id: activeWorkspace.id,
+            descripcion: 'Usuario conectado al espacio',
+            datos_extra: { origen: 'workspace_layout' }
+          });
           
           // Limpiar registros antiguos según retención configurada
           const retDays = privacyForConn.activityRetentionDays;
@@ -203,32 +380,31 @@ export const WorkspaceLayout: React.FC = () => {
           .update({ desconectado_en: new Date().toISOString() })
           .eq('id', conexionId)
           .then(() => console.log('Desconexión registrada'));
+
+        supabase.from('actividades_log').insert({
+          usuario_id: session.user.id,
+          empresa_id: currentUserRef.current.empresa_id ?? null,
+          espacio_id: activeWorkspace.id,
+          accion: 'desconexion_espacio',
+          entidad: 'espacio',
+          entidad_id: activeWorkspace.id,
+          descripcion: 'Usuario desconectado del espacio',
+          datos_extra: { origen: 'workspace_layout' }
+        }).then(() => {});
       }
-      supabase.removeChannel(channel);
-      presenceChannelRef.current = null;
     };
-  }, [activeWorkspace?.id, session?.user?.id]);
+  }, [activeWorkspace?.id, session?.user?.id, session?.access_token]);
 
   // Actualizar presencia cuando cambia la posición (respetando settings de privacidad)
   useEffect(() => {
-    if (presenceChannelRef.current && session?.user?.id && presenceChannelRef.current.state === 'joined') {
-      const privacy = getSettingsSection('privacy');
-      // Siempre actualizar estado (track), la privacidad de ubicación se maneja en las propiedades x/y
-      presenceChannelRef.current.track({
-        user_id: session.user.id,
-        name: currentUser.name,
-        role: currentUser.role,
-        avatarConfig: currentUser.avatarConfig,
-        profilePhoto: currentUser.profilePhoto,
-        x: privacy.showLocationInSpace ? currentUser.x : 0,
-        y: privacy.showLocationInSpace ? currentUser.y : 0,
-        direction: currentUser.direction,
-        isMicOn: currentUser.isMicOn,
-        isCameraOn: currentUser.isCameraOn,
-        status: !privacy.showOnlineStatus ? PresenceStatus.AWAY : !privacy.showActivityStatus ? PresenceStatus.AVAILABLE : currentUser.status,
-      });
-    }
-  }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, currentUser.status, session?.user?.id]);
+    if (!session?.user?.id) return;
+    presenceChannelsRef.current.forEach((channel, canalNombre) => {
+      if (channel.state === 'joined') {
+        const nivelDetalle = canalNombre.includes(':publico') ? 'publico' : 'empresa';
+        trackPresenceEnCanal(channel, nivelDetalle);
+      }
+    });
+  }, [currentUser.x, currentUser.y, currentUser.isMicOn, currentUser.isCameraOn, currentUser.status, currentUser.empresa_id, session?.user?.id, trackPresenceEnCanal]);
 
   if (!activeWorkspace) return null;
 

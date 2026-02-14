@@ -268,21 +268,71 @@ export const GLTFAvatar: React.FC<AvatarProps> = ({ config, isMoving, direction 
 
 ---
 
-### Fase 4: AI Agents en Espacio (Diferenciador)
+### 🚧 Fase 3.5: Zonas de Empresa y Privacidad Multi-empresa
 
-**Objetivo:** Agentes AI como avatares 3D interactivos
+**Objetivo:** Crear zonas visuales por empresa y mostrar avatares fantasma para usuarios no autorizados.
 
-> ⚠️ Esta es nuestra **ventaja competitiva única** vs Gather
+#### Entregables principales
 
-#### Funcionalidades
+| # | Feature | Estado | Archivo |
+|---|---------|:------:|---------|
+| 3.5.1 | Render de zonas por empresa | ✅ | `components/3d/ZonaEmpresa.tsx`, `VirtualSpace3D.tsx` |
+| 3.5.2 | Avatares fantasma para empresas no autorizadas | ✅ | `components/3d/GhostAvatar.tsx`, `VirtualSpace3D.tsx` |
+| 3.5.3 | Servicio de autorizaciones entre empresas | ✅ | `lib/autorizacionesEmpresa.ts` |
+| 3.5.4 | Panel de zonas y autorizaciones | ✅ | `components/settings/sections/SettingsZona.tsx` |
 
-| # | Feature | Descripción |
-|---|---------|-------------|
-| 4.1 | Agentes como avatares | Claude, Codex, Gemini como personajes 3D |
-| 4.2 | Interacción por proximidad | Acercarte al agente para chatear |
-| 4.3 | Animaciones de trabajo | Agente "escribiendo" cuando procesa |
-| 4.4 | Tareas visibles | Ver qué está haciendo el agente |
-| 4.5 | Multi-agent collaboration | Agentes trabajando entre sí |
+#### Próximos pasos
+- [x] Notificaciones en tiempo real para nuevas solicitudes (Realtime)
+- [x] Indicadores visuales en el HUD cuando una empresa solicita acceso
+
+---
+
+### ✅ Fase 4: Experiencia Multi-empresa en Tiempo Real
+
+**Objetivo:** Diferenciar zonas por empresa, solicitar acceso por proximidad y operar autorizaciones con notificaciones y canales compartidos temporales.
+
+#### Entregables principales
+
+| # | Feature | Estado | Archivo |
+|---|---------|:------:|---------|
+| 4.1 | Diferenciación visual de zonas (propia/ajena/común) | ✅ | `components/3d/ZonaEmpresa.tsx`, `VirtualSpace3D.tsx` |
+| 4.2 | Botón "Solicitar acceso" por proximidad | ✅ | `components/VirtualSpace3D.tsx` |
+| 4.3 | Notificaciones realtime de solicitudes/aprobaciones | ✅ | `components/VirtualSpace3D.tsx`, `lib/autorizacionesEmpresa.ts` |
+| 4.4 | Canales compartidos temporales al aprobar | ✅ | `lib/autorizacionesEmpresa.ts`, `SettingsZona.tsx` |
+| 4.5 | Etiqueta "Hay alguien aquí" en GhostAvatar | ✅ | `components/3d/GhostAvatar.tsx`, `VirtualSpace3D.tsx` |
+| 4.6 | Expiración y refresco de autorizaciones activas | ✅ | `lib/autorizacionesEmpresa.ts` |
+
+#### Notas técnicas
+- Las notificaciones usan `notificaciones` (Supabase Realtime) con filtrado por `usuario_id`.
+- Se prioriza privacidad: empresas no autorizadas permanecen como GhostAvatar.
+
+---
+
+### FASE 5: Optimizaciones Avanzadas + Scaling (ongoing)
+
+**Objetivo:** Escalar a 1000+ usuarios.
+
+#### Estado actual (2026-02)
+
+| # | Tarea | Estado | Evidencia |
+|---|-------|:------:|-----------|
+| 5.1 | **Web Workers (chunks/interpolación)** | ✅ | `workers/chunkWorker.ts`, `workers/interpolacionWorker.ts`, `components/VirtualSpace3D.tsx` |
+| 5.2 | **bitECS base** (world + sync posiciones) | 🟡 Parcial | `lib/ecs/espacioEcs.ts`, `components/VirtualSpace3D.tsx` |
+| 5.3 | **Agones (K8s)** | ❌ | Pendiente de infraestructura |
+| 5.4 | **OffscreenCanvas** | ❌ | Pendiente de I+D |
+| 5.5 | **WebGPU** | ❌ | Pendiente (evaluación futura) |
+| 5.6 | **WASM Physics (Rapier.js)** | ❌ | Pendiente de integración |
+| 5.7 | **Edge Computing (Workers + LiveKit Edge)** | ❌ | Pendiente de arquitectura |
+| 5.8 | **AI Layer** (noise cancellation + routing) | 🟡 Parcial | `components/meetings/recording/useTranscription.ts`, `components/meetings/recording/useMediaPipeWorker.ts` |
+
+#### Pendientes para completar Fase 5
+1. **bitECS completo:** mover movimiento/colisiones/visibilidad a sistemas ECS y remover lógica legacy.
+2. **Rapier.js:** integración de colisiones de zonas (WASM) con zonas/teleports.
+3. **OffscreenCanvas:** PoC Three.js render en worker + pipeline de mensajes.
+4. **WebGPU:** plan de migración gradual + detección de soporte.
+5. **Agones:** infraestructura K8s, autoscaling, health checks.
+6. **Edge computing:** LiveKit Edge + Cloudflare Workers (routing regional).
+7. **AI Layer:** noise cancellation real (DSP/ML), routing inteligente y fallback.
 
 ---
 

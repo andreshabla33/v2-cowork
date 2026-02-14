@@ -676,7 +676,7 @@ export const VirtualSpace: React.FC = () => {
             }
           }
           if (this.textures.exists(key)) this.textures.remove(key);
-          this.textures.addSpriteSheet(key, canvas, { frameWidth: 64, frameHeight: 64 });
+          this.textures.addSpriteSheet(key, canvas as unknown as HTMLImageElement, { frameWidth: 64, frameHeight: 64 });
           ['down', 'left', 'right', 'up'].forEach((dir, i) => { 
             const animKey = `${key}-${dir}`;
             if (!this.anims.exists(animKey)) {
@@ -688,7 +688,7 @@ export const VirtualSpace: React.FC = () => {
           const c = this.add.container(u.x, u.y);
           const s = this.add.sprite(0, 0, tex, 0).setScale(1.5);
           const nColor = theme === 'arcade' ? '#00ff41' : '#ffffff';
-          const l = this.add.text(0, -60, u.name, { fontSize: '12px', fontWeight: 'bold', backgroundColor: '#00000088', padding: { x: 4, y: 2 }, color: nColor }).setOrigin(0.5);
+          const l = this.add.text(0, -60, u.name, { fontSize: '12px', fontStyle: 'bold', backgroundColor: '#00000088', padding: { x: 4, y: 2 }, color: nColor }).setOrigin(0.5);
           c.add([s, l]); this.remotePlayers.set(u.id, c);
         }
         update(time: number) {
