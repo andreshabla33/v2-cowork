@@ -143,7 +143,7 @@ export const MobileJoystick: React.FC<MobileJoystickProps> = ({
       ref={containerRef}
       className="absolute z-[150] select-none touch-none"
       style={{
-        bottom: 160,
+        bottom: 100,
         left: 20,
         width: size,
         height: size,

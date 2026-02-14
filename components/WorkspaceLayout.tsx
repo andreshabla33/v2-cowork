@@ -32,6 +32,7 @@ export const WorkspaceLayout: React.FC = () => {
   const [pendingGameInvitation, setPendingGameInvitation] = useState<{ invitacion: any; partidaId: string } | null>(null);
   const [isMobile, setIsMobile] = useState(typeof window !== 'undefined' && window.innerWidth < 768);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const presenceChannelsRef = useRef<Map<string, any>>(new Map());
   const prevOnlineUsersRef = useRef<Set<string>>(new Set());
   const lastNotificationRef = useRef<Map<string, number>>(new Map());
@@ -43,7 +44,7 @@ export const WorkspaceLayout: React.FC = () => {
     const handleResize = () => {
       const mobile = window.innerWidth < 768;
       setIsMobile(mobile);
-      if (!mobile) setMobileDrawerOpen(false);
+      if (!mobile) { setMobileDrawerOpen(false); setMobileMenuOpen(false); }
     };
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
@@ -51,7 +52,7 @@ export const WorkspaceLayout: React.FC = () => {
 
   // Cerrar drawer al cambiar de tab en mobile
   useEffect(() => {
-    if (isMobile) setMobileDrawerOpen(false);
+    if (isMobile) { setMobileDrawerOpen(false); setMobileMenuOpen(false); }
   }, [activeSubTab, isMobile]);
 
   // Mini Mode: auto-show al salir del espacio virtual, auto-hide al volver
@@ -775,61 +776,84 @@ export const WorkspaceLayout: React.FC = () => {
           />
         )}
 
-        {/* ===== MOBILE BOTTOM TAB BAR — Tendencia 2026: nav inferior minimalista ===== */}
+        {/* ===== MOBILE FAB + OVERLAY MENU — Patrón gaming 2026 (Wild Rift style) ===== */}
         {isMobile && (
-          <nav
-            className={`fixed bottom-0 left-0 right-0 z-[180] flex items-center justify-around border-t backdrop-blur-2xl ${
-              theme === 'arcade'
-                ? 'bg-black/90 border-[#00ff41]/30'
-                : theme === 'light'
-                  ? 'bg-white/90 border-zinc-200'
-                  : 'bg-black/80 border-white/[0.08]'
-            }`}
-            style={{ height: 'calc(56px + env(safe-area-inset-bottom, 0px))', paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}
-          >
-            {[
-              { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Espacio' },
-              { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chat', badge: unreadChatCount },
-              { id: '_drawer', icon: 'M4 6h16M4 12h16M4 18h16', label: 'Menú' },
-              { id: '_games', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: 'Juegos' },
-              { id: '_settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z', label: 'Ajustes' },
-            ].map(tab => {
-              const isActive = tab.id === activeSubTab || (tab.id === '_drawer' && mobileDrawerOpen);
-              const handleTabClick = () => {
-                if (tab.id === '_drawer') { setMobileDrawerOpen(!mobileDrawerOpen); return; }
-                if (tab.id === '_games') { setShowGameHub(true); return; }
-                if (tab.id === '_settings') { setShowSettings(true); return; }
-                setActiveSubTab(tab.id as any);
-                if (tab.id === 'chat') clearUnreadChat();
-              };
-              return (
-                <button
-                  key={tab.id}
-                  onClick={handleTabClick}
-                  className={`flex flex-col items-center justify-center gap-0.5 flex-1 h-full transition-colors relative ${
-                    isActive
-                      ? theme === 'arcade' ? 'text-[#00ff41]' : theme === 'light' ? 'text-violet-600' : 'text-white'
-                      : theme === 'light' ? 'text-zinc-400' : 'text-white/30'
-                  }`}
-                >
-                  {isActive && (
-                    <span className={`absolute top-0 left-1/2 -translate-x-1/2 w-6 h-0.5 rounded-full ${
-                      theme === 'arcade' ? 'bg-[#00ff41]' : 'bg-gradient-to-r from-violet-500 to-cyan-500'
-                    }`} />
+          <>
+            {/* FAB: Floating Action Button — esquina superior derecha */}
+            <button
+              onClick={() => { setMobileMenuOpen(!mobileMenuOpen); if (mobileDrawerOpen) setMobileDrawerOpen(false); }}
+              className={`fixed top-3 right-3 z-[210] w-10 h-10 rounded-xl flex items-center justify-center backdrop-blur-xl border transition-all duration-300 ${
+                mobileMenuOpen
+                  ? 'bg-white/20 border-white/30 rotate-90 scale-110'
+                  : theme === 'arcade'
+                    ? 'bg-black/70 border-[#00ff41]/40 text-[#00ff41]'
+                    : theme === 'light'
+                      ? 'bg-white/80 border-zinc-300 text-zinc-600'
+                      : 'bg-black/60 border-white/15 text-white/70'
+              }`}
+              style={{ paddingTop: 'env(safe-area-inset-top, 0px)' }}
+            >
+              {mobileMenuOpen ? (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                  {unreadChatCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">{unreadChatCount > 9 ? '9+' : unreadChatCount}</span>
                   )}
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={isActive ? 2 : 1.5} d={tab.icon} />
-                  </svg>
-                  <span className="text-[9px] font-bold">{tab.label}</span>
-                  {tab.badge && tab.badge > 0 && tab.id !== activeSubTab && (
-                    <span className="absolute top-1 right-1/2 translate-x-3 w-4 h-4 bg-red-500 rounded-full text-[8px] font-bold text-white flex items-center justify-center">
-                      {tab.badge > 9 ? '9+' : tab.badge}
-                    </span>
-                  )}
-                </button>
-              );
-            })}
-          </nav>
+                </>
+              )}
+            </button>
+
+            {/* Overlay menú fullscreen — se abre al tocar el FAB */}
+            {mobileMenuOpen && (
+              <div className="fixed inset-0 z-[205] flex items-center justify-center animate-in fade-in duration-200" onClick={() => setMobileMenuOpen(false)}>
+                {/* Backdrop */}
+                <div className={`absolute inset-0 ${theme === 'light' ? 'bg-white/80' : 'bg-black/80'} backdrop-blur-xl`} />
+                {/* Grid de opciones */}
+                <div className="relative grid grid-cols-3 gap-4 p-8 max-w-xs" onClick={(e) => e.stopPropagation()}>
+                  {[
+                    { id: 'space', icon: 'M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6', label: 'Espacio', color: 'from-indigo-500 to-blue-500' },
+                    { id: 'chat', icon: 'M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z', label: 'Chat', color: 'from-blue-500 to-cyan-500', badge: unreadChatCount },
+                    { id: '_drawer_sidebar', icon: 'M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10', label: 'Workspace', color: 'from-violet-500 to-purple-500' },
+                    { id: '_games', icon: 'M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z', label: 'Juegos', color: 'from-amber-500 to-orange-500' },
+                    { id: '_settings', icon: 'M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z', label: 'Ajustes', color: 'from-zinc-400 to-zinc-600' },
+                    { id: 'calendar', icon: 'M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z', label: 'Calendario', color: 'from-emerald-500 to-teal-500' },
+                  ].map((item, i) => {
+                    const handleItemClick = () => {
+                      setMobileMenuOpen(false);
+                      if (item.id === '_games') { setShowGameHub(true); return; }
+                      if (item.id === '_settings') { setShowSettings(true); return; }
+                      if (item.id === '_drawer_sidebar') {
+                        setMobileDrawerOpen(true);
+                        return;
+                      }
+                      setActiveSubTab(item.id as any);
+                      if (item.id === 'chat') clearUnreadChat();
+                    };
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={handleItemClick}
+                        className="flex flex-col items-center gap-2 group"
+                        style={{ animationDelay: `${i * 50}ms` }}
+                      >
+                        <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${item.color} flex items-center justify-center shadow-lg group-active:scale-90 transition-transform relative`}>
+                          <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d={item.icon} />
+                          </svg>
+                          {item.badge && item.badge > 0 && (
+                            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 rounded-full text-[9px] font-bold text-white flex items-center justify-center border-2 border-black">{item.badge > 9 ? '9+' : item.badge}</span>
+                          )}
+                        </div>
+                        <span className={`text-[10px] font-bold ${theme === 'light' ? 'text-zinc-700' : 'text-white/80'}`}>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </>
         )}
       </main>
 
