@@ -175,7 +175,7 @@ const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any; onTe
 
   return (
     <div
-      className="absolute bottom-[76px] md:bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl z-20 cursor-pointer hover:border-indigo-500/40 transition-colors"
+      className="absolute bottom-[76px] md:bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl z-20 cursor-pointer hover:border-indigo-500/40 transition-colors hidden md:block"
       onClick={handleMinimapClick}
       title="Clic para teletransportarte"
     >
