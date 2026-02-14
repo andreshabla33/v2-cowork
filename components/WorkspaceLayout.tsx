@@ -694,33 +694,49 @@ export const WorkspaceLayout: React.FC = () => {
             <VirtualSpace3D theme={theme} isGameHubOpen={showGameHub} isPlayingGame={isPlayingGame} />
           </div>
           {activeSubTab !== 'space' && (
-            <div className="h-full w-full overflow-y-auto animate-in fade-in duration-500">
-              {activeSubTab === 'tasks' && <TaskBoard />}
-              {activeSubTab === 'miembros' && <MiembrosView />}
-              {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
-              {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
-              {activeSubTab === 'calendar' && <CalendarPanel />}
-              {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
-            {activeSubTab === 'settings' && (
-              <div className="p-16 max-w-4xl mx-auto">
-                <h2 className="text-5xl font-black uppercase italic tracking-tighter mb-10">{t('settings.title', currentLang)}</h2>
-                <div className={`p-12 rounded-[50px] border-2 ${s.border} bg-black/10 backdrop-blur-3xl shadow-2xl`}>
-                  <div className={`flex justify-between items-center pb-10 border-b-2 ${s.border}`}>
-                    <div>
-                      <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30">{t('workspace.inUse', currentLang)}</p>
-                      <p className="text-4xl font-bold mt-2">{activeWorkspace?.name}</p>
+            <div className="h-full w-full flex flex-col overflow-hidden animate-in fade-in duration-500">
+              {/* Mobile: header con botón volver al espacio */}
+              {isMobile && (
+                <div className={`flex items-center gap-3 px-4 py-3 border-b ${s.border} shrink-0 ${s.header} backdrop-blur-xl`}>
+                  <button
+                    onClick={() => setActiveSubTab('space' as any)}
+                    className="w-8 h-8 rounded-xl bg-white/5 flex items-center justify-center hover:bg-white/10 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                  </button>
+                  <span className="text-xs font-black uppercase tracking-wider opacity-70">
+                    {activeSubTab === 'chat' ? 'Chat' : activeSubTab === 'tasks' ? 'Tareas' : activeSubTab === 'calendar' ? 'Calendario' : activeSubTab === 'grabaciones' ? 'Grabaciones' : activeSubTab === 'miembros' ? 'Miembros' : activeSubTab === 'avatar' ? 'Avatar' : activeSubTab}
+                  </span>
+                </div>
+              )}
+              <div className={`flex-1 overflow-y-auto ${isMobile ? 'pb-16' : ''}`}>
+                {activeSubTab === 'tasks' && <TaskBoard />}
+                {activeSubTab === 'miembros' && <MiembrosView />}
+                {activeSubTab === 'avatar' && <AvatarCustomizer3D />}
+                {activeSubTab === 'chat' && <ChatPanel chatOnly={true} />}
+                {activeSubTab === 'calendar' && <CalendarPanel />}
+                {activeSubTab === 'grabaciones' && <GrabacionesHistorial />}
+              {activeSubTab === 'settings' && (
+                <div className="p-6 md:p-16 max-w-4xl mx-auto">
+                  <h2 className="text-2xl md:text-5xl font-black uppercase italic tracking-tighter mb-6 md:mb-10">{t('settings.title', currentLang)}</h2>
+                  <div className={`p-4 md:p-12 rounded-2xl md:rounded-[50px] border-2 ${s.border} bg-black/10 backdrop-blur-3xl shadow-2xl`}>
+                    <div className={`flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 md:pb-10 border-b-2 ${s.border}`}>
+                      <div>
+                        <p className="text-[11px] font-black uppercase tracking-[0.3em] opacity-30">{t('workspace.inUse', currentLang)}</p>
+                        <p className="text-xl md:text-4xl font-bold mt-2">{activeWorkspace?.name}</p>
+                      </div>
+                      <button className={`px-6 md:px-10 py-3 md:py-4 rounded-2xl md:rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all ${s.btn}`}>{t('button.customize', currentLang)}</button>
                     </div>
-                    <button className={`px-10 py-4 rounded-3xl text-[11px] font-black uppercase tracking-widest transition-all ${s.btn}`}>{t('button.customize', currentLang)}</button>
-                  </div>
-                  <div className="pt-10">
-                    <button onClick={() => setActiveWorkspace(null)} className="text-red-500 text-[11px] font-black uppercase tracking-[0.2em] hover:text-red-400 flex items-center gap-3 transition-colors">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                      {t('button.logout', currentLang)}
-                    </button>
+                    <div className="pt-6 md:pt-10">
+                      <button onClick={() => setActiveWorkspace(null)} className="text-red-500 text-[11px] font-black uppercase tracking-[0.2em] hover:text-red-400 flex items-center gap-3 transition-colors">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        {t('button.logout', currentLang)}
+                      </button>
+                    </div>
                   </div>
                 </div>
+              )}
               </div>
-            )}
             </div>
           )}
         </div>

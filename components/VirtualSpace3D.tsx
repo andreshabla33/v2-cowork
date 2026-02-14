@@ -175,7 +175,7 @@ const Minimap: React.FC<{ currentUser: User; users: User[]; workspace: any; onTe
 
   return (
     <div
-      className="absolute bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl z-20 cursor-pointer hover:border-indigo-500/40 transition-colors"
+      className="absolute bottom-[76px] md:bottom-6 left-6 w-[140px] h-[140px] bg-black/60 backdrop-blur-xl rounded-2xl border border-white/10 overflow-hidden shadow-2xl z-20 cursor-pointer hover:border-indigo-500/40 transition-colors"
       onClick={handleMinimapClick}
       title="Clic para teletransportarte"
     >
@@ -1820,7 +1820,7 @@ const VideoHUD: React.FC<VideoHUDProps> = ({
             </div>
 
             {/* Controles de zoom flotantes - estilo minimalista 2026 */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/5 backdrop-blur-2xl px-2 py-2 rounded-2xl border border-white/10 shadow-lg">
+            <div className="absolute bottom-[76px] md:bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 bg-white/5 backdrop-blur-2xl px-2 py-2 rounded-2xl border border-white/10 shadow-lg">
               {/* Zoom out */}
               <button 
                 onClick={() => setZoomLevel(z => Math.max(0.5, z - 0.25))}
@@ -4811,7 +4811,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
       {/* Botón de resetear vista */}
       <button
         onClick={handleResetView}
-        className="absolute bottom-4 left-4 bg-gray-800/80 hover:bg-gray-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm backdrop-blur-sm transition-colors z-10"
+        className="absolute bottom-[76px] md:bottom-4 left-4 bg-gray-800/80 hover:bg-gray-700 text-white px-3 py-2 rounded-lg flex items-center gap-2 text-sm backdrop-blur-sm transition-colors z-10"
         title="Resetear vista (centrar cámara en tu avatar)"
         data-tour-step="avatar-area"
       >
@@ -4945,7 +4945,7 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
 
       {/* Input de Chat Flotante - Minimalista */}
       {showChat && (
-        <div className="absolute bottom-[88px] left-1/2 -translate-x-1/2 z-[201] animate-slide-up" onClick={(e) => e.stopPropagation()}>
+        <div className="absolute bottom-[152px] md:bottom-[88px] left-1/2 -translate-x-1/2 z-[201] animate-slide-up" onClick={(e) => e.stopPropagation()}>
           <div className="bg-black/60 backdrop-blur-md px-1 py-1 rounded-2xl border border-white/10 flex gap-1 items-center">
             <input
               type="text"
@@ -5069,11 +5069,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
           {/* Joystick virtual — esquina inferior izquierda */}
           <MobileJoystick inputRef={mobileInputRef} size={120} deadZone={0.15} runThreshold={0.7} />
 
-          {/* Botón de emotes — esquina inferior derecha */}
+          {/* Botón de emotes — esquina inferior derecha (offset +64px por tab bar) */}
           <button
             className="absolute z-[150] select-none touch-none flex items-center justify-center rounded-full"
             style={{
-              bottom: 140,
+              bottom: 204,
               right: 24,
               width: 52,
               height: 52,
@@ -5086,11 +5086,11 @@ const VirtualSpace3D: React.FC<VirtualSpace3DProps> = ({ theme = 'dark', isGameH
             <span className="text-xl">😄</span>
           </button>
 
-          {/* Botón de chat — encima de emotes */}
+          {/* Botón de chat — encima de emotes (offset +64px por tab bar) */}
           <button
             className="absolute z-[150] select-none touch-none flex items-center justify-center rounded-full"
             style={{
-              bottom: 200,
+              bottom: 264,
               right: 24,
               width: 44,
               height: 44,
